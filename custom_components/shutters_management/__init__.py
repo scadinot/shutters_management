@@ -163,20 +163,16 @@ class ShuttersScheduler:
             "Delaying %s by %s seconds (randomized)", service, delay_seconds
         )
 
-        unsub_holder: list[Callable[[], None]] = []
+        unsub_ref: Callable[[], None] | None = None
 
         @callback
         def _deferred(_fire_at: datetime) -> None:
-            if unsub_holder:
-                try:
-                    self._pending_unsubs.remove(unsub_holder[0])
-                except ValueError:
-                    pass
+            if unsub_ref is not None and unsub_ref in self._pending_unsubs:
+                self._pending_unsubs.remove(unsub_ref)
             self.hass.async_create_task(self._async_deferred_call(service))
 
-        unsub = async_call_later(self.hass, delay_seconds, _deferred)
-        unsub_holder.append(unsub)
-        self._pending_unsubs.append(unsub)
+        unsub_ref = async_call_later(self.hass, delay_seconds, _deferred)
+        self._pending_unsubs.append(unsub_ref)
 
     def _compute_delay(self, now: datetime) -> int:
         """Pick a random delay, capped so it stays in the current day."""
@@ -251,7 +247,12 @@ class ShuttersScheduler:
 
     def _all_persons_away(self) -> bool:
         """Fallback presence check across all person entities."""
-        persons = [s for s in self.hass.states.async_all("person")]
+        persons = self.hass.states.async_all("person")
         if not persons:
-            return False
+            _LOGGER.warning(
+                "only_when_away is enabled but no presence entity is "
+                "configured and no person.* exists; assuming away so the "
+                "simulation can run"
+            )
+            return True
         return all(p.state in AWAY_STATES for p in persons)
