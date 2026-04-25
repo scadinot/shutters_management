@@ -1,31 +1,192 @@
 # Shutters Management
 
-Custom integration Home Assistant (HACS) pour simuler une présence avec des volets roulants.
+Intégration personnalisée Home Assistant (HACS) qui simule une présence en pilotant automatiquement vos volets roulants selon des horaires configurables, avec décalage aléatoire et prise en compte optionnelle de l'absence du foyer.
+
+## Table des matières
+
+- [Fonctionnalités](#fonctionnalités)
+- [Prérequis](#prérequis)
+- [Installation](#installation)
+  - [Via HACS (recommandé)](#via-hacs-recommandé)
+  - [Installation manuelle](#installation-manuelle)
+- [Configuration](#configuration)
+- [Comportement](#comportement)
+- [Exemples d'utilisation](#exemples-dutilisation)
+- [Dépannage](#dépannage)
+- [FAQ](#faq)
+- [Limitations connues](#limitations-connues)
+- [Roadmap](#roadmap)
+- [Contribuer](#contribuer)
+- [Licence](#licence)
 
 ## Fonctionnalités
 
-- Configuration via UI (`config_flow`).
-- Sélection de plusieurs volets (`cover.*`).
-- Horaires d'ouverture et de fermeture.
-- Jours actifs configurables.
-- Décalage aléatoire (en minutes) pour éviter des horaires fixes.
-- Option pour exécuter uniquement quand le foyer est absent.
+- Configuration entièrement par l'interface graphique (`config_flow`), modifiable à tout moment via les options.
+- Sélection multiple d'entités `cover.*` pilotées simultanément.
+- Heure d'ouverture et heure de fermeture indépendantes.
+- Choix des jours de la semaine actifs (du lundi au dimanche).
+- Décalage aléatoire optionnel (en minutes) pour éviter une régularité parfaite, plafonné automatiquement avant minuit pour ne pas déborder sur le jour suivant.
+- Mode « uniquement en absence » : l'action ne se déclenche que si personne n'est à la maison.
+- Choix d'une entité `person` ou `group` comme référence de présence, avec un repli automatique sur l'ensemble des `person.*` du système.
+- Ré-évaluation des conditions au moment exact de l'exécution différée : si l'utilisateur revient pendant le délai aléatoire, l'action est annulée.
+- Annulation propre des déclencheurs au déchargement ou au rechargement de l'intégration.
+- Interface traduite en français et en anglais.
 
-## Installation via HACS (Custom repository)
+## Prérequis
 
-1. Ouvrir HACS > Integrations > menu ⋮ > Custom repositories.
-2. Ajouter l'URL du repo GitHub.
-3. Type: **Integration**.
-4. Installer puis redémarrer Home Assistant.
-5. Ajouter l'intégration **Shutters Management** depuis Paramètres > Appareils et services.
+- Home Assistant **2024.4.0** ou plus récent.
+- Au moins une entité `cover.*` opérationnelle (volets roulants connectés à HA).
+- Optionnel : une entité `person.*` ou `group.*` si vous souhaitez utiliser le mode « uniquement en absence » avec un suivi explicite.
+
+## Installation
+
+### Via HACS (recommandé)
+
+1. Ouvrez **HACS** dans Home Assistant.
+2. Allez dans **Intégrations** puis ouvrez le menu **⋮** en haut à droite et choisissez **Custom repositories**.
+3. Ajoutez l'URL du dépôt GitHub : `https://github.com/scadinot/shutters_management`.
+4. Sélectionnez le type **Integration**.
+5. Validez. L'intégration apparaît alors dans la liste — installez-la.
+6. Redémarrez Home Assistant.
+7. Allez dans **Paramètres → Appareils et services → Ajouter une intégration**, recherchez **Shutters Management** et suivez l'assistant de configuration.
+
+### Installation manuelle
+
+1. Téléchargez la dernière version du dépôt.
+2. Copiez le dossier `custom_components/shutters_management/` dans le dossier `config/custom_components/` de votre installation Home Assistant.
+3. Redémarrez Home Assistant.
+4. Ajoutez l'intégration depuis **Paramètres → Appareils et services → Ajouter une intégration**.
 
 ## Configuration
 
-L'intégration propose un assistant de configuration UI avec :
+L'intégration ne se configure pas en YAML. Tout passe par l'assistant graphique au moment de l'ajout, puis par l'écran **Options** ensuite.
 
-- Volets à piloter.
-- Heure d'ouverture.
-- Heure de fermeture.
-- Jours actifs.
-- Activation de l'aléatoire + amplitude max.
-- Exécution uniquement en absence (optionnel).
+| Champ | Type | Valeur par défaut | Description |
+|---|---|---|---|
+| `covers` | Liste d'entités `cover.*` | _(aucune)_ | Volets pilotés par l'intégration. Au moins un est requis. |
+| `open_time` | Heure (`HH:MM:SS`) | `08:00:00` | Heure d'ouverture quotidienne (heure locale du système Home Assistant). |
+| `close_time` | Heure (`HH:MM:SS`) | `21:00:00` | Heure de fermeture quotidienne (heure locale). |
+| `days` | Liste de jours | Tous les jours | Jours où l'intégration est active. Valeurs : `mon`, `tue`, `wed`, `thu`, `fri`, `sat`, `sun`. |
+| `randomize` | Booléen | `true` | Active le décalage aléatoire à chaque déclenchement. |
+| `random_max_minutes` | Entier (0 – 240) | `30` | Amplitude maximale du décalage aléatoire (en minutes). Ignoré si `randomize` est désactivé. |
+| `only_when_away` | Booléen | `false` | Si activé, l'action ne se déclenche que si personne n'est détecté à la maison. |
+| `presence_entity` | Entité `person` ou `group` | _(vide)_ | Référence explicite pour le mode absence. Optionnel ; sinon repli sur toutes les `person.*`. |
+
+Les modifications via l'écran **Options** rechargent automatiquement l'intégration ; vous n'avez pas besoin de redémarrer Home Assistant.
+
+## Comportement
+
+### Horaires et fuseau horaire
+
+Les heures d'ouverture et de fermeture sont interprétées dans le **fuseau horaire local de Home Assistant** (celui défini dans `Paramètres → Système → Général`). Le système gère seul les changements heure d'été / heure d'hiver.
+
+### Décalage aléatoire
+
+Lorsque `randomize` est actif, un délai aléatoire entre `0` et `random_max_minutes` minutes est appliqué à chaque déclenchement, recalculé à chaque fois. Pour éviter qu'une action ne déborde sur le lendemain (et change donc de jour actif), le délai est automatiquement plafonné au temps restant avant minuit. Programmer une action à 23 h 55 avec 30 min d'amplitude limitera donc le décalage à 5 min.
+
+### Ré-évaluation différée
+
+Si le décalage aléatoire repousse l'exécution dans le futur, les conditions (jour actif, mode absence, état de présence) sont **vérifiées à nouveau au moment exact de l'exécution**. Concrètement :
+
+- Si vous rentrez pendant le délai et que `only_when_away` est activé, l'action n'est pas exécutée.
+- Si l'intégration est rechargée pendant le délai, le déclenchement programmé est annulé proprement.
+
+### Logique de présence
+
+Quand `only_when_away` est activé, l'intégration applique l'ordre suivant :
+
+1. Si une `presence_entity` est configurée : son état est consulté. L'absence est détectée pour les états `not_home` ou `away`.
+2. Sinon, repli sur toutes les entités `person.*` du système : la condition est satisfaite si **toutes** sont absentes.
+3. Si aucune entité `person.*` n'existe et qu'aucune n'est configurée : la simulation s'exécute par défaut (un avertissement est inscrit dans le journal de Home Assistant).
+
+## Exemples d'utilisation
+
+### Usage standard
+
+Trois volets de salon (`cover.salon_droit`, `cover.salon_gauche`, `cover.salle_a_manger`), ouverture à 7 h 30 ± 20 min et fermeture à 22 h 00 ± 20 min, tous les jours. Mode absence désactivé : la simulation tourne en permanence pour que les voisins voient une activité régulière.
+
+### Simulation pendant les vacances
+
+Mêmes volets, ouverture 8 h 15 ± 30 min et fermeture 21 h 30 ± 30 min, tous les jours, **avec** `only_when_away` activé et `presence_entity` réglé sur un groupe `group.famille`. L'intégration ne pilote rien tant que le groupe n'est pas en `not_home`.
+
+### Week-end uniquement
+
+Réservé aux samedi et dimanche : ouverture 9 h 30 ± 60 min, fermeture 23 h 00 ± 30 min, jours = `sat`, `sun`. Utile pour rajouter une variabilité sur les jours où vous êtes parfois absent.
+
+## Dépannage
+
+**Les volets ne bougent pas du tout.**
+Vérifiez dans **Outils de développement → Services** que `cover.open_cover` et `cover.close_cover` fonctionnent manuellement sur les entités sélectionnées. Si oui, contrôlez le journal de Home Assistant : tout déclenchement ou skip y est tracé en niveau `DEBUG`. Activez le debug dans `configuration.yaml` :
+
+```yaml
+logger:
+  default: warning
+  logs:
+    custom_components.shutters_management: debug
+```
+
+**`only_when_away` semble ignoré.**
+Vérifiez que l'entité de présence (ou les `person.*` détectées) basculent bien en `not_home` quand vous quittez la maison. Une `presence_entity` non configurée et aucune `person.*` connue déclenche un avertissement dans les logs et fait tourner la simulation par défaut.
+
+**Le décalage aléatoire semble plus court que prévu.**
+Si l'heure programmée est proche de minuit (ex. 23 h 50), l'amplitude est plafonnée pour ne pas déborder sur le lendemain. C'est intentionnel.
+
+**Une modification dans Options n'a pas d'effet.**
+Le rechargement est automatique. Si rien ne change, supprimez l'intégration et reconfigurez-la — un avertissement éventuel apparaîtra dans le journal.
+
+## FAQ
+
+**Puis-je avoir plusieurs profils horaires (semaine / week-end / vacances) ?**
+Pas dans la version actuelle : une seule instance est gérée. C'est prévu dans la [roadmap](ROADMAP.md).
+
+**Puis-je piloter par des heures relatives au coucher du soleil ?**
+Pas encore. Voir la [roadmap](ROADMAP.md) (v0.3).
+
+**L'intégration expose-t-elle des entités ou services pour automatisation ?**
+Pas dans la version actuelle. Des entités `sensor.*` et services dédiés sont prévus en v0.2 (cf. [roadmap](ROADMAP.md)).
+
+**Que se passe-t-il si Home Assistant redémarre pendant un délai aléatoire ?**
+Le délai en attente est perdu (comportement standard d'`async_call_later`). Le prochain déclenchement programmé reprend normalement.
+
+## Limitations connues
+
+- Une seule instance de l'intégration peut être configurée par installation Home Assistant.
+- Pas de support des déclencheurs liés au soleil (`sunset` / `sunrise`).
+- Pas de service Home Assistant exposé (`run_now`, `pause`, etc.).
+- Pas d'entité `sensor.*` exposant le prochain déclenchement.
+
+Toutes ces limitations sont suivies dans la [roadmap](ROADMAP.md).
+
+## Roadmap
+
+Voir le fichier [ROADMAP.md](ROADMAP.md) pour la liste des évolutions prévues et l'état d'avancement.
+
+## Contribuer
+
+Les contributions sont les bienvenues : ouvrez d'abord une issue pour décrire le besoin avant de proposer une pull request, surtout pour les évolutions importantes.
+
+Structure du dépôt :
+
+```
+shutters_management/
+├── custom_components/
+│   └── shutters_management/
+│       ├── __init__.py        # logique de planification
+│       ├── config_flow.py     # assistant UI + options
+│       ├── const.py           # constantes
+│       ├── manifest.json
+│       ├── strings.json
+│       └── translations/
+│           ├── en.json
+│           └── fr.json
+├── hacs.json
+├── README.md
+├── ROADMAP.md
+└── LICENSE
+```
+
+Pour tester localement, copiez le dossier `custom_components/shutters_management/` dans le `config/custom_components/` d'une instance Home Assistant de développement et redémarrez-la.
+
+## Licence
+
+Distribué sous licence MIT. Voir [LICENSE](LICENSE) pour le texte complet.
