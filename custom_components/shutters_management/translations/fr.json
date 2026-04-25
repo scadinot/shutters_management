@@ -1,0 +1,62 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Shutters Management",
+        "description": "Configurer les volets pour simuler une présence.",
+        "data": {
+          "covers": "Volets à piloter",
+          "open_time": "Heure d'ouverture",
+          "close_time": "Heure de fermeture",
+          "days": "Jours actifs",
+          "randomize": "Activer le décalage aléatoire",
+          "random_max_minutes": "Amplitude maximale (minutes)",
+          "only_when_away": "Exécuter uniquement en absence",
+          "presence_entity": "Entité de présence (personne ou groupe)"
+        }
+      }
+    },
+    "error": {
+      "no_covers": "Sélectionnez au moins un volet.",
+      "no_days": "Sélectionnez au moins un jour."
+    },
+    "abort": {
+      "already_configured": "Shutters Management est déjà configuré."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Shutters Management",
+        "description": "Modifier la configuration.",
+        "data": {
+          "covers": "Volets à piloter",
+          "open_time": "Heure d'ouverture",
+          "close_time": "Heure de fermeture",
+          "days": "Jours actifs",
+          "randomize": "Activer le décalage aléatoire",
+          "random_max_minutes": "Amplitude maximale (minutes)",
+          "only_when_away": "Exécuter uniquement en absence",
+          "presence_entity": "Entité de présence (personne ou groupe)"
+        }
+      }
+    },
+    "error": {
+      "no_covers": "Sélectionnez au moins un volet.",
+      "no_days": "Sélectionnez au moins un jour."
+    }
+  },
+  "selector": {
+    "days": {
+      "options": {
+        "mon": "Lundi",
+        "tue": "Mardi",
+        "wed": "Mercredi",
+        "thu": "Jeudi",
+        "fri": "Vendredi",
+        "sat": "Samedi",
+        "sun": "Dimanche"
+      }
+    }
+  }
+}
