@@ -1,0 +1,13 @@
+{
+  "domain": "shutters_management",
+  "name": "Shutters Management",
+  "version": "0.1.0",
+  "config_flow": true,
+  "documentation": "https://github.com/scadinot/shutters_management",
+  "issue_tracker": "https://github.com/scadinot/shutters_management/issues",
+  "codeowners": ["@scadinot"],
+  "iot_class": "calculated",
+  "integration_type": "service",
+  "requirements": [],
+  "dependencies": []
+}

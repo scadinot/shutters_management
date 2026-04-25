@@ -1,0 +1,62 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Shutters Management",
+        "description": "Configure shutters to simulate presence.",
+        "data": {
+          "covers": "Shutters to control",
+          "open_time": "Opening time",
+          "close_time": "Closing time",
+          "days": "Active days",
+          "randomize": "Randomize times",
+          "random_max_minutes": "Maximum random offset (minutes)",
+          "only_when_away": "Run only when away",
+          "presence_entity": "Presence entity (person or group)"
+        }
+      }
+    },
+    "error": {
+      "no_covers": "Select at least one cover.",
+      "no_days": "Select at least one day."
+    },
+    "abort": {
+      "already_configured": "Shutters Management is already configured."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Shutters Management",
+        "description": "Update the configuration.",
+        "data": {
+          "covers": "Shutters to control",
+          "open_time": "Opening time",
+          "close_time": "Closing time",
+          "days": "Active days",
+          "randomize": "Randomize times",
+          "random_max_minutes": "Maximum random offset (minutes)",
+          "only_when_away": "Run only when away",
+          "presence_entity": "Presence entity (person or group)"
+        }
+      }
+    },
+    "error": {
+      "no_covers": "Select at least one cover.",
+      "no_days": "Select at least one day."
+    }
+  },
+  "selector": {
+    "days": {
+      "options": {
+        "mon": "Monday",
+        "tue": "Tuesday",
+        "wed": "Wednesday",
+        "thu": "Thursday",
+        "fri": "Friday",
+        "sat": "Saturday",
+        "sun": "Sunday"
+      }
+    }
+  }
+}
