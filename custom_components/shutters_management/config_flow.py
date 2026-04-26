@@ -10,7 +10,7 @@ from homeassistant.config_entries import (
     ConfigFlow,
     OptionsFlow,
 )
-from homeassistant.core import callback
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.data_entry_flow import FlowResult
 from homeassistant.helpers import selector
 
@@ -109,7 +109,7 @@ def _normalize(user_input: dict[str, Any]) -> dict[str, Any]:
     return data
 
 
-def _needs_presence_warning(hass, data: dict[str, Any]) -> bool:
+def _needs_presence_warning(hass: HomeAssistant, data: dict[str, Any]) -> bool:
     """Return True when only_when_away has no presence source available."""
     if not data.get(CONF_ONLY_WHEN_AWAY):
         return False

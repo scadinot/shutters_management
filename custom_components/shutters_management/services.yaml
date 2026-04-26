@@ -8,5 +8,5 @@ run_now:
           options:
             - open
             - close
-pause:
-resume:
+pause: {}
+resume: {}
