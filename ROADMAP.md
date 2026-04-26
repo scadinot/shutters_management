@@ -6,7 +6,7 @@ Ce document liste les évolutions envisagées pour l'intégration. Il est indica
 
 Offrir une intégration Home Assistant simple, fiable et entièrement configurable graphiquement pour simuler une présence en pilotant des volets roulants. La priorité est la robustesse en production, puis la richesse fonctionnelle (profils, déclencheurs solaires, observabilité), avant d'envisager des extensions plus avancées (templates, statistiques).
 
-## Statut actuel — v0.1.0
+## Statut actuel — v0.2.0
 
 Livré :
 
@@ -20,23 +20,26 @@ Livré :
 - Annulation propre des déclencheurs et des callbacks différés au déchargement / rechargement.
 - Traductions français et anglais.
 
-## v0.2.0 — Court terme
+## v0.2.0 — Livré
 
 Objectif : combler les manques d'observabilité et faciliter l'automatisation.
 
 - **Services Home Assistant exposés** :
-  - `shutters_management.run_now` pour forcer un déclenchement immédiat (ouverture ou fermeture).
-  - `shutters_management.pause` / `shutters_management.resume` pour suspendre temporairement la simulation sans la supprimer.
+  - `shutters_management.run_now` (champ obligatoire `action`) pour forcer un déclenchement immédiat.
+  - `shutters_management.pause` / `shutters_management.resume` pour suspendre temporairement la simulation.
 - **Entités exposées** :
-  - `sensor.shutters_management_next_open` : horodatage du prochain déclenchement d'ouverture.
-  - `sensor.shutters_management_next_close` : horodatage du prochain déclenchement de fermeture.
-  - `binary_sensor.shutters_management_active` : état actif / en pause de la simulation.
-- **Tests et qualité** :
-  - Suite de tests unitaires (planification, plafonnement minuit, ré-évaluation, présence).
-  - GitHub Actions : `hassfest`, `HACS validation`, lint Python (`ruff`), vérification JSON des traductions.
+  - `sensor.shutters_management_next_opening` : horodatage du prochain déclenchement d'ouverture.
+  - `sensor.shutters_management_next_closing` : horodatage du prochain déclenchement de fermeture.
+  - `binary_sensor.shutters_management_simulation_active` : état actif / en pause de la simulation.
 - **Confort d'usage** :
-  - Bouton « Tester maintenant » accessible depuis le service ou l'écran options.
-  - Avertissement explicite dans le `config_flow` si `only_when_away` est coché alors qu'aucune `person.*` ni `presence_entity` n'est disponible.
+  - Menu d'options avec entrées « Tester ouverture / fermeture » et « Mettre en pause / Reprendre ».
+  - Étape de confirmation dans le config_flow si `only_when_away` est coché alors qu'aucune `person.*` ni `presence_entity` n'est disponible.
+
+## v0.2.1 — En attente (qualité)
+
+- **Tests et CI** :
+  - Suite de tests unitaires (planification, plafonnement minuit, ré-évaluation, présence, services, sensors, pause/resume).
+  - GitHub Actions : `hassfest`, `HACS validation`, lint Python (`ruff`), vérification JSON des traductions.
 
 ## v0.3.0 — Moyen terme
 

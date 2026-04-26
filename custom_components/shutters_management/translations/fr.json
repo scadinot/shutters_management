@@ -14,6 +14,10 @@
           "only_when_away": "Exécuter uniquement en absence",
           "presence_entity": "Entité de présence (personne ou groupe)"
         }
+      },
+      "confirm_no_presence": {
+        "title": "Aucune source de présence détectée",
+        "description": "L'option « Exécuter uniquement en absence » est activée mais aucune entité de présence n'est configurée et aucune entité person.* n'existe. La simulation s'exécutera quand même. Continuer ?"
       }
     },
     "error": {
@@ -28,7 +32,18 @@
     "step": {
       "init": {
         "title": "Shutters Management",
-        "description": "Modifier la configuration.",
+        "description": "Choisissez une action.",
+        "menu_options": {
+          "configure": "Modifier la configuration",
+          "run_open": "Tester : ouvrir maintenant",
+          "run_close": "Tester : fermer maintenant",
+          "pause_simulation": "Mettre la simulation en pause",
+          "resume_simulation": "Reprendre la simulation"
+        }
+      },
+      "configure": {
+        "title": "Modifier la configuration",
+        "description": "Mettre à jour la configuration.",
         "data": {
           "covers": "Volets à piloter",
           "open_time": "Heure d'ouverture",
@@ -39,11 +54,20 @@
           "only_when_away": "Exécuter uniquement en absence",
           "presence_entity": "Entité de présence (personne ou groupe)"
         }
+      },
+      "confirm_no_presence": {
+        "title": "Aucune source de présence détectée",
+        "description": "L'option « Exécuter uniquement en absence » est activée mais aucune entité de présence n'est configurée et aucune entité person.* n'existe. La simulation s'exécutera quand même. Continuer ?"
       }
     },
     "error": {
       "no_covers": "Sélectionnez au moins un volet.",
       "no_days": "Sélectionnez au moins un jour."
+    },
+    "abort": {
+      "action_run": "Action déclenchée.",
+      "simulation_paused": "Simulation mise en pause.",
+      "simulation_resumed": "Simulation reprise."
     }
   },
   "selector": {
@@ -57,6 +81,41 @@
         "sat": "Samedi",
         "sun": "Dimanche"
       }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "next_open": {
+        "name": "Prochaine ouverture"
+      },
+      "next_close": {
+        "name": "Prochaine fermeture"
+      }
+    },
+    "binary_sensor": {
+      "active": {
+        "name": "Simulation active"
+      }
+    }
+  },
+  "services": {
+    "run_now": {
+      "name": "Déclencher maintenant",
+      "description": "Déclenche immédiatement une ouverture ou une fermeture des volets configurés, sans tenir compte des jours, du décalage aléatoire ou de la présence.",
+      "fields": {
+        "action": {
+          "name": "Action",
+          "description": "Ouvrir ou fermer les volets."
+        }
+      }
+    },
+    "pause": {
+      "name": "Mettre en pause",
+      "description": "Met la simulation en pause. Les déclenchements programmés sont ignorés jusqu'à la reprise."
+    },
+    "resume": {
+      "name": "Reprendre",
+      "description": "Reprend la simulation après une pause."
     }
   }
 }

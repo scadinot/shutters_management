@@ -1,0 +1,12 @@
+run_now:
+  fields:
+    action:
+      required: true
+      example: open
+      selector:
+        select:
+          options:
+            - open
+            - close
+pause:
+resume:
