@@ -7,13 +7,16 @@ from collections.abc import Callable
 from datetime import datetime, time, timedelta
 from typing import Any
 
+import voluptuous as vol
+
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
     ATTR_ENTITY_ID,
     SERVICE_CLOSE_COVER,
     SERVICE_OPEN_COVER,
 )
-from homeassistant.core import HomeAssistant, callback
+from homeassistant.core import HomeAssistant, ServiceCall, callback
+from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.helpers.event import (
     async_call_later,
     async_track_time_change,
@@ -21,6 +24,9 @@ from homeassistant.helpers.event import (
 from homeassistant.util import dt as dt_util
 
 from .const import (
+    ACTION_CLOSE,
+    ACTION_OPEN,
+    ATTR_ACTION,
     AWAY_STATES,
     CONF_CLOSE_TIME,
     CONF_COVERS,
@@ -33,9 +39,18 @@ from .const import (
     DAYS,
     DEFAULT_RANDOM_MAX_MINUTES,
     DOMAIN,
+    PLATFORMS,
+    SERVICE_PAUSE,
+    SERVICE_RESUME,
+    SERVICE_RUN_NOW,
+    SIGNAL_STATE_UPDATE,
 )
 
 _LOGGER = logging.getLogger(__name__)
+
+RUN_NOW_SCHEMA = vol.Schema(
+    {vol.Required(ATTR_ACTION): vol.In([ACTION_OPEN, ACTION_CLOSE])}
+)
 
 
 def _parse_time(value: str | time) -> time:
@@ -46,6 +61,25 @@ def _parse_time(value: str | time) -> time:
     while len(parts) < 3:
         parts.append(0)
     return time(parts[0], parts[1], parts[2])
+
+
+def _next_datetime_for(
+    local_now: datetime, time_value: time, days_keys: list[str]
+) -> datetime | None:
+    """Return the next datetime matching time_value on an active weekday."""
+    candidate = local_now.replace(
+        hour=time_value.hour,
+        minute=time_value.minute,
+        second=time_value.second,
+        microsecond=0,
+    )
+    if candidate <= local_now:
+        candidate += timedelta(days=1)
+    for _ in range(8):
+        if DAYS[candidate.weekday()] in days_keys:
+            return candidate
+        candidate += timedelta(days=1)
+    return None
 
 
 async def async_setup(hass: HomeAssistant, config: dict) -> bool:
@@ -63,6 +97,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     hass.data[DOMAIN][entry.entry_id] = manager
 
+    await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+    _async_register_services(hass)
+
     entry.async_on_unload(entry.add_update_listener(_async_update_listener))
 
     return True
@@ -70,11 +107,19 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry."""
+    unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+    if not unload_ok:
+        return False
+
     manager: ShuttersScheduler | None = hass.data.get(DOMAIN, {}).pop(
         entry.entry_id, None
     )
     if manager is not None:
         manager.async_unschedule()
+
+    if not hass.data.get(DOMAIN):
+        _async_unregister_services(hass)
+
     return True
 
 
@@ -83,19 +128,53 @@ async def _async_update_listener(hass: HomeAssistant, entry: ConfigEntry) -> Non
     await hass.config_entries.async_reload(entry.entry_id)
 
 
+@callback
+def _async_register_services(hass: HomeAssistant) -> None:
+    """Register integration-level services (idempotent)."""
+    if hass.services.has_service(DOMAIN, SERVICE_RUN_NOW):
+        return
+
+    async def _handle_run_now(call: ServiceCall) -> None:
+        action = call.data[ATTR_ACTION]
+        for manager in list(hass.data.get(DOMAIN, {}).values()):
+            await manager.async_run_now(action)
+
+    async def _handle_pause(call: ServiceCall) -> None:
+        for manager in list(hass.data.get(DOMAIN, {}).values()):
+            await manager.async_set_paused(True)
+
+    async def _handle_resume(call: ServiceCall) -> None:
+        for manager in list(hass.data.get(DOMAIN, {}).values()):
+            await manager.async_set_paused(False)
+
+    hass.services.async_register(
+        DOMAIN, SERVICE_RUN_NOW, _handle_run_now, schema=RUN_NOW_SCHEMA
+    )
+    hass.services.async_register(DOMAIN, SERVICE_PAUSE, _handle_pause)
+    hass.services.async_register(DOMAIN, SERVICE_RESUME, _handle_resume)
+
+
+@callback
+def _async_unregister_services(hass: HomeAssistant) -> None:
+    """Remove integration-level services."""
+    for service in (SERVICE_RUN_NOW, SERVICE_PAUSE, SERVICE_RESUME):
+        if hass.services.has_service(DOMAIN, service):
+            hass.services.async_remove(DOMAIN, service)
+
+
 class ShuttersScheduler:
     """Schedule open/close actions for the configured covers."""
 
     def __init__(self, hass: HomeAssistant, entry: ConfigEntry) -> None:
         self.hass = hass
         self.entry = entry
+        self.paused = False
         self._unsubs: list[Callable[[], None]] = []
         self._pending_unsubs: list[Callable[[], None]] = []
 
     @property
     def _settings(self) -> dict[str, Any]:
-        data = {**self.entry.data, **self.entry.options}
-        return data
+        return {**self.entry.data, **self.entry.options}
 
     @callback
     def async_schedule(self) -> None:
@@ -198,7 +277,10 @@ class ShuttersScheduler:
         return random.randint(0, upper)
 
     def _conditions_met(self, service: str, now: datetime) -> bool:
-        """Check active day and presence conditions for the given moment."""
+        """Check active day, pause and presence conditions."""
+        if self.paused:
+            _LOGGER.debug("Skipping %s: simulation is paused", service)
+            return False
         settings = self._settings
         local_now = dt_util.as_local(now)
         active_days: list[str] = settings.get(CONF_DAYS, DAYS)
@@ -232,6 +314,7 @@ class ShuttersScheduler:
             blocking=False,
         )
         _LOGGER.info("Called cover.%s on %s", service, covers)
+        async_dispatcher_send(self.hass, SIGNAL_STATE_UPDATE)
 
     def _is_away(self, settings: dict[str, Any]) -> bool:
         """Return True when the configured presence entity reports away."""
@@ -256,3 +339,40 @@ class ShuttersScheduler:
             )
             return True
         return all(p.state in AWAY_STATES for p in persons)
+
+    def next_open(self) -> datetime | None:
+        """Return the next scheduled opening as a UTC datetime."""
+        return self._next_for(CONF_OPEN_TIME)
+
+    def next_close(self) -> datetime | None:
+        """Return the next scheduled closing as a UTC datetime."""
+        return self._next_for(CONF_CLOSE_TIME)
+
+    def _next_for(self, time_key: str) -> datetime | None:
+        """Compute the next scheduled trigger for the given time key."""
+        if self.paused:
+            return None
+        settings = self._settings
+        time_value = _parse_time(settings[time_key])
+        days_keys: list[str] = settings.get(CONF_DAYS, DAYS)
+        if not days_keys:
+            return None
+        local_now = dt_util.as_local(dt_util.utcnow())
+        local_next = _next_datetime_for(local_now, time_value, days_keys)
+        if local_next is None:
+            return None
+        return dt_util.as_utc(local_next)
+
+    async def async_run_now(self, action: str) -> None:
+        """Trigger an immediate open or close, bypassing all conditions."""
+        service = SERVICE_OPEN_COVER if action == ACTION_OPEN else SERVICE_CLOSE_COVER
+        _LOGGER.info("Manual run_now: %s", service)
+        await self._async_call(service)
+
+    async def async_set_paused(self, paused: bool) -> None:
+        """Update the paused flag and notify listeners."""
+        if self.paused == paused:
+            return
+        self.paused = paused
+        _LOGGER.info("Simulation %s", "paused" if paused else "resumed")
+        async_dispatcher_send(self.hass, SIGNAL_STATE_UPDATE)

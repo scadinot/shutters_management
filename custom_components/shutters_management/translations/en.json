@@ -14,6 +14,10 @@
           "only_when_away": "Run only when away",
           "presence_entity": "Presence entity (person or group)"
         }
+      },
+      "confirm_no_presence": {
+        "title": "No presence source detected",
+        "description": "You enabled \"Run only when away\" but no presence entity is configured and no person.* entity exists. The simulation will run anyway. Continue?"
       }
     },
     "error": {
@@ -28,6 +32,17 @@
     "step": {
       "init": {
         "title": "Shutters Management",
+        "description": "Choose an action.",
+        "menu_options": {
+          "configure": "Edit configuration",
+          "run_open": "Test: open now",
+          "run_close": "Test: close now",
+          "pause_simulation": "Pause simulation",
+          "resume_simulation": "Resume simulation"
+        }
+      },
+      "configure": {
+        "title": "Edit configuration",
         "description": "Update the configuration.",
         "data": {
           "covers": "Shutters to control",
@@ -39,11 +54,20 @@
           "only_when_away": "Run only when away",
           "presence_entity": "Presence entity (person or group)"
         }
+      },
+      "confirm_no_presence": {
+        "title": "No presence source detected",
+        "description": "You enabled \"Run only when away\" but no presence entity is configured and no person.* entity exists. The simulation will run anyway. Continue?"
       }
     },
     "error": {
       "no_covers": "Select at least one cover.",
       "no_days": "Select at least one day."
+    },
+    "abort": {
+      "action_run": "Action triggered.",
+      "simulation_paused": "Simulation paused.",
+      "simulation_resumed": "Simulation resumed."
     }
   },
   "selector": {
@@ -57,6 +81,41 @@
         "sat": "Saturday",
         "sun": "Sunday"
       }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "next_open": {
+        "name": "Next opening"
+      },
+      "next_close": {
+        "name": "Next closing"
+      }
+    },
+    "binary_sensor": {
+      "active": {
+        "name": "Simulation active"
+      }
+    }
+  },
+  "services": {
+    "run_now": {
+      "name": "Run now",
+      "description": "Trigger an immediate opening or closing of the configured shutters, bypassing day, randomization and presence conditions.",
+      "fields": {
+        "action": {
+          "name": "Action",
+          "description": "Whether to open or close the shutters."
+        }
+      }
+    },
+    "pause": {
+      "name": "Pause",
+      "description": "Pause the simulation. Scheduled triggers are ignored until resumed."
+    },
+    "resume": {
+      "name": "Resume",
+      "description": "Resume the simulation after a pause."
     }
   }
 }

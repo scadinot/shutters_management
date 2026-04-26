@@ -11,6 +11,9 @@ Intégration personnalisée Home Assistant (HACS) qui simule une présence en pi
   - [Installation manuelle](#installation-manuelle)
 - [Configuration](#configuration)
 - [Comportement](#comportement)
+- [Entités exposées](#entités-exposées)
+- [Services](#services)
+- [Menu d'options](#menu-doptions)
 - [Exemples d'utilisation](#exemples-dutilisation)
 - [Dépannage](#dépannage)
 - [FAQ](#faq)
@@ -99,6 +102,65 @@ Quand `only_when_away` est activé, l'intégration applique l'ordre suivant :
 2. Sinon, repli sur toutes les entités `person.*` du système : la condition est satisfaite si **toutes** sont absentes.
 3. Si aucune entité `person.*` n'existe et qu'aucune n'est configurée : la simulation s'exécute par défaut (un avertissement est inscrit dans le journal de Home Assistant).
 
+## Entités exposées
+
+L'intégration crée trois entités liées à votre configuration :
+
+| Entité | Type | Description |
+|---|---|---|
+| `sensor.shutters_management_next_opening` | `timestamp` | Date et heure du prochain déclenchement d'ouverture (sans le décalage aléatoire). |
+| `sensor.shutters_management_next_closing` | `timestamp` | Date et heure du prochain déclenchement de fermeture. |
+| `binary_sensor.shutters_management_simulation_active` | `running` | `on` quand la simulation tourne, `off` quand elle est en pause. |
+
+Les noms exacts des entités peuvent varier selon votre langue ; les `unique_id` restent stables (`<entry_id>_next_open`, `<entry_id>_next_close`, `<entry_id>_active`).
+
+Les capteurs `next_*` n'incluent pas le décalage aléatoire : ils annoncent l'heure programmée. Le décalage est appliqué au moment du déclenchement.
+
+## Services
+
+L'intégration enregistre trois services au niveau du domaine `shutters_management`.
+
+### `shutters_management.run_now`
+
+Déclenche immédiatement une ouverture ou une fermeture des volets configurés. Les conditions habituelles (jour actif, présence, décalage aléatoire) sont **ignorées** : c'est un mode test manuel.
+
+| Champ | Obligatoire | Valeurs | Description |
+|---|---|---|---|
+| `action` | oui | `open`, `close` | Action à exécuter. |
+
+Exemple YAML :
+
+```yaml
+service: shutters_management.run_now
+data:
+  action: open
+```
+
+### `shutters_management.pause`
+
+Met la simulation en pause. Les déclenchements programmés sont ignorés tant que la simulation n'a pas repris. Le `binary_sensor.shutters_management_simulation_active` passe à `off`.
+
+```yaml
+service: shutters_management.pause
+```
+
+### `shutters_management.resume`
+
+Reprend la simulation après une pause. Le `binary_sensor` repasse à `on`.
+
+```yaml
+service: shutters_management.resume
+```
+
+## Menu d'options
+
+L'écran **Configurer** de l'intégration propose désormais un menu :
+
+- **Modifier la configuration** : édite les volets, les heures, les jours, etc.
+- **Tester : ouvrir maintenant** : déclenche une ouverture immédiate (équivalent au service `run_now` avec `action: open`).
+- **Tester : fermer maintenant** : déclenche une fermeture immédiate.
+- **Mettre la simulation en pause** ou **Reprendre la simulation** : selon l'état courant.
+
 ## Exemples d'utilisation
 
 ### Usage standard
@@ -143,7 +205,7 @@ Pas dans la version actuelle : une seule instance est gérée. C'est prévu dans
 Pas encore. Voir la [roadmap](ROADMAP.md) (v0.3).
 
 **L'intégration expose-t-elle des entités ou services pour automatisation ?**
-Pas dans la version actuelle. Des entités `sensor.*` et services dédiés sont prévus en v0.2 (cf. [roadmap](ROADMAP.md)).
+Oui : voir les sections [Entités exposées](#entités-exposées) et [Services](#services).
 
 **Que se passe-t-il si Home Assistant redémarre pendant un délai aléatoire ?**
 Le délai en attente est perdu (comportement standard d'`async_call_later`). Le prochain déclenchement programmé reprend normalement.
@@ -152,10 +214,8 @@ Le délai en attente est perdu (comportement standard d'`async_call_later`). Le 
 
 - Une seule instance de l'intégration peut être configurée par installation Home Assistant.
 - Pas de support des déclencheurs liés au soleil (`sunset` / `sunrise`).
-- Pas de service Home Assistant exposé (`run_now`, `pause`, etc.).
-- Pas d'entité `sensor.*` exposant le prochain déclenchement.
 
-Toutes ces limitations sont suivies dans la [roadmap](ROADMAP.md).
+Ces limitations sont suivies dans la [roadmap](ROADMAP.md).
 
 ## Roadmap
 

@@ -1,7 +1,11 @@
 """Constants for the Shutters Management integration."""
 from __future__ import annotations
 
+from homeassistant.const import Platform
+
 DOMAIN = "shutters_management"
+
+PLATFORMS: list[Platform] = [Platform.SENSOR, Platform.BINARY_SENSOR]
 
 CONF_COVERS = "covers"
 CONF_OPEN_TIME = "open_time"
@@ -22,3 +26,13 @@ DAYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]
 DEFAULT_DAYS = DAYS
 
 AWAY_STATES = {"not_home", "away"}
+
+SERVICE_RUN_NOW = "run_now"
+SERVICE_PAUSE = "pause"
+SERVICE_RESUME = "resume"
+
+ATTR_ACTION = "action"
+ACTION_OPEN = "open"
+ACTION_CLOSE = "close"
+
+SIGNAL_STATE_UPDATE = "shutters_management_state_update"
