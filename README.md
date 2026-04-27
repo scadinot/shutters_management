@@ -1,5 +1,9 @@
 # Shutters Management
 
+[![Tests](https://github.com/scadinot/shutters_management/actions/workflows/tests.yaml/badge.svg)](https://github.com/scadinot/shutters_management/actions/workflows/tests.yaml)
+[![HACS](https://github.com/scadinot/shutters_management/actions/workflows/Validate%20HACS.yaml/badge.svg)](https://github.com/scadinot/shutters_management/actions/workflows/Validate%20HACS.yaml)
+[![Hassfest](https://github.com/scadinot/shutters_management/actions/workflows/Validate%20Hassfest.yaml/badge.svg)](https://github.com/scadinot/shutters_management/actions/workflows/Validate%20Hassfest.yaml)
+
 Intégration personnalisée Home Assistant (HACS) qui simule une présence en pilotant automatiquement vos volets roulants selon des horaires configurables, avec décalage aléatoire et prise en compte optionnelle de l'absence du foyer.
 
 ## Table des matières
