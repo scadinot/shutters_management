@@ -43,7 +43,7 @@ Intégration personnalisée Home Assistant (HACS) qui simule une présence en pi
 
 ## Prérequis
 
-- Home Assistant **2024.4.0** ou plus récent.
+- Home Assistant **2026.3.0** ou plus récent (cette version introduit le chargement des assets de marque embarqués dans `custom_components/<domain>/brand/`).
 - Au moins une entité `cover.*` opérationnelle (volets roulants connectés à HA).
 - Optionnel : une entité `person.*` ou `group.*` si vous souhaitez utiliser le mode « uniquement en absence » avec un suivi explicite.
 
@@ -280,6 +280,9 @@ shutters_management/
 ├── custom_components/
 │   └── shutters_management/
 │       ├── __init__.py        # logique de planification
+│       ├── brand/             # assets de marque (HA ≥ 2026.3)
+│       │   ├── icon.png       # 256×256
+│       │   └── icon@2x.png    # 512×512
 │       ├── button.py          # boutons "tester ouverture/fermeture"
 │       ├── config_flow.py     # assistant UI + options
 │       ├── const.py           # constantes
