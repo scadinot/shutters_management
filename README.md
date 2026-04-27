@@ -282,7 +282,9 @@ shutters_management/
 │       ├── __init__.py        # logique de planification
 │       ├── brand/             # assets de marque (HA ≥ 2026.3)
 │       │   ├── icon.png       # 256×256
-│       │   └── icon@2x.png    # 512×512
+│       │   ├── icon@2x.png    # 512×512
+│       │   ├── logo.png       # 768×256
+│       │   └── logo@2x.png    # 1536×512
 │       ├── button.py          # boutons "tester ouverture/fermeture"
 │       ├── config_flow.py     # assistant UI + options
 │       ├── const.py           # constantes

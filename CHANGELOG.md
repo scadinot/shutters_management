@@ -11,10 +11,12 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le pr
 ### Ajouté
 
 - Assets de marque embarqués dans `custom_components/shutters_management/brand/` :
-  - `icon.png` (256×256) — utilisé par défaut.
-  - `icon@2x.png` (512×512) — version haute résolution.
+  - `icon.png` (256×256) — icône carrée utilisée par défaut.
+  - `icon@2x.png` (512×512) — version haute résolution de l'icône.
+  - `logo.png` (768×256) — logo horizontal « Shutters Management » avec l'icône.
+  - `logo@2x.png` (1536×512) — version haute résolution du logo.
 
-  Depuis Home Assistant 2026.3, le frontend charge directement ces fichiers locaux pour afficher le logo de l'intégration sur la page « Ajouter une intégration » et dans « Appareils et services ». Le check `brands` de la validation HACS passe désormais sans nécessiter de PR sur le repo `home-assistant/brands`.
+  Depuis Home Assistant 2026.3, le frontend charge directement ces fichiers locaux pour afficher l'icône et le logo de l'intégration sur la page « Ajouter une intégration » et dans « Appareils et services ». Le check `brands` de la validation HACS passe désormais sans nécessiter de PR sur le repo `home-assistant/brands`.
 
 ### Modifié
 
