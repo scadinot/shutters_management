@@ -19,9 +19,11 @@ def _switch_entity_id(
 ) -> str:
     """Look up the switch entity_id by its scoped unique_id."""
     registry = er.async_get(hass)
-    return registry.async_get_entity_id(
+    entity_id = registry.async_get_entity_id(
         "switch", DOMAIN, f"{entry.entry_id}_simulation_active"
     )
+    assert entity_id is not None, "simulation_active switch entity was not created"
+    return entity_id
 
 
 async def test_switch_unique_id_is_entry_scoped(

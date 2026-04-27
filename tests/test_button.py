@@ -20,9 +20,11 @@ def _button_entity_id(
 ) -> str:
     """Look up the button entity_id by its scoped unique_id."""
     registry = er.async_get(hass)
-    return registry.async_get_entity_id(
+    entity_id = registry.async_get_entity_id(
         "button", DOMAIN, f"{entry.entry_id}_test_{action}"
     )
+    assert entity_id is not None, f"Missing button entity for action: {action}"
+    return entity_id
 
 
 async def test_button_unique_ids_are_entry_scoped(

@@ -14,9 +14,11 @@ def _entity_id_for(
 ) -> str:
     """Look up the sensor entity_id by its scoped unique_id."""
     registry = er.async_get(hass)
-    return registry.async_get_entity_id(
+    entity_id = registry.async_get_entity_id(
         "sensor", DOMAIN, f"{entry.entry_id}_{suffix}"
     )
+    assert entity_id is not None, f"Missing sensor entity for suffix: {suffix}"
+    return entity_id
 
 
 async def test_sensor_unique_ids_are_entry_scoped(
