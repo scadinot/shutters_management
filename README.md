@@ -121,7 +121,7 @@ Les capteurs `next_*` n'incluent pas le décalage aléatoire : ils annoncent l'h
 
 ### Migration depuis la v0.2.0
 
-> **Breaking change v0.2.1** — le `binary_sensor.shutters_management_simulation_active` a été remplacé par un `switch.shutters_management_simulation_active` togglable. Les automations qui référencent l'ancienne entité doivent être mises à jour pour pointer vers le switch (les états restent `on` / `off`). Au premier redémarrage après la mise à jour, l'ancienne entité disparaît du registre des entités.
+> **Breaking change v0.2.1** — le `binary_sensor.shutters_management_simulation_active` a été remplacé par un `switch.shutters_management_simulation_active` togglable. Les automations qui référencent l'ancienne entité doivent être mises à jour pour pointer vers le switch (les états restent `on` / `off`). Selon votre registre des entités existant, l'ancien `binary_sensor` peut rester présent comme entité obsolète ou indisponible après la mise à jour ; si c'est le cas, vous pouvez le supprimer manuellement du registre des entités.
 
 ## Tableau de bord
 
