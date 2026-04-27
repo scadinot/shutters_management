@@ -6,6 +6,21 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le pr
 
 ## [Non publié]
 
+## [0.2.5] — 2026-04-27
+
+### Modifié
+
+- Bump de la version de l'intégration `0.2.4` → `0.2.5` dans `manifest.json`.
+- **Options flow simplifié** : l'écran « Configurer » s'ouvre désormais directement sur le formulaire d'édition, sans menu intermédiaire. Les anciennes entrées « Tester : ouvrir maintenant », « Tester : fermer maintenant » et « Mettre la simulation en pause / Reprendre la simulation » sont retirées de l'options flow.
+
+### Supprimé
+
+- `async_step_run_open`, `async_step_run_close`, `async_step_pause_simulation`, `async_step_resume_simulation` dans `config_flow.py` (les actions correspondantes restent disponibles via les boutons `button.shutters_management_test_open` / `test_close` et le switch `switch.shutters_management_simulation_active` exposés depuis la v0.2.1, ainsi que via les services `shutters_management.run_now` / `pause` / `resume`).
+- Étape intermédiaire `configure` de l'options flow (fusionnée dans `init`).
+- Clés de traduction `options.step.init.menu_options`, `options.step.configure`, `options.abort.action_run`, `options.abort.simulation_paused`, `options.abort.simulation_resumed`.
+
+> **Note** : aucune fonctionnalité n'est perdue. Les actions sont toujours déclenchables depuis le dashboard (boutons + switch) et depuis les services Home Assistant. La simplification supprime uniquement la duplication d'UI.
+
 ## [0.2.4] — 2026-04-27
 
 ### Ajouté
@@ -105,7 +120,8 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le pr
 - Annulation propre des déclencheurs et des callbacks différés au déchargement / rechargement.
 - Traductions français et anglais.
 
-[Non publié]: https://github.com/scadinot/shutters_management/compare/v0.2.4...HEAD
+[Non publié]: https://github.com/scadinot/shutters_management/compare/v0.2.5...HEAD
+[0.2.5]: https://github.com/scadinot/shutters_management/compare/v0.2.4...v0.2.5
 [0.2.4]: https://github.com/scadinot/shutters_management/compare/v0.2.3...v0.2.4
 [0.2.3]: https://github.com/scadinot/shutters_management/compare/v0.2.2...v0.2.3
 [0.2.2]: https://github.com/scadinot/shutters_management/compare/v0.2.1...v0.2.2

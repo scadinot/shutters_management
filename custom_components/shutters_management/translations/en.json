@@ -31,17 +31,6 @@
   "options": {
     "step": {
       "init": {
-        "title": "Shutters Management",
-        "description": "Choose an action.",
-        "menu_options": {
-          "configure": "Edit configuration",
-          "run_open": "Test: open now",
-          "run_close": "Test: close now",
-          "pause_simulation": "Pause simulation",
-          "resume_simulation": "Resume simulation"
-        }
-      },
-      "configure": {
         "title": "Edit configuration",
         "description": "Update the configuration.",
         "data": {
@@ -63,11 +52,6 @@
     "error": {
       "no_covers": "Select at least one cover.",
       "no_days": "Select at least one day."
-    },
-    "abort": {
-      "action_run": "Action triggered.",
-      "simulation_paused": "Simulation paused.",
-      "simulation_resumed": "Simulation resumed."
     }
   },
   "selector": {
