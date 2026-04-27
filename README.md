@@ -18,7 +18,7 @@ Intégration personnalisée Home Assistant (HACS) qui simule une présence en pi
 - [Entités exposées](#entités-exposées)
 - [Tableau de bord](#tableau-de-bord)
 - [Services](#services)
-- [Menu d'options](#menu-doptions)
+- [Modifier la configuration](#modifier-la-configuration)
 - [Exemples d'utilisation](#exemples-dutilisation)
 - [Dépannage](#dépannage)
 - [FAQ](#faq)
@@ -196,14 +196,11 @@ Reprend la simulation après une pause. Le switch repasse à `on`.
 service: shutters_management.resume
 ```
 
-## Menu d'options
+## Modifier la configuration
 
-L'écran **Configurer** de l'intégration propose désormais un menu :
+L'écran **Configurer** de l'intégration ouvre directement le formulaire d'édition (volets, heures, jours, mode absence, etc.). Le rechargement est automatique : aucun redémarrage de Home Assistant n'est nécessaire après une modification.
 
-- **Modifier la configuration** : édite les volets, les heures, les jours, etc.
-- **Tester : ouvrir maintenant** : déclenche une ouverture immédiate (équivalent au service `run_now` avec `action: open`).
-- **Tester : fermer maintenant** : déclenche une fermeture immédiate.
-- **Mettre la simulation en pause** ou **Reprendre la simulation** : selon l'état courant.
+Les actions ponctuelles (tester l'ouverture, tester la fermeture, mettre en pause / reprendre la simulation) ne passent pas par cet écran : elles sont disponibles directement depuis le dashboard via les entités [`button.shutters_management_test_open`](#entités-exposées), `button.shutters_management_test_close` et `switch.shutters_management_simulation_active`, ou via les [services](#services) `shutters_management.run_now` / `pause` / `resume`.
 
 ## Exemples d'utilisation
 

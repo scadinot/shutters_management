@@ -1,15 +1,11 @@
 """Tests for the Shutters Management config and options flows."""
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, patch
-
 from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.shutters_management.const import (
-    ACTION_CLOSE,
-    ACTION_OPEN,
     CONF_CLOSE_TIME,
     CONF_COVERS,
     CONF_DAYS,
@@ -97,66 +93,20 @@ async def test_user_flow_confirms_when_no_presence_source(
     assert result["type"] == FlowResultType.CREATE_ENTRY
 
 
-async def test_options_flow_run_open_calls_scheduler(
+async def test_options_flow_edits_configuration(
     hass: HomeAssistant, setup_integration, mock_config_entry: MockConfigEntry
 ) -> None:
-    """The 'run_open' menu entry must invoke scheduler.async_run_now('open')."""
-    scheduler = setup_integration
-    with patch.object(
-        scheduler, "async_run_now", AsyncMock()
-    ) as mock_run_now:
-        result = await hass.config_entries.options.async_init(
-            mock_config_entry.entry_id
-        )
-        assert result["type"] == FlowResultType.MENU
-        result = await hass.config_entries.options.async_configure(
-            result["flow_id"], user_input={"next_step_id": "run_open"}
-        )
-        assert result["type"] == FlowResultType.ABORT
-        assert result["reason"] == "action_run"
-        mock_run_now.assert_awaited_once_with(ACTION_OPEN)
-
-
-async def test_options_flow_run_close_calls_scheduler(
-    hass: HomeAssistant, setup_integration, mock_config_entry: MockConfigEntry
-) -> None:
-    """The 'run_close' menu entry must invoke scheduler.async_run_now('close')."""
-    scheduler = setup_integration
-    with patch.object(
-        scheduler, "async_run_now", AsyncMock()
-    ) as mock_run_now:
-        result = await hass.config_entries.options.async_init(
-            mock_config_entry.entry_id
-        )
-        result = await hass.config_entries.options.async_configure(
-            result["flow_id"], user_input={"next_step_id": "run_close"}
-        )
-        assert result["type"] == FlowResultType.ABORT
-        mock_run_now.assert_awaited_once_with(ACTION_CLOSE)
-
-
-async def test_options_flow_pause_then_resume(
-    hass: HomeAssistant, setup_integration, mock_config_entry: MockConfigEntry
-) -> None:
-    """The pause then resume menu entries must flip scheduler.paused."""
-    scheduler = setup_integration
-
+    """The options flow opens straight into the configuration form."""
     result = await hass.config_entries.options.async_init(
         mock_config_entry.entry_id
     )
-    result = await hass.config_entries.options.async_configure(
-        result["flow_id"], user_input={"next_step_id": "pause_simulation"}
-    )
-    assert result["type"] == FlowResultType.ABORT
-    assert result["reason"] == "simulation_paused"
-    assert scheduler.paused is True
+    assert result["type"] == FlowResultType.FORM
+    assert result["step_id"] == "init"
 
-    result = await hass.config_entries.options.async_init(
-        mock_config_entry.entry_id
-    )
+    new_input = _valid_user_input(**{CONF_OPEN_TIME: "07:30:00", CONF_CLOSE_TIME: "21:30:00"})
     result = await hass.config_entries.options.async_configure(
-        result["flow_id"], user_input={"next_step_id": "resume_simulation"}
+        result["flow_id"], user_input=new_input
     )
-    assert result["type"] == FlowResultType.ABORT
-    assert result["reason"] == "simulation_resumed"
-    assert scheduler.paused is False
+    assert result["type"] == FlowResultType.CREATE_ENTRY
+    assert result["data"][CONF_OPEN_TIME] == "07:30:00"
+    assert result["data"][CONF_CLOSE_TIME] == "21:30:00"
