@@ -24,6 +24,7 @@ Intégration personnalisée Home Assistant (HACS) qui simule une présence en pi
 - [FAQ](#faq)
 - [Limitations connues](#limitations-connues)
 - [Roadmap](#roadmap)
+- [Changelog](#changelog)
 - [Contribuer](#contribuer)
 - [Licence](#licence)
 
@@ -115,17 +116,19 @@ L'intégration crée cinq entités regroupées sous un device unique « Shutters
 |---|---|---|
 | `sensor.shutters_management_next_opening` | `timestamp` | Date et heure du prochain déclenchement d'ouverture (sans le décalage aléatoire). |
 | `sensor.shutters_management_next_closing` | `timestamp` | Date et heure du prochain déclenchement de fermeture. |
-| `switch.shutters_management_simulation_active` | `switch` | État actif/pause de la simulation. Togglable directement depuis le dashboard. |
+| `switch.shutters_management_simulation_active` | `switch` | État actif/pause de la simulation. Basculable directement depuis le dashboard. |
 | `button.shutters_management_test_open` | `button` | Déclenche immédiatement une ouverture des volets configurés. |
 | `button.shutters_management_test_close` | `button` | Déclenche immédiatement une fermeture des volets configurés. |
 
-Les noms exacts des entités peuvent varier selon votre langue ; les `unique_id` restent stables (`<entry_id>_next_open`, `<entry_id>_next_close`, `<entry_id>_simulation_active`, `<entry_id>_test_open`, `<entry_id>_test_close`).
+Depuis la v0.2.3, les `entity_id` listés ci-dessus sont stables : ils ne dépendent plus de la langue de Home Assistant pour les nouvelles installations. Le nom d'affichage (« Prochaine ouverture » en français, « Next opening » en anglais, etc.) reste piloté par les traductions. Les `unique_id` restent eux aussi stables (`<entry_id>_next_open`, `<entry_id>_next_close`, `<entry_id>_simulation_active`, `<entry_id>_test_open`, `<entry_id>_test_close`).
 
 Les capteurs `next_*` n'incluent pas le décalage aléatoire : ils annoncent l'heure programmée. Le décalage est appliqué au moment du déclenchement. Quand le switch est sur `off` (simulation en pause), les capteurs renvoient `unknown`.
 
-### Migration depuis la v0.2.0
+### Notes de migration
 
-> **Breaking change v0.2.1** — le `binary_sensor.shutters_management_simulation_active` a été remplacé par un `switch.shutters_management_simulation_active` togglable. Les automations qui référencent l'ancienne entité doivent être mises à jour pour pointer vers le switch (les états restent `on` / `off`). Selon votre registre des entités existant, l'ancien `binary_sensor` peut rester présent comme entité obsolète ou indisponible après la mise à jour ; si c'est le cas, vous pouvez le supprimer manuellement du registre des entités.
+> **v0.2.1 — Breaking change** : le `binary_sensor.shutters_management_simulation_active` a été remplacé par un `switch.shutters_management_simulation_active` basculable. Les automations qui référencent l'ancienne entité doivent être mises à jour pour pointer vers le switch (les états restent `on` / `off`). Selon votre registre des entités existant, l'ancien `binary_sensor` peut rester présent comme entité obsolète ou indisponible après la mise à jour ; si c'est le cas, vous pouvez le supprimer manuellement du registre des entités.
+
+> **v0.2.3** : les `entity_id` sont désormais figés sur leur slug anglais pour les nouvelles installations. Les installations existantes dans une langue autre que l'anglais (par exemple `sensor.shutters_management_prochaine_ouverture` en français) conservent leurs identifiants stockés dans le registry — c'est volontaire pour ne pas casser les automations existantes. Pour aligner sur les exemples du tableau ci-dessus, renommez manuellement chaque entité via **Paramètres → Appareils et services → Shutters Management** puis clic sur l'entité → modifier l'`entity_id`.
 
 ## Tableau de bord
 
@@ -262,6 +265,10 @@ Ces limitations sont suivies dans la [roadmap](ROADMAP.md).
 
 Voir le fichier [ROADMAP.md](ROADMAP.md) pour la liste des évolutions prévues et l'état d'avancement.
 
+## Changelog
+
+L'historique détaillé des versions est tenu dans [CHANGELOG.md](CHANGELOG.md), au format [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/).
+
 ## Contribuer
 
 Les contributions sont les bienvenues : ouvrez d'abord une issue pour décrire le besoin avant de proposer une pull request, surtout pour les évolutions importantes.
@@ -290,6 +297,7 @@ shutters_management/
 ├── hacs.json
 ├── README.md
 ├── ROADMAP.md
+├── CHANGELOG.md
 └── LICENSE
 ```
 
@@ -312,7 +320,7 @@ Pour la couverture détaillée :
 pytest --cov=custom_components.shutters_management --cov-report=term-missing
 ```
 
-La CI GitHub Actions (`.github/workflows/tests.yml`) exécute la même commande sur Python 3.12 et 3.13 à chaque push sur `main` et chaque pull request.
+La CI GitHub Actions (`.github/workflows/tests.yaml`) exécute la même commande sur Python 3.12 et 3.13 à chaque push sur `main` et chaque pull request. Deux workflows additionnels (`Validate HACS.yaml` et `Validate Hassfest.yaml`) valident la conformité de l'intégration aux standards HACS et Hassfest sur les mêmes déclencheurs, plus une exécution quotidienne planifiée.
 
 ## Licence
 
