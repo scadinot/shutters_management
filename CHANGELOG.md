@@ -19,8 +19,10 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le pr
 
 ### Modifié
 
+- Bump de la version de l'intégration `0.2.2` → `0.2.3` dans `manifest.json`.
 - Manifest réordonné selon les règles hassfest (`domain`, `name`, puis ordre alphabétique).
 - Renommage du workflow tests `tests.yml` → `tests.yaml`.
+- `ROADMAP.md` recentré sur les évolutions à venir : les sections « Livré » des versions passées sont retirées et l'historique détaillé est délégué au `CHANGELOG.md`.
 
 ### Corrigé
 
