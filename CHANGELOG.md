@@ -43,34 +43,49 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le pr
 
 ## [0.2.3] — 2026-04-27
 
+Release essentiellement de documentation et de maintenance autour de la 0.2.2 (qui contient les véritables nouveautés fonctionnelles : tests, CI, `entity_id` stables).
+
 ### Ajouté
 
-- `entity_id` stables, indépendants de la langue de Home Assistant pour les nouvelles installations : `sensor.shutters_management_next_opening`, `sensor.shutters_management_next_closing`, `switch.shutters_management_simulation_active`, `button.shutters_management_test_open`, `button.shutters_management_test_close`. Le nom d'affichage reste traduit ; seul l'identifiant technique est figé. Mise en œuvre via `_attr_suggested_object_id` (pattern canonique HA) — les renommages utilisateur via l'UI sont préservés.
-- Workflow GitHub Actions `Validate Hassfest.yaml` (push, pull request, cron quotidien).
-- Workflow GitHub Actions `Validate HACS.yaml` (push, pull request, cron quotidien).
-- Badges CI dans le README (`Tests`, `Hassfest`, `HACS`).
-- Trois tests `test_*_entity_id*_is_stable_english` qui vérifient via le registry que les `entity_id` finaux correspondent au slug EN attendu (suite : 36 tests, couverture 84 %).
-- Section « Notes de migration » dans le README, avec une note v0.2.3 pour les utilisateurs FR/non-EN existants.
+- `CHANGELOG.md` au format [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) couvrant l'historique de v0.1.0 à v0.2.3.
+- Section « Notes de migration » dans le README, regroupant la note v0.2.1 (`binary_sensor` → `switch`) et la note v0.2.2 sur les `entity_id` traduits des installations FR existantes.
 
 ### Modifié
 
 - Bump de la version de l'intégration `0.2.2` → `0.2.3` dans `manifest.json`.
-- Manifest réordonné selon les règles hassfest (`domain`, `name`, puis ordre alphabétique).
-- Renommage du workflow tests `tests.yml` → `tests.yaml`.
-- `ROADMAP.md` recentré sur les évolutions à venir : les sections « Livré » des versions passées sont retirées et l'historique détaillé est délégué au `CHANGELOG.md`.
+- `ROADMAP.md` recentré sur les évolutions à venir : les sections « Livré » des versions passées sont retirées et l'historique détaillé est délégué au `CHANGELOG.md`. Restyle ensuite selon la présentation Motivation / Piste technique inspirée de [voltapeak_loops/ROADMAP](https://github.com/scadinot/voltapeak_loops/blob/main/ROADMAP.md).
+- Synchronisation du README : structure du dépôt mise à jour, références `tests.yml` corrigées en `tests.yaml`, mention des workflows additionnels.
 
-### Corrigé
+### Pas de changement fonctionnel
 
-- Hassfest : ajout d'un `CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)` qui signale explicitement que l'intégration n'accepte pas de YAML.
-
-> **Note de migration** : les installations existantes en français (ou autre langue non-EN) conservent leurs `entity_id` traduits stockés dans le registry — c'est volontaire pour ne pas casser les automations existantes. Pour aligner sur les exemples du README, renommez manuellement chaque entité depuis **Paramètres → Appareils et services → Shutters Management** puis clic sur l'entité → modifier l'`entity_id`.
+Aucun changement de code dans l'intégration. Seules les méta-données (`manifest.json`) et la documentation (`README.md`, `ROADMAP.md`, `CHANGELOG.md`) évoluent. Compatibilité strictement identique à v0.2.2.
 
 ## [0.2.2] — 2026-04-27
 
 ### Ajouté
 
-- Suite de tests unitaires (`tests/`) couvrant le config flow, l'options flow, l'init/unload, la logique du scheduler (next_open/next_close, pause, présence, run_now), les sensors, le switch et les boutons (33 tests, couverture 84 %).
-- Workflow CI (`.github/workflows/tests.yml`, renommé en `tests.yaml` en v0.2.3) exécutant `pytest` avec couverture sur Python 3.12 et 3.13 à chaque push `main` et chaque pull request.
+#### Tests et CI
+
+- Suite de tests unitaires (`tests/`) couvrant le config flow, l'options flow, l'init/unload, la logique du scheduler (next_open/next_close, pause, présence, run_now), les sensors, le switch et les boutons. **36 tests, couverture 84 %**.
+- Workflow GitHub Actions `.github/workflows/tests.yaml` exécutant `pytest` avec couverture sur Python 3.12 et 3.13 à chaque push `main` et chaque pull request.
+- Workflow GitHub Actions `.github/workflows/Validate Hassfest.yaml` (push, pull request, cron quotidien).
+- Workflow GitHub Actions `.github/workflows/Validate HACS.yaml` (push, pull request, cron quotidien).
+- Badges CI dans le README : `Tests`, `Hassfest`, `HACS`.
+
+#### `entity_id` stables
+
+- Identifiants techniques EN figés pour les nouvelles installations : `sensor.shutters_management_next_opening`, `sensor.shutters_management_next_closing`, `switch.shutters_management_simulation_active`, `button.shutters_management_test_open`, `button.shutters_management_test_close`. Le nom d'affichage reste traduit. Mise en œuvre via `_attr_suggested_object_id` (pattern canonique HA) — les renommages utilisateur via l'UI sont préservés.
+- Trois tests `test_*_entity_id*_is_stable_english` qui vérifient via le registry que les `entity_id` finaux correspondent au slug EN attendu.
+
+### Modifié
+
+- Manifest `manifest.json` réordonné selon les règles hassfest (`domain`, `name`, puis ordre alphabétique).
+
+### Corrigé
+
+- Hassfest : ajout d'un `CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)` qui signale explicitement que l'intégration n'accepte pas de configuration YAML.
+
+> **Note de migration** : les installations existantes en français (ou autre langue non-EN) conservent leurs `entity_id` traduits stockés dans le registry — c'est volontaire pour ne pas casser les automations existantes. Pour aligner sur les exemples du README, renommez manuellement chaque entité depuis **Paramètres → Appareils et services → Shutters Management** puis clic sur l'entité → modifier l'`entity_id`.
 
 ## [0.2.1] — 2026-04-27
 
