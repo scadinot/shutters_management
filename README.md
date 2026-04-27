@@ -24,6 +24,7 @@ Intégration personnalisée Home Assistant (HACS) qui simule une présence en pi
 - [FAQ](#faq)
 - [Limitations connues](#limitations-connues)
 - [Roadmap](#roadmap)
+- [Changelog](#changelog)
 - [Contribuer](#contribuer)
 - [Licence](#licence)
 
@@ -264,6 +265,10 @@ Ces limitations sont suivies dans la [roadmap](ROADMAP.md).
 
 Voir le fichier [ROADMAP.md](ROADMAP.md) pour la liste des évolutions prévues et l'état d'avancement.
 
+## Changelog
+
+L'historique détaillé des versions est tenu dans [CHANGELOG.md](CHANGELOG.md), au format [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/).
+
 ## Contribuer
 
 Les contributions sont les bienvenues : ouvrez d'abord une issue pour décrire le besoin avant de proposer une pull request, surtout pour les évolutions importantes.
@@ -292,6 +297,7 @@ shutters_management/
 ├── hacs.json
 ├── README.md
 ├── ROADMAP.md
+├── CHANGELOG.md
 └── LICENSE
 ```
 
