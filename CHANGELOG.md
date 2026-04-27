@@ -6,6 +6,24 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le pr
 
 ## [Non publié]
 
+## [0.2.4] — 2026-04-27
+
+### Ajouté
+
+- Assets de marque embarqués dans `custom_components/shutters_management/brand/` :
+  - `icon.png` (256×256) — utilisé par défaut.
+  - `icon@2x.png` (512×512) — version haute résolution.
+
+  Depuis Home Assistant 2026.3, le frontend charge directement ces fichiers locaux pour afficher le logo de l'intégration sur la page « Ajouter une intégration » et dans « Appareils et services ». Le check `brands` de la validation HACS passe désormais sans nécessiter de PR sur le repo `home-assistant/brands`.
+
+### Modifié
+
+- Bump de la version de l'intégration `0.2.3` → `0.2.4` dans `manifest.json`.
+- **Version minimale de Home Assistant relevée à 2026.3.0** dans `manifest.json` (nouveau champ `homeassistant`) et `hacs.json` — c'est la première version qui charge les assets de marque embarqués.
+- Section « Prérequis » du README mise à jour.
+
+> **Note de migration** : si vous tournez sur une version de Home Assistant antérieure à 2026.3, restez sur la v0.2.3 jusqu'à votre prochaine mise à jour HA. La v0.2.4 ne se chargera pas sur HA &lt; 2026.3.
+
 ## [0.2.3] — 2026-04-27
 
 ### Ajouté
@@ -85,7 +103,8 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le pr
 - Annulation propre des déclencheurs et des callbacks différés au déchargement / rechargement.
 - Traductions français et anglais.
 
-[Non publié]: https://github.com/scadinot/shutters_management/compare/v0.2.3...HEAD
+[Non publié]: https://github.com/scadinot/shutters_management/compare/v0.2.4...HEAD
+[0.2.4]: https://github.com/scadinot/shutters_management/compare/v0.2.3...v0.2.4
 [0.2.3]: https://github.com/scadinot/shutters_management/compare/v0.2.2...v0.2.3
 [0.2.2]: https://github.com/scadinot/shutters_management/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/scadinot/shutters_management/compare/v0.2.0...v0.2.1
