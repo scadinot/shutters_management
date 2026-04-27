@@ -92,9 +92,17 @@
         "name": "Next closing"
       }
     },
-    "binary_sensor": {
-      "active": {
+    "switch": {
+      "simulation_active": {
         "name": "Simulation active"
+      }
+    },
+    "button": {
+      "test_open": {
+        "name": "Test open"
+      },
+      "test_close": {
+        "name": "Test close"
       }
     }
   },

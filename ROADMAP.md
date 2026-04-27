@@ -6,7 +6,7 @@ Ce document liste les évolutions envisagées pour l'intégration. Il est indica
 
 Offrir une intégration Home Assistant simple, fiable et entièrement configurable graphiquement pour simuler une présence en pilotant des volets roulants. La priorité est la robustesse en production, puis la richesse fonctionnelle (profils, déclencheurs solaires, observabilité), avant d'envisager des extensions plus avancées (templates, statistiques).
 
-## Statut actuel — v0.2.0
+## Statut actuel — v0.2.1
 
 Livré :
 
@@ -35,10 +35,20 @@ Objectif : combler les manques d'observabilité et faciliter l'automatisation.
   - Menu d'options avec entrées « Tester ouverture / fermeture » et « Mettre en pause / Reprendre ».
   - Étape de confirmation dans le config_flow si `only_when_away` est coché alors qu'aucune `person.*` ni `presence_entity` n'est disponible.
 
-## v0.2.1 — En attente (qualité)
+## v0.2.1 — Livré
+
+Objectif : rendre les actions accessibles directement depuis un tableau de bord Lovelace, sans passer par l'écran d'options.
+
+- **Nouvelles entités actionnables** :
+  - `switch.shutters_management_simulation_active` : togglable, expose et contrôle l'état actif/pause de la simulation.
+  - `button.shutters_management_test_open` : déclenche immédiatement une ouverture des volets configurés.
+  - `button.shutters_management_test_close` : déclenche immédiatement une fermeture.
+- **Breaking change** : le `binary_sensor.shutters_management_simulation_active` introduit en v0.2.0 a été remplacé par le switch. Les automations existantes doivent être mises à jour pour pointer vers `switch.shutters_management_simulation_active` (les états restent `on` / `off`).
+
+## v0.2.2 — En attente (qualité)
 
 - **Tests et CI** :
-  - Suite de tests unitaires (planification, plafonnement minuit, ré-évaluation, présence, services, sensors, pause/resume).
+  - Suite de tests unitaires (planification, plafonnement minuit, ré-évaluation, présence, services, sensors, switch, buttons).
   - GitHub Actions : `hassfest`, `HACS validation`, lint Python (`ruff`), vérification JSON des traductions.
 
 ## v0.3.0 — Moyen terme
