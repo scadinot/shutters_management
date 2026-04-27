@@ -6,7 +6,7 @@ Ce document liste les évolutions envisagées pour l'intégration. Il est indica
 
 Offrir une intégration Home Assistant simple, fiable et entièrement configurable graphiquement pour simuler une présence en pilotant des volets roulants. La priorité est la robustesse en production, puis la richesse fonctionnelle (profils, déclencheurs solaires, observabilité), avant d'envisager des extensions plus avancées (templates, statistiques).
 
-## Statut actuel — v0.2.2
+## Statut actuel — v0.2.3
 
 Livré :
 
@@ -50,8 +50,20 @@ Objectif : rendre les actions accessibles directement depuis un tableau de bord 
 Objectif : poser un filet de sécurité avant les évolutions fonctionnelles de v0.3.
 
 - **Suite de tests unitaires** (`tests/`) couvrant le config flow, l'options flow, l'init/unload, la logique du scheduler (next_open/next_close, pause, présence, run_now), les sensors, le switch et les boutons.
-- **CI GitHub Actions** (`.github/workflows/tests.yml`) : `pytest` avec couverture sur Python 3.12 et 3.13, exécutée sur chaque push `main` et chaque pull request.
+- **CI GitHub Actions** (`.github/workflows/tests.yaml`) : `pytest` avec couverture sur Python 3.12 et 3.13, exécutée sur chaque push `main` et chaque pull request.
 - **Discipline anti-régression** : tests conçus pour survivre au refactor multi-instance prévu en v0.3 (unique_ids dérivés de `entry.entry_id`, assertions sur les effets plutôt que sur les noms de signaux internes).
+
+## v0.2.3 — Livré
+
+Objectif : stabiliser les `entity_id` indépendamment de la locale et compléter la chaîne de validation CI.
+
+- **`entity_id` stables, indépendants de la langue** : les nouvelles installations reçoivent des identifiants techniques en anglais quel que soit le langage de Home Assistant (`sensor.shutters_management_next_opening`, `sensor.shutters_management_next_closing`, `switch.shutters_management_simulation_active`, `button.shutters_management_test_open`, `button.shutters_management_test_close`). Le nom d'affichage reste traduit. Mise en œuvre via `_attr_suggested_object_id` (pattern canonique HA) — les renommages utilisateur via l'UI sont préservés.
+- **Validation Hassfest** : nouveau workflow (`Validate Hassfest.yaml`), manifest réordonné selon les règles hassfest (`domain`, `name`, puis ordre alphabétique), ajout d'un `CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)`.
+- **Validation HACS** : nouveau workflow (`Validate HACS.yaml`). 7/8 checks au vert ; le check `brands` reste à traiter via une PR sur `home-assistant/brands`.
+- **Badges CI dans le README** : `Tests`, `Hassfest` et `HACS` reflètent l'état réel de la branche `main`.
+- **3 tests supplémentaires** (`test_*_entity_id*_is_stable_english`) qui assertent via le registry que les `entity_id` finaux correspondent au slug EN attendu (suite : 36 tests).
+
+> **Note de migration** : les installations existantes en français (ou autre langue non-EN) conservent leurs `entity_id` traduits stockés dans le registry. Pour aligner sur les exemples du README, renommez manuellement chaque entité depuis **Settings → Devices → Shutters Management**.
 
 ## v0.3.0 — Moyen terme
 
