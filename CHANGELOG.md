@@ -43,7 +43,7 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le pr
 
 ## [0.2.3] — 2026-04-27
 
-Release essentiellement de documentation et de maintenance autour de la 0.2.2 (qui contient les véritables nouveautés fonctionnelles : tests, CI, `entity_id` stables).
+Release essentiellement de documentation et de maintenance autour de la v0.2.2 (qui contient les véritables nouveautés fonctionnelles : tests, CI, `entity_id` stables).
 
 ### Ajouté
 
