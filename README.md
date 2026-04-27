@@ -273,20 +273,46 @@ shutters_management/
 ├── custom_components/
 │   └── shutters_management/
 │       ├── __init__.py        # logique de planification
+│       ├── button.py          # boutons "tester ouverture/fermeture"
 │       ├── config_flow.py     # assistant UI + options
 │       ├── const.py           # constantes
 │       ├── manifest.json
+│       ├── sensor.py          # sensors prochaine ouverture/fermeture
 │       ├── strings.json
+│       ├── switch.py          # switch actif/pause
 │       └── translations/
 │           ├── en.json
 │           └── fr.json
+├── tests/                     # suite pytest
+├── .github/workflows/         # CI GitHub Actions
+├── pyproject.toml
+├── requirements_test.txt
 ├── hacs.json
 ├── README.md
 ├── ROADMAP.md
 └── LICENSE
 ```
 
-Pour tester localement, copiez le dossier `custom_components/shutters_management/` dans le `config/custom_components/` d'une instance Home Assistant de développement et redémarrez-la.
+### Tester localement avec Home Assistant
+
+Copiez le dossier `custom_components/shutters_management/` dans le `config/custom_components/` d'une instance Home Assistant de développement et redémarrez-la.
+
+### Lancer la suite de tests
+
+Depuis la racine du dépôt :
+
+```bash
+pip install -r requirements_test.txt
+pytest
+```
+
+Pour la couverture détaillée :
+
+```bash
+pytest --cov=custom_components.shutters_management --cov-report=term-missing
+```
+
+La CI GitHub Actions (`.github/workflows/tests.yml`) exécute la même commande sur Python 3.12 et 3.13 à chaque push sur `main` et chaque pull request.
 
 ## Licence
 

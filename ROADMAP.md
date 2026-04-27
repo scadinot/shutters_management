@@ -6,7 +6,7 @@ Ce document liste les évolutions envisagées pour l'intégration. Il est indica
 
 Offrir une intégration Home Assistant simple, fiable et entièrement configurable graphiquement pour simuler une présence en pilotant des volets roulants. La priorité est la robustesse en production, puis la richesse fonctionnelle (profils, déclencheurs solaires, observabilité), avant d'envisager des extensions plus avancées (templates, statistiques).
 
-## Statut actuel — v0.2.1
+## Statut actuel — v0.2.2
 
 Livré :
 
@@ -45,11 +45,13 @@ Objectif : rendre les actions accessibles directement depuis un tableau de bord 
   - `button.shutters_management_test_close` : déclenche immédiatement une fermeture.
 - **Breaking change** : le `binary_sensor.shutters_management_simulation_active` introduit en v0.2.0 a été remplacé par le switch. Les automations existantes doivent être mises à jour pour pointer vers `switch.shutters_management_simulation_active` (les états restent `on` / `off`).
 
-## v0.2.2 — En attente (qualité)
+## v0.2.2 — Livré
 
-- **Tests et CI** :
-  - Suite de tests unitaires (planification, plafonnement minuit, ré-évaluation, présence, services, sensors, switch, buttons).
-  - GitHub Actions : `hassfest`, `HACS validation`, lint Python (`ruff`), vérification JSON des traductions.
+Objectif : poser un filet de sécurité avant les évolutions fonctionnelles de v0.3.
+
+- **Suite de tests unitaires** (`tests/`) couvrant le config flow, l'options flow, l'init/unload, la logique du scheduler (next_open/next_close, pause, présence, run_now), les sensors, le switch et les boutons.
+- **CI GitHub Actions** (`.github/workflows/tests.yml`) : `pytest` avec couverture sur Python 3.12 et 3.13, exécutée sur chaque push `main` et chaque pull request.
+- **Discipline anti-régression** : tests conçus pour survivre au refactor multi-instance prévu en v0.3 (unique_ids dérivés de `entry.entry_id`, assertions sur les effets plutôt que sur les noms de signaux internes).
 
 ## v0.3.0 — Moyen terme
 
