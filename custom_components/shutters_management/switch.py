@@ -1,10 +1,9 @@
-"""Binary sensor exposing the simulation active/paused state."""
+"""Switch exposing the simulation active/paused state as a togglable entity."""
 from __future__ import annotations
 
-from homeassistant.components.binary_sensor import (
-    BinarySensorDeviceClass,
-    BinarySensorEntity,
-)
+from typing import Any
+
+from homeassistant.components.switch import SwitchEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.device_registry import DeviceEntryType, DeviceInfo
@@ -20,22 +19,21 @@ async def async_setup_entry(
     entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    """Set up the active/paused binary sensor for a config entry."""
+    """Set up the simulation switch for a config entry."""
     scheduler: ShuttersScheduler = hass.data[DOMAIN][entry.entry_id]
-    async_add_entities([ShuttersActiveBinarySensor(scheduler)])
+    async_add_entities([ShuttersSimulationSwitch(scheduler)])
 
 
-class ShuttersActiveBinarySensor(BinarySensorEntity):
-    """Binary sensor reflecting whether the simulation is currently active."""
+class ShuttersSimulationSwitch(SwitchEntity):
+    """Switch reflecting and toggling the active/paused state of the simulation."""
 
     _attr_has_entity_name = True
-    _attr_translation_key = "active"
-    _attr_device_class = BinarySensorDeviceClass.RUNNING
+    _attr_translation_key = "simulation_active"
     _attr_should_poll = False
 
     def __init__(self, scheduler: ShuttersScheduler) -> None:
         self._scheduler = scheduler
-        self._attr_unique_id = f"{scheduler.entry.entry_id}_active"
+        self._attr_unique_id = f"{scheduler.entry.entry_id}_simulation_active"
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, scheduler.entry.entry_id)},
             name="Shutters Management",
@@ -46,6 +44,12 @@ class ShuttersActiveBinarySensor(BinarySensorEntity):
     @property
     def is_on(self) -> bool:
         return not self._scheduler.paused
+
+    async def async_turn_on(self, **kwargs: Any) -> None:
+        await self._scheduler.async_set_paused(False)
+
+    async def async_turn_off(self, **kwargs: Any) -> None:
+        await self._scheduler.async_set_paused(True)
 
     async def async_added_to_hass(self) -> None:
         """Subscribe to state updates."""

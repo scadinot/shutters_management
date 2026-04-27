@@ -5,7 +5,7 @@ from homeassistant.const import Platform
 
 DOMAIN = "shutters_management"
 
-PLATFORMS: list[Platform] = [Platform.SENSOR, Platform.BINARY_SENSOR]
+PLATFORMS: list[Platform] = [Platform.SENSOR, Platform.SWITCH, Platform.BUTTON]
 
 CONF_COVERS = "covers"
 CONF_OPEN_TIME = "open_time"

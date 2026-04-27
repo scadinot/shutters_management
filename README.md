@@ -12,6 +12,7 @@ Intégration personnalisée Home Assistant (HACS) qui simule une présence en pi
 - [Configuration](#configuration)
 - [Comportement](#comportement)
 - [Entités exposées](#entités-exposées)
+- [Tableau de bord](#tableau-de-bord)
 - [Services](#services)
 - [Menu d'options](#menu-doptions)
 - [Exemples d'utilisation](#exemples-dutilisation)
@@ -104,17 +105,53 @@ Quand `only_when_away` est activé, l'intégration applique l'ordre suivant :
 
 ## Entités exposées
 
-L'intégration crée trois entités liées à votre configuration :
+L'intégration crée cinq entités regroupées sous un device unique « Shutters Management » :
 
 | Entité | Type | Description |
 |---|---|---|
 | `sensor.shutters_management_next_opening` | `timestamp` | Date et heure du prochain déclenchement d'ouverture (sans le décalage aléatoire). |
 | `sensor.shutters_management_next_closing` | `timestamp` | Date et heure du prochain déclenchement de fermeture. |
-| `binary_sensor.shutters_management_simulation_active` | `running` | `on` quand la simulation tourne, `off` quand elle est en pause. |
+| `switch.shutters_management_simulation_active` | `switch` | État actif/pause de la simulation. Togglable directement depuis le dashboard. |
+| `button.shutters_management_test_open` | `button` | Déclenche immédiatement une ouverture des volets configurés. |
+| `button.shutters_management_test_close` | `button` | Déclenche immédiatement une fermeture des volets configurés. |
 
-Les noms exacts des entités peuvent varier selon votre langue ; les `unique_id` restent stables (`<entry_id>_next_open`, `<entry_id>_next_close`, `<entry_id>_active`).
+Les noms exacts des entités peuvent varier selon votre langue ; les `unique_id` restent stables (`<entry_id>_next_open`, `<entry_id>_next_close`, `<entry_id>_simulation_active`, `<entry_id>_test_open`, `<entry_id>_test_close`).
 
-Les capteurs `next_*` n'incluent pas le décalage aléatoire : ils annoncent l'heure programmée. Le décalage est appliqué au moment du déclenchement.
+Les capteurs `next_*` n'incluent pas le décalage aléatoire : ils annoncent l'heure programmée. Le décalage est appliqué au moment du déclenchement. Quand le switch est sur `off` (simulation en pause), les capteurs renvoient `unknown`.
+
+### Migration depuis la v0.2.0
+
+> **Breaking change v0.2.1** — le `binary_sensor.shutters_management_simulation_active` a été remplacé par un `switch.shutters_management_simulation_active` togglable. Les automations qui référencent l'ancienne entité doivent être mises à jour pour pointer vers le switch (les états restent `on` / `off`). Selon votre registre des entités existant, l'ancien `binary_sensor` peut rester présent comme entité obsolète ou indisponible après la mise à jour ; si c'est le cas, vous pouvez le supprimer manuellement du registre des entités.
+
+## Tableau de bord
+
+Les entités actionnables s'intègrent directement dans Lovelace. Exemple de carte combinant le switch et les deux boutons de test, avec les capteurs d'horodatage :
+
+```yaml
+type: entities
+title: Volets
+entities:
+  - entity: switch.shutters_management_simulation_active
+    name: Simulation
+  - entity: sensor.shutters_management_next_opening
+  - entity: sensor.shutters_management_next_closing
+  - type: button
+    name: Tester l'ouverture
+    tap_action:
+      action: call-service
+      service: button.press
+      target:
+        entity_id: button.shutters_management_test_open
+  - type: button
+    name: Tester la fermeture
+    tap_action:
+      action: call-service
+      service: button.press
+      target:
+        entity_id: button.shutters_management_test_close
+```
+
+Vous pouvez aussi ajouter directement les entités `button.*` dans une carte « Entités » : un appui suffit à déclencher l'action.
 
 ## Services
 
@@ -138,7 +175,7 @@ data:
 
 ### `shutters_management.pause`
 
-Met la simulation en pause. Les déclenchements programmés sont ignorés tant que la simulation n'a pas repris. Le `binary_sensor.shutters_management_simulation_active` passe à `off`.
+Met la simulation en pause. Les déclenchements programmés sont ignorés tant que la simulation n'a pas repris. Le `switch.shutters_management_simulation_active` passe à `off`.
 
 ```yaml
 service: shutters_management.pause
@@ -146,7 +183,7 @@ service: shutters_management.pause
 
 ### `shutters_management.resume`
 
-Reprend la simulation après une pause. Le `binary_sensor` repasse à `on`.
+Reprend la simulation après une pause. Le switch repasse à `on`.
 
 ```yaml
 service: shutters_management.resume
