@@ -1,7 +1,7 @@
 {
   "domain": "shutters_management",
   "name": "Shutters Management",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "config_flow": true,
   "documentation": "https://github.com/scadinot/shutters_management",
   "issue_tracker": "https://github.com/scadinot/shutters_management/issues",
