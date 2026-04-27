@@ -1,4 +1,4 @@
-"""Switch exposing the simulation active/paused state as a togglable entity."""
+"""Switch exposing the simulation active/paused state as a toggleable entity."""
 from __future__ import annotations
 
 from typing import Any

@@ -39,7 +39,7 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le pr
 
 ### Ajouté
 
-- `switch.shutters_management_simulation_active` : togglable, expose et contrôle l'état actif/pause de la simulation depuis le dashboard.
+- `switch.shutters_management_simulation_active` : basculable, expose et contrôle l'état actif/pause de la simulation depuis le dashboard.
 - `button.shutters_management_test_open` : déclenche immédiatement une ouverture des volets configurés.
 - `button.shutters_management_test_close` : déclenche immédiatement une fermeture.
 

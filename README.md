@@ -116,7 +116,7 @@ L'intégration crée cinq entités regroupées sous un device unique « Shutters
 |---|---|---|
 | `sensor.shutters_management_next_opening` | `timestamp` | Date et heure du prochain déclenchement d'ouverture (sans le décalage aléatoire). |
 | `sensor.shutters_management_next_closing` | `timestamp` | Date et heure du prochain déclenchement de fermeture. |
-| `switch.shutters_management_simulation_active` | `switch` | État actif/pause de la simulation. Togglable directement depuis le dashboard. |
+| `switch.shutters_management_simulation_active` | `switch` | État actif/pause de la simulation. Basculable directement depuis le dashboard. |
 | `button.shutters_management_test_open` | `button` | Déclenche immédiatement une ouverture des volets configurés. |
 | `button.shutters_management_test_close` | `button` | Déclenche immédiatement une fermeture des volets configurés. |
 
@@ -126,7 +126,7 @@ Les capteurs `next_*` n'incluent pas le décalage aléatoire : ils annoncent l'h
 
 ### Notes de migration
 
-> **v0.2.1 — Breaking change** : le `binary_sensor.shutters_management_simulation_active` a été remplacé par un `switch.shutters_management_simulation_active` togglable. Les automations qui référencent l'ancienne entité doivent être mises à jour pour pointer vers le switch (les états restent `on` / `off`). Selon votre registre des entités existant, l'ancien `binary_sensor` peut rester présent comme entité obsolète ou indisponible après la mise à jour ; si c'est le cas, vous pouvez le supprimer manuellement du registre des entités.
+> **v0.2.1 — Breaking change** : le `binary_sensor.shutters_management_simulation_active` a été remplacé par un `switch.shutters_management_simulation_active` basculable. Les automations qui référencent l'ancienne entité doivent être mises à jour pour pointer vers le switch (les états restent `on` / `off`). Selon votre registre des entités existant, l'ancien `binary_sensor` peut rester présent comme entité obsolète ou indisponible après la mise à jour ; si c'est le cas, vous pouvez le supprimer manuellement du registre des entités.
 
 > **v0.2.3** : les `entity_id` sont désormais figés sur leur slug anglais pour les nouvelles installations. Les installations existantes dans une langue autre que l'anglais (par exemple `sensor.shutters_management_prochaine_ouverture` en français) conservent leurs identifiants stockés dans le registry — c'est volontaire pour ne pas casser les automations existantes. Pour aligner sur les exemples du tableau ci-dessus, renommez manuellement chaque entité via **Paramètres → Appareils et services → Shutters Management** puis clic sur l'entité → modifier l'`entity_id`.
 

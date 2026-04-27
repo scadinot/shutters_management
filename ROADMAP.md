@@ -40,7 +40,7 @@ Objectif : combler les manques d'observabilité et faciliter l'automatisation.
 Objectif : rendre les actions accessibles directement depuis un tableau de bord Lovelace, sans passer par l'écran d'options.
 
 - **Nouvelles entités actionnables** :
-  - `switch.shutters_management_simulation_active` : togglable, expose et contrôle l'état actif/pause de la simulation.
+  - `switch.shutters_management_simulation_active` : basculable, expose et contrôle l'état actif/pause de la simulation.
   - `button.shutters_management_test_open` : déclenche immédiatement une ouverture des volets configurés.
   - `button.shutters_management_test_close` : déclenche immédiatement une fermeture.
 - **Breaking change** : le `binary_sensor.shutters_management_simulation_active` introduit en v0.2.0 a été remplacé par le switch. Les automations existantes doivent être mises à jour pour pointer vers `switch.shutters_management_simulation_active` (les états restent `on` / `off`).
@@ -63,7 +63,7 @@ Objectif : stabiliser les `entity_id` indépendamment de la locale et compléter
 - **Badges CI dans le README** : `Tests`, `Hassfest` et `HACS` reflètent l'état réel de la branche `main`.
 - **3 tests supplémentaires** (`test_*_entity_id*_is_stable_english`) qui assertent via le registry que les `entity_id` finaux correspondent au slug EN attendu (suite : 36 tests).
 
-> **Note de migration** : les installations existantes en français (ou autre langue non-EN) conservent leurs `entity_id` traduits stockés dans le registry. Pour aligner sur les exemples du README, renommez manuellement chaque entité depuis **Settings → Devices → Shutters Management**.
+> **Note de migration** : les installations existantes en français (ou autre langue non-EN) conservent leurs `entity_id` traduits stockés dans le registry. Pour aligner sur les exemples du README, renommez manuellement chaque entité depuis **Paramètres → Appareils et services → Shutters Management**.
 
 ## v0.3.0 — Moyen terme
 
