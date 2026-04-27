@@ -8,9 +8,21 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le pr
 
 ## [0.2.5] — 2026-04-27
 
+### Ajouté
+
+- Assets de marque embarqués dans `custom_components/shutters_management/brand/` :
+  - `icon.png` (256×256) — icône carrée standard.
+  - `icon@2x.png` (512×512) — icône haute résolution.
+  - `logo.png` (768×256) — logo horizontal « Shutters Management » avec l'icône et le wordmark.
+  - `logo@2x.png` (1536×512) — logo haute résolution.
+
+  Depuis Home Assistant 2026.3, le frontend charge directement ces fichiers locaux pour afficher l'icône et le logo de l'intégration sur la page « Ajouter une intégration » et dans « Appareils et services ». Le check `brands` de la validation HACS passe désormais sans nécessiter de PR sur le repo `home-assistant/brands`.
+
 ### Modifié
 
-- Bump de la version de l'intégration `0.2.4` → `0.2.5` dans `manifest.json`.
+- Bump de la version de l'intégration `0.2.3` → `0.2.5` dans `manifest.json`. La version intermédiaire 0.2.4 a été retirée des releases parce que son tag Git avait été placé sur le mauvais commit, ce qui rendait l'archive `v0.2.4.zip` incohérente ; ses fonctionnalités sont incluses ici.
+- **Version minimale de Home Assistant relevée à 2026.3.0** dans `hacs.json` — c'est la première version qui charge les assets de marque embarqués. (Le schéma `manifest.json` des intégrations custom n'accepte pas de champ `homeassistant` ; HACS bloque l'installation sur les versions antérieures avant que le code n'arrive sur disque.)
+- Section « Prérequis » du README mise à jour.
 - **Options flow simplifié** : l'écran « Configurer » s'ouvre désormais directement sur le formulaire d'édition, sans menu intermédiaire. Les anciennes entrées « Tester : ouvrir maintenant », « Tester : fermer maintenant » et « Mettre la simulation en pause / Reprendre la simulation » sont retirées de l'options flow.
 
 ### Supprimé
@@ -19,27 +31,9 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le pr
 - Étape intermédiaire `configure` de l'options flow (fusionnée dans `init`).
 - Clés de traduction `options.step.init.menu_options`, `options.step.configure`, `options.abort.action_run`, `options.abort.simulation_paused`, `options.abort.simulation_resumed`.
 
-> **Note** : aucune fonctionnalité n'est perdue. Les actions sont toujours déclenchables depuis le dashboard (boutons + switch) et depuis les services Home Assistant. La simplification supprime uniquement la duplication d'UI.
+> **Note de migration HA** : si vous tournez sur une version de Home Assistant antérieure à 2026.3, restez sur la v0.2.3 jusqu'à votre prochaine mise à jour HA. La v0.2.5 ne se chargera pas sur HA &lt; 2026.3.
 
-## [0.2.4] — 2026-04-27
-
-### Ajouté
-
-- Assets de marque embarqués dans `custom_components/shutters_management/brand/` :
-  - `icon.png` (256×256) — icône carrée utilisée par défaut.
-  - `icon@2x.png` (512×512) — version haute résolution de l'icône.
-  - `logo.png` (768×256) — logo horizontal « Shutters Management » avec l'icône.
-  - `logo@2x.png` (1536×512) — version haute résolution du logo.
-
-  Depuis Home Assistant 2026.3, le frontend charge directement ces fichiers locaux pour afficher l'icône et le logo de l'intégration sur la page « Ajouter une intégration » et dans « Appareils et services ». Le check `brands` de la validation HACS passe désormais sans nécessiter de PR sur le repo `home-assistant/brands`.
-
-### Modifié
-
-- Bump de la version de l'intégration `0.2.3` → `0.2.4` dans `manifest.json`.
-- **Version minimale de Home Assistant relevée à 2026.3.0** dans `hacs.json` — c'est la première version qui charge les assets de marque embarqués. (Le schéma `manifest.json` des intégrations custom n'accepte pas de champ `homeassistant` ; HACS bloque l'installation sur les versions antérieures avant que le code n'arrive sur disque.)
-- Section « Prérequis » du README mise à jour.
-
-> **Note de migration** : si vous tournez sur une version de Home Assistant antérieure à 2026.3, restez sur la v0.2.3 jusqu'à votre prochaine mise à jour HA. La v0.2.4 ne se chargera pas sur HA &lt; 2026.3.
+> **Note** : aucune fonctionnalité n'est perdue par la simplification de l'options flow. Les actions sont toujours déclenchables depuis le dashboard (boutons + switch) et depuis les services Home Assistant.
 
 ## [0.2.3] — 2026-04-27
 
@@ -136,8 +130,7 @@ Aucun changement de code dans l'intégration. Seules les méta-données (`manife
 - Traductions français et anglais.
 
 [Non publié]: https://github.com/scadinot/shutters_management/compare/v0.2.5...HEAD
-[0.2.5]: https://github.com/scadinot/shutters_management/compare/v0.2.4...v0.2.5
-[0.2.4]: https://github.com/scadinot/shutters_management/compare/v0.2.3...v0.2.4
+[0.2.5]: https://github.com/scadinot/shutters_management/compare/v0.2.3...v0.2.5
 [0.2.3]: https://github.com/scadinot/shutters_management/compare/v0.2.2...v0.2.3
 [0.2.2]: https://github.com/scadinot/shutters_management/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/scadinot/shutters_management/compare/v0.2.0...v0.2.1
