@@ -32,6 +32,21 @@ async def test_sensor_unique_ids_are_entry_scoped(
     assert registry.async_get_entity_id("sensor", DOMAIN, expected_close) is not None
 
 
+async def test_sensor_entity_ids_are_stable_english(
+    hass: HomeAssistant, setup_integration, mock_config_entry: MockConfigEntry
+) -> None:
+    """Resolved entity_ids must use the English slug regardless of locale."""
+    registry = er.async_get(hass)
+    open_id = registry.async_get_entity_id(
+        "sensor", DOMAIN, f"{mock_config_entry.entry_id}_next_open"
+    )
+    close_id = registry.async_get_entity_id(
+        "sensor", DOMAIN, f"{mock_config_entry.entry_id}_next_close"
+    )
+    assert open_id == "sensor.shutters_management_next_opening"
+    assert close_id == "sensor.shutters_management_next_closing"
+
+
 async def test_sensors_have_timestamp_state_when_active(
     hass: HomeAssistant, setup_integration, mock_config_entry: MockConfigEntry
 ) -> None:

@@ -35,6 +35,17 @@ async def test_switch_unique_id_is_entry_scoped(
     assert registry.async_get_entity_id("switch", DOMAIN, expected) is not None
 
 
+async def test_switch_entity_id_is_stable_english(
+    hass: HomeAssistant, setup_integration, mock_config_entry: MockConfigEntry
+) -> None:
+    """Resolved entity_id must use the English slug regardless of locale."""
+    registry = er.async_get(hass)
+    entity_id = registry.async_get_entity_id(
+        "switch", DOMAIN, f"{mock_config_entry.entry_id}_simulation_active"
+    )
+    assert entity_id == "switch.shutters_management_simulation_active"
+
+
 async def test_switch_initial_state_is_on(
     hass: HomeAssistant, setup_integration, mock_config_entry: MockConfigEntry
 ) -> None:

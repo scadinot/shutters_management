@@ -39,6 +39,21 @@ async def test_button_unique_ids_are_entry_scoped(
         )
 
 
+async def test_button_entity_ids_are_stable_english(
+    hass: HomeAssistant, setup_integration, mock_config_entry: MockConfigEntry
+) -> None:
+    """Resolved entity_ids must use the English slug regardless of locale."""
+    registry = er.async_get(hass)
+    open_id = registry.async_get_entity_id(
+        "button", DOMAIN, f"{mock_config_entry.entry_id}_test_{ACTION_OPEN}"
+    )
+    close_id = registry.async_get_entity_id(
+        "button", DOMAIN, f"{mock_config_entry.entry_id}_test_{ACTION_CLOSE}"
+    )
+    assert open_id == "button.shutters_management_test_open"
+    assert close_id == "button.shutters_management_test_close"
+
+
 async def test_button_press_open_calls_run_now(
     hass: HomeAssistant, setup_integration, mock_config_entry: MockConfigEntry
 ) -> None:
