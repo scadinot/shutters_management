@@ -37,6 +37,7 @@ class ShuttersRunNowButton(ButtonEntity):
         self._action = action
         self._attr_unique_id = f"{scheduler.entry.entry_id}_test_{action}"
         self._attr_translation_key = f"test_{action}"
+        self.entity_id = f"button.{DOMAIN}_test_{action}"
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, scheduler.entry.entry_id)},
             name="Shutters Management",
