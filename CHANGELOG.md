@@ -6,6 +6,29 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le pr
 
 ## [Non publié]
 
+## [0.3.0] — 2026-04-27
+
+### Ajouté
+
+- **Multi-instance** : on peut désormais créer plusieurs entrées indépendantes de l'intégration sous le même domaine (ex. « Bureau », « RDC », « Étage »), chacune avec ses propres volets, horaires, jours actifs et mode absence. Chaque entrée crée son propre device dans Home Assistant et expose ses 5 entités sous ce device.
+- Champ « Nom de l'instance » (`CONF_NAME`) requis dans le config flow et dans l'options flow. Sert de titre de l'entrée, de nom du device, et de préfixe pour les `entity_id` générés (par exemple `sensor.bureau_next_opening`, `sensor.rdc_next_opening`).
+- `async_migrate_entry` qui passe les entrées v1 pré-existantes en v2 en injectant `CONF_NAME = entry.title` (transparent pour l'utilisateur, aucune action requise).
+- 4 tests dans `tests/test_multi_instance.py` : coexistence de deux entrées, isolation de la pause entre instances, signal scopé par `entry_id`, migration v1→v2.
+
+### Modifié
+
+- `SIGNAL_STATE_UPDATE` (constante globale) remplacée par une fabrique `signal_state_update(entry_id)` qui retourne un nom de signal par entry. Les entités d'une instance ne reçoivent plus les notifications de l'autre.
+- `DeviceInfo.name` des entités sensor/switch/button est désormais dérivé de `entry.title` au lieu d'être figé sur `"Shutters Management"`.
+- `_attr_suggested_object_id` retiré ; avec `_attr_has_entity_name = True` Home Assistant génère lui-même un `entity_id` propre `<platform>.<device_slug>_<entity_slug>`.
+- Renommer une instance via l'options flow synchronise désormais le titre de l'entry **et** le nom du device dans le device registry.
+- `ConfigFlow.VERSION` passe de `1` à `2`.
+
+### Note importante
+
+> **Les entity_ids des installations existantes restent intacts.** Le `unique_id` (préfixé par `entry.entry_id` depuis v0.2.1) et l'`entity_id` stocké dans le registry sont préservés. Seuls les `entity_id` générés pour les **nouvelles** entrées créées en v0.3.0 utilisent le slug du nom (ex. `bureau`, `rdc`).
+
+> **Services broadcast inchangés** : les services `shutters_management.run_now` / `pause` / `resume` agissent toujours sur **toutes** les instances. Le ciblage par instance via `target` est reporté à v0.3.1.
+
 ## [0.2.5] — 2026-04-27
 
 ### Ajouté
@@ -129,7 +152,8 @@ Aucun changement de code dans l'intégration. Seules les méta-données (`manife
 - Annulation propre des déclencheurs et des callbacks différés au déchargement / rechargement.
 - Traductions français et anglais.
 
-[Non publié]: https://github.com/scadinot/shutters_management/compare/v0.2.5...HEAD
+[Non publié]: https://github.com/scadinot/shutters_management/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/scadinot/shutters_management/compare/v0.2.5...v0.3.0
 [0.2.5]: https://github.com/scadinot/shutters_management/compare/v0.2.3...v0.2.5
 [0.2.3]: https://github.com/scadinot/shutters_management/compare/v0.2.2...v0.2.3
 [0.2.2]: https://github.com/scadinot/shutters_management/compare/v0.2.1...v0.2.2
