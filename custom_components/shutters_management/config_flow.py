@@ -89,7 +89,7 @@ def _build_schema(
                 ): offset_selector,
             }
         ),
-        {"collapsed": False},
+        {"collapsed": True},
     )
     close_section = data_entry_flow.section(
         vol.Schema(
@@ -110,7 +110,7 @@ def _build_schema(
                 ): offset_selector,
             }
         ),
-        {"collapsed": False},
+        {"collapsed": True},
     )
 
     fields: dict[Any, Any] = {}
@@ -135,7 +135,7 @@ def _build_schema(
                 selector.SelectSelectorConfig(
                     options=DAYS,
                     multiple=True,
-                    mode=selector.SelectSelectorMode.LIST,
+                    mode=selector.SelectSelectorMode.DROPDOWN,
                     translation_key="days",
                 )
             ),

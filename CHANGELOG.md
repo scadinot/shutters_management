@@ -6,6 +6,23 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le pr
 
 ## [Non publié]
 
+## [0.3.3] — 2026-04-28
+
+### Modifié
+
+- Bump de la version de l'intégration `0.3.2` → `0.3.3` dans `manifest.json`.
+- **Configuration plus compacte** :
+  - Les deux sections « Ouverture » et « Fermeture » sont désormais **repliées par défaut** (`collapsed: True`) au lieu d'être ouvertes. Les défauts (`fixed`, `08:00:00`, `21:00:00`, offset `0`) couvrent ~90 % des usages, donc le formulaire tient sur une fraction de la hauteur précédente. Un clic suffit pour déplier la section et personnaliser un déclencheur.
+  - Le sélecteur de **jours actifs** passe de `SelectSelectorMode.LIST` (7 lignes empilées verticalement, ~280 px) à `SelectSelectorMode.DROPDOWN` (un seul champ avec les jours sélectionnés affichés en chips, ~50 px). C'est l'idiome utilisé par les intégrations core HA qui gèrent les jours de la semaine (`trafikverket_train`, `trafikverket_ferry`, `workday`).
+
+### Pas de breaking change
+
+Aucune modification du schéma, du payload, des tests, du scheduler, des entités ou des services. Le format de données pour `days` reste une liste de chaînes (`["mon", "tue", ...]`), seul le rendu UI change. Les 44 tests existants passent sans modification.
+
+### Limite connue
+
+HA ne propose pas (encore) de sélecteur **tableau / grille** pour les jours de la semaine. `SelectSelectorMode` n'expose que `DROPDOWN` et `LIST`, et `SelectSelectorConfig` n'a pas d'option de colonnes. Le dropdown multi-select avec chips reste l'alternative compacte la plus propre disponible.
+
 ## [0.3.2] — 2026-04-28
 
 ### Modifié
@@ -197,7 +214,8 @@ Aucun changement de code dans l'intégration. Seules les méta-données (`manife
 - Annulation propre des déclencheurs et des callbacks différés au déchargement / rechargement.
 - Traductions français et anglais.
 
-[Non publié]: https://github.com/scadinot/shutters_management/compare/v0.3.2...HEAD
+[Non publié]: https://github.com/scadinot/shutters_management/compare/v0.3.3...HEAD
+[0.3.3]: https://github.com/scadinot/shutters_management/compare/v0.3.2...v0.3.3
 [0.3.2]: https://github.com/scadinot/shutters_management/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/scadinot/shutters_management/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/scadinot/shutters_management/compare/v0.2.5...v0.3.0
