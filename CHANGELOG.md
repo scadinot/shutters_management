@@ -6,6 +6,23 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le pr
 
 ## [Non publié]
 
+## [0.3.2] — 2026-04-28
+
+### Modifié
+
+- Bump de la version de l'intégration `0.3.1` → `0.3.2` dans `manifest.json`.
+- **Configuration : panneau unique** — l'écran « Ajouter une intégration » et l'options flow regroupent désormais tous les champs sur **un seul écran**, avec deux sections pliées « Ouverture » et « Fermeture ». Plus de wizard en 2 étapes. Les champs `time` et `offset` sont visibles ensemble dans chaque section ; les libellés indiquent lequel est utilisé selon le mode (`heure fixe` vs `lever/coucher du soleil`).
+- Implémentation via `homeassistant.data_entry_flow.section`, mécanisme natif HA utilisé par 10+ intégrations core.
+- `_normalize` aplatit les sous-dictionnaires de sections avant validation, donc le reste du code (scheduler, entités) lit toujours `entry.data[CONF_OPEN_MODE]` etc. sans changement.
+
+### Pas de breaking change
+
+Aucune migration de schéma. Les entries v0.3.1 existantes ont déjà tous les champs nécessaires dans `data` ; un reload après upgrade les expose simplement dans le nouveau panneau unique. Le scheduler, les entités, les services et les `entity_id` sont strictement inchangés.
+
+### Pas de réactivité côté UI
+
+L'idéal aurait été que les champs `time` / `offset` apparaissent et disparaissent en fonction du `mode` choisi dans le même panneau. **Cette réactivité n'est pas disponible** dans Home Assistant aujourd'hui (vérifié dans `data_entry_flow.py` et `selector.py` du venv HA 2026.x : aucun mécanisme `depends_on`/`visibility`/`show_if`). Le frontend ne re-rend pas un schéma sur changement d'un champ peer. La solution avec sections reste la plus propre alternative actuellement.
+
 ## [0.3.1] — 2026-04-28
 
 ### Ajouté
@@ -180,7 +197,8 @@ Aucun changement de code dans l'intégration. Seules les méta-données (`manife
 - Annulation propre des déclencheurs et des callbacks différés au déchargement / rechargement.
 - Traductions français et anglais.
 
-[Non publié]: https://github.com/scadinot/shutters_management/compare/v0.3.1...HEAD
+[Non publié]: https://github.com/scadinot/shutters_management/compare/v0.3.2...HEAD
+[0.3.2]: https://github.com/scadinot/shutters_management/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/scadinot/shutters_management/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/scadinot/shutters_management/compare/v0.2.5...v0.3.0
 [0.2.5]: https://github.com/scadinot/shutters_management/compare/v0.2.3...v0.2.5
