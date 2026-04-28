@@ -7,23 +7,29 @@
         "data": {
           "name": "Instance name",
           "covers": "Shutters to control",
-          "open_mode": "Opening trigger",
-          "close_mode": "Closing trigger",
           "days": "Active days",
           "randomize": "Randomize times",
           "random_max_minutes": "Maximum random offset (minutes)",
           "only_when_away": "Run only when away",
           "presence_entity": "Presence entity (person or group)"
-        }
-      },
-      "triggers": {
-        "title": "Trigger times",
-        "description": "Set the time for fixed triggers, or the offset (in minutes, signed) for sunrise/sunset triggers.",
-        "data": {
-          "open_time": "Opening time",
-          "open_offset": "Opening offset (minutes)",
-          "close_time": "Closing time",
-          "close_offset": "Closing offset (minutes)"
+        },
+        "sections": {
+          "open": {
+            "name": "Opening",
+            "data": {
+              "open_mode": "Opening trigger",
+              "open_time": "Opening time (used when trigger is fixed)",
+              "open_offset": "Opening offset in minutes (used when trigger is sunrise/sunset)"
+            }
+          },
+          "close": {
+            "name": "Closing",
+            "data": {
+              "close_mode": "Closing trigger",
+              "close_time": "Closing time (used when trigger is fixed)",
+              "close_offset": "Closing offset in minutes (used when trigger is sunrise/sunset)"
+            }
+          }
         }
       },
       "confirm_no_presence": {
@@ -48,23 +54,29 @@
         "data": {
           "name": "Instance name",
           "covers": "Shutters to control",
-          "open_mode": "Opening trigger",
-          "close_mode": "Closing trigger",
           "days": "Active days",
           "randomize": "Randomize times",
           "random_max_minutes": "Maximum random offset (minutes)",
           "only_when_away": "Run only when away",
           "presence_entity": "Presence entity (person or group)"
-        }
-      },
-      "triggers": {
-        "title": "Trigger times",
-        "description": "Set the time for fixed triggers, or the offset (in minutes, signed) for sunrise/sunset triggers.",
-        "data": {
-          "open_time": "Opening time",
-          "open_offset": "Opening offset (minutes)",
-          "close_time": "Closing time",
-          "close_offset": "Closing offset (minutes)"
+        },
+        "sections": {
+          "open": {
+            "name": "Opening",
+            "data": {
+              "open_mode": "Opening trigger",
+              "open_time": "Opening time (used when trigger is fixed)",
+              "open_offset": "Opening offset in minutes (used when trigger is sunrise/sunset)"
+            }
+          },
+          "close": {
+            "name": "Closing",
+            "data": {
+              "close_mode": "Closing trigger",
+              "close_time": "Closing time (used when trigger is fixed)",
+              "close_offset": "Closing offset in minutes (used when trigger is sunrise/sunset)"
+            }
+          }
         }
       },
       "confirm_no_presence": {
