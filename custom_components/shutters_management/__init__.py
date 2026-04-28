@@ -137,9 +137,11 @@ async def async_migrate_entry(
 ) -> bool:
     """Migrate older config entries forward.
 
-    v1 entries (pre-multi-instance) had no CONF_NAME. We backfill it from
-    the entry title so the rest of the integration can rely on
-    entry.data[CONF_NAME] being present.
+    v1 entries (pre-multi-instance) had no CONF_NAME in entry.data. We
+    backfill it from entry.title so the new code paths that read the
+    instance name out of entry.data still work for upgraded users. From
+    v0.3.0 onward, entry.data[CONF_NAME] is the canonical source of the
+    instance name and the options flow keeps it in sync on rename.
     """
     if entry.version == 1:
         new_data = {**entry.data}

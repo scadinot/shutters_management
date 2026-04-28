@@ -113,3 +113,24 @@ async def test_options_flow_edits_configuration(
     assert result["type"] == FlowResultType.CREATE_ENTRY
     assert result["data"][CONF_OPEN_TIME] == "07:30:00"
     assert result["data"][CONF_CLOSE_TIME] == "21:30:00"
+    # CONF_NAME is kept out of entry.options so it can't drift from entry.data
+    assert CONF_NAME not in result["data"]
+
+
+async def test_options_flow_rename_keeps_data_in_sync(
+    hass: HomeAssistant, setup_integration, mock_config_entry: MockConfigEntry
+) -> None:
+    """Renaming via the options flow must update entry.data[CONF_NAME] and entry.title."""
+    result = await hass.config_entries.options.async_init(
+        mock_config_entry.entry_id
+    )
+    new_input = _valid_user_input(**{CONF_NAME: "Étage"})
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], user_input=new_input
+    )
+    assert result["type"] == FlowResultType.CREATE_ENTRY
+    # entry.data[CONF_NAME] is the canonical name, kept in sync with title
+    assert mock_config_entry.data[CONF_NAME] == "Étage"
+    assert mock_config_entry.title == "Étage"
+    # And entry.options must not carry CONF_NAME (no duplicate)
+    assert CONF_NAME not in mock_config_entry.options

@@ -107,6 +107,15 @@ def _build_schema(
     return vol.Schema(fields)
 
 
+def _strip_name(data: dict[str, Any]) -> dict[str, Any]:
+    """Drop CONF_NAME from a payload destined for entry.options.
+
+    The instance name lives in entry.data (and entry.title); keeping it
+    out of entry.options avoids a stale duplicate after a rename.
+    """
+    return {k: v for k, v in data.items() if k != CONF_NAME}
+
+
 def _normalize(user_input: dict[str, Any]) -> dict[str, Any]:
     """Normalize user input (cast types, drop empties)."""
     data = dict(user_input)
@@ -211,12 +220,11 @@ class ShuttersManagementOptionsFlow(OptionsFlow):
             elif not data.get(CONF_DAYS):
                 errors[CONF_DAYS] = "no_days"
             else:
-                data[CONF_NAME] = name
                 if _needs_presence_warning(self.hass, data):
                     self._pending_data = data
                     return await self.async_step_confirm_no_presence()
                 self._sync_name(name)
-                return self.async_create_entry(title="", data=data)
+                return self.async_create_entry(title="", data=_strip_name(data))
 
         defaults = {
             **self.config_entry.data,
@@ -230,11 +238,25 @@ class ShuttersManagementOptionsFlow(OptionsFlow):
         )
 
     def _sync_name(self, name: str) -> None:
-        """Propagate a renamed instance to the config entry title and device."""
-        if name == self.config_entry.title:
+        """Keep the instance name authoritative across data, title and device.
+
+        Stored in entry.data[CONF_NAME] (single source of truth), mirrored
+        on entry.title (what HA shows in the integrations list) and on the
+        device.name (what the device card displays). entry.options never
+        carries CONF_NAME; this avoids data/options/title drift after a
+        rename. The unique_id (built from the original name's slug at
+        creation) is left untouched intentionally — HA does not allow
+        unique_id changes after creation.
+        """
+        current_data_name = self.config_entry.data.get(CONF_NAME)
+        if (
+            name == self.config_entry.title
+            and current_data_name == name
+        ):
             return
+        new_data = {**self.config_entry.data, CONF_NAME: name}
         self.hass.config_entries.async_update_entry(
-            self.config_entry, title=name
+            self.config_entry, title=name, data=new_data
         )
         device_registry = dr.async_get(self.hass)
         device = device_registry.async_get_device(
@@ -252,7 +274,7 @@ class ShuttersManagementOptionsFlow(OptionsFlow):
             data = self._pending_data
             self._pending_data = None
             self._sync_name(data[CONF_NAME])
-            return self.async_create_entry(title="", data=data)
+            return self.async_create_entry(title="", data=_strip_name(data))
 
         return self.async_show_form(
             step_id="confirm_no_presence",
