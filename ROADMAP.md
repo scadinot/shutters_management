@@ -15,7 +15,7 @@ utilisateurs.
 
 | Horizon | Objectif principal | Effort estimé |
 |---|---|---|
-| [Statut actuel](#statut-actuel) | Version courante v0.3.0 — voir CHANGELOG pour l'historique | livré |
+| [Statut actuel](#statut-actuel) | Version courante v0.3.1 — voir CHANGELOG pour l'historique | livré |
 | [Moyen terme](#moyen-terme--fonctionnalités-v030) | Profils horaires, déclencheurs solaires, multi-instance | quelques jours par lot |
 | [Long terme](#long-terme--stabilisation-v10) | Templates, notifications, statistiques, API publique stabilisée | plusieurs semaines |
 | [Pistes exploratoires](#pistes-exploratoires) | Météo, luminosité, jours fériés, ouverture partielle | à évaluer au cas par cas |
@@ -24,7 +24,7 @@ utilisateurs.
 
 ## Statut actuel
 
-La version courante est **v0.3.0**. Pour la liste des fonctionnalités
+La version courante est **v0.3.1**. Pour la liste des fonctionnalités
 déjà disponibles, voir la section [Fonctionnalités](README.md#fonctionnalités)
 du README. Pour l'historique détaillé des versions livrées, voir le
 [CHANGELOG.md](CHANGELOG.md).
@@ -35,20 +35,14 @@ Le présent document décrit uniquement les évolutions **à venir**.
 
 ## Moyen terme — fonctionnalités v0.3.0
 
-### 1. Déclencheurs solaires
+### 1. Déclencheurs solaires — ✅ livré en v0.3.1
 
-**Motivation.** Beaucoup d'utilisateurs préfèrent piloter leurs volets
-relativement au coucher ou au lever du soleil plutôt qu'à une heure
-fixe. L'horaire fixe désynchronise les volets et la luminosité réelle
-au fil des saisons (jusqu'à plus de 4 h d'écart entre les solstices à
-nos latitudes).
-
-**Piste technique.** Réutiliser
-`homeassistant.helpers.sun.get_astral_event_next` pour calculer
-sunrise/sunset. Étendre le `config_flow` avec un sélecteur (« heure
-fixe » / « relatif au lever » / « relatif au coucher ») et un offset
-signé (+/- minutes). Conserver le décalage aléatoire en plus du
-décalage solaire.
+Chaque événement (ouverture / fermeture) peut être configuré en mode
+`fixed`, `sunrise` ou `sunset` avec un offset signé en minutes
+(-360..+360). Le décalage aléatoire reste appliqué en plus du
+décalage solaire. Le config flow utilise une étape conditionnelle qui
+n'expose que les champs pertinents selon le mode choisi. Voir le
+[CHANGELOG](CHANGELOG.md#031--2026-04-28).
 
 ### 2. Profils horaires
 

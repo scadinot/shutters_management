@@ -73,8 +73,12 @@ L'intégration ne se configure pas en YAML. Tout passe par l'assistant graphique
 | Champ | Type | Valeur par défaut | Description |
 |---|---|---|---|
 | `covers` | Liste d'entités `cover.*` | _(aucune)_ | Volets pilotés par l'intégration. Au moins un est requis. |
-| `open_time` | Heure (`HH:MM:SS`) | `08:00:00` | Heure d'ouverture quotidienne (heure locale du système Home Assistant). |
-| `close_time` | Heure (`HH:MM:SS`) | `21:00:00` | Heure de fermeture quotidienne (heure locale). |
+| `open_mode` | `fixed` / `sunrise` / `sunset` | `fixed` | Type de déclencheur d'ouverture : heure fixe, lever du soleil, ou coucher du soleil. |
+| `open_time` | Heure (`HH:MM:SS`) | `08:00:00` | Heure d'ouverture quotidienne, **uniquement si `open_mode = fixed`** (heure locale du système Home Assistant). |
+| `open_offset` | Entier signé (-360 – +360 min) | `0` | Décalage en minutes par rapport au lever/coucher, **uniquement si `open_mode != fixed`**. Positif = après l'événement, négatif = avant. |
+| `close_mode` | `fixed` / `sunrise` / `sunset` | `fixed` | Type de déclencheur de fermeture. |
+| `close_time` | Heure (`HH:MM:SS`) | `21:00:00` | Heure de fermeture, **uniquement si `close_mode = fixed`**. |
+| `close_offset` | Entier signé (-360 – +360 min) | `0` | Décalage en minutes par rapport au lever/coucher, **uniquement si `close_mode != fixed`**. |
 | `days` | Liste de jours | Tous les jours | Jours où l'intégration est active. Valeurs : `mon`, `tue`, `wed`, `thu`, `fri`, `sat`, `sun`. |
 | `randomize` | Booléen | `true` | Active le décalage aléatoire à chaque déclenchement. |
 | `random_max_minutes` | Entier (0 – 240) | `30` | Amplitude maximale du décalage aléatoire (en minutes). Ignoré si `randomize` est désactivé. |
@@ -245,7 +249,7 @@ Le rechargement est automatique. Si rien ne change, supprimez l'intégration et 
 Pas directement, mais depuis v0.3.0 vous pouvez créer **plusieurs instances** de l'intégration (par exemple une par étage ou une par profil horaire) et activer/désactiver celles dont vous n'avez pas besoin via leur switch `simulation_active`. Le support natif des profils horaires est prévu dans la [roadmap](ROADMAP.md).
 
 **Puis-je piloter par des heures relatives au coucher du soleil ?**
-Pas encore. Voir la [roadmap](ROADMAP.md) (v0.3).
+Oui depuis la v0.3.1 ! À la création d'une instance ou via les options, choisissez le mode « Lever du soleil » ou « Coucher du soleil » comme déclencheur d'ouverture ou de fermeture, puis renseignez un décalage signé en minutes (`+30` = 30 min après l'événement, `-15` = 15 min avant). Le décalage aléatoire reste appliqué en plus, si activé.
 
 **L'intégration expose-t-elle des entités ou services pour automatisation ?**
 Oui : voir les sections [Entités exposées](#entités-exposées) et [Services](#services).
@@ -255,7 +259,6 @@ Le délai en attente est perdu (comportement standard d'`async_call_later`). Le 
 
 ## Limitations connues
 
-- Pas de support des déclencheurs liés au soleil (`sunset` / `sunrise`).
 - Les services `shutters_management.run_now` / `pause` / `resume` agissent sur **toutes** les instances simultanément (broadcast). Le ciblage par `target` est prévu dans une release future. En attendant, pour cibler une instance spécifique depuis une automation, utilisez le bouton/switch correspondant (`button.<nom>_test_open`, `switch.<nom>_simulation_active`, etc.).
 
 Ces limitations sont suivies dans la [roadmap](ROADMAP.md).
