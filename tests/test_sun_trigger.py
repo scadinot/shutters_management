@@ -169,7 +169,7 @@ async def test_config_flow_sunrise_path_in_single_panel(
         "close": {
             CONF_CLOSE_MODE: MODE_FIXED,
             CONF_CLOSE_TIME: "20:00:00",
-            "close_offset": 0,
+            CONF_CLOSE_OFFSET: 0,
         },
         CONF_DAYS: list(DAYS),
         CONF_RANDOMIZE: False,

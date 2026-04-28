@@ -187,9 +187,10 @@ def _normalize(user_input: dict[str, Any]) -> dict[str, Any]:
     """Normalize user input: flatten section sub-dicts, cast types, drop empties."""
     flat: dict[str, Any] = {}
     for key, value in user_input.items():
-        if isinstance(value, dict):
+        if key in (SECTION_OPEN, SECTION_CLOSE) and isinstance(value, dict):
             # data_entry_flow.section returns its inner schema as a sub-dict;
-            # flatten it so the rest of the integration sees a flat payload.
+            # flatten only the known trigger sections so unrelated dict-valued
+            # fields keep their original structure.
             flat.update(value)
         else:
             flat[key] = value

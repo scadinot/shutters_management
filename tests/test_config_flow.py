@@ -8,11 +8,13 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.shutters_management.const import (
     CONF_CLOSE_MODE,
+    CONF_CLOSE_OFFSET,
     CONF_CLOSE_TIME,
     CONF_COVERS,
     CONF_DAYS,
     CONF_ONLY_WHEN_AWAY,
     CONF_OPEN_MODE,
+    CONF_OPEN_OFFSET,
     CONF_OPEN_TIME,
     CONF_RANDOMIZE,
     CONF_RANDOM_MAX_MINUTES,
@@ -37,20 +39,20 @@ def _valid_user_input(**overrides):
         "open": {
             CONF_OPEN_MODE: DEFAULT_OPEN_MODE,
             CONF_OPEN_TIME: "08:00:00",
-            "open_offset": 0,
+            CONF_OPEN_OFFSET: 0,
         },
         "close": {
             CONF_CLOSE_MODE: DEFAULT_CLOSE_MODE,
             CONF_CLOSE_TIME: "20:00:00",
-            "close_offset": 0,
+            CONF_CLOSE_OFFSET: 0,
         },
         CONF_DAYS: list(DAYS),
         CONF_RANDOMIZE: False,
         CONF_RANDOM_MAX_MINUTES: 30,
         CONF_ONLY_WHEN_AWAY: False,
     }
-    open_keys = {CONF_OPEN_MODE, CONF_OPEN_TIME, "open_offset"}
-    close_keys = {CONF_CLOSE_MODE, CONF_CLOSE_TIME, "close_offset"}
+    open_keys = {CONF_OPEN_MODE, CONF_OPEN_TIME, CONF_OPEN_OFFSET}
+    close_keys = {CONF_CLOSE_MODE, CONF_CLOSE_TIME, CONF_CLOSE_OFFSET}
     for key, value in overrides.items():
         if key in open_keys:
             data["open"][key] = value

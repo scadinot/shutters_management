@@ -11,13 +11,13 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le pr
 ### Modifié
 
 - Bump de la version de l'intégration `0.3.1` → `0.3.2` dans `manifest.json`.
-- **Configuration : panneau unique** — l'écran « Ajouter une intégration » et l'options flow regroupent désormais tous les champs sur **un seul écran**, avec deux sections pliées « Ouverture » et « Fermeture ». Plus de wizard en 2 étapes. Les champs `time` et `offset` sont visibles ensemble dans chaque section ; les libellés indiquent lequel est utilisé selon le mode (`heure fixe` vs `lever/coucher du soleil`).
+- **Configuration : panneau unique** — l'écran « Ajouter une intégration » et l'options flow regroupent désormais tous les champs sur **un seul écran**, avec deux sections repliables « Ouverture » et « Fermeture », affichées ouvertes par défaut. Plus de wizard en 2 étapes. Les champs `time` et `offset` sont visibles ensemble dans chaque section ; les libellés indiquent lequel est utilisé selon le mode (`heure fixe` vs `lever/coucher du soleil`).
 - Implémentation via `homeassistant.data_entry_flow.section`, mécanisme natif HA utilisé par 10+ intégrations core.
 - `_normalize` aplatit les sous-dictionnaires de sections avant validation, donc le reste du code (scheduler, entités) lit toujours `entry.data[CONF_OPEN_MODE]` etc. sans changement.
 
 ### Pas de breaking change
 
-Aucune migration de schéma. Les entries v0.3.1 existantes ont déjà tous les champs nécessaires dans `data` ; un reload après upgrade les expose simplement dans le nouveau panneau unique. Le scheduler, les entités, les services et les `entity_id` sont strictement inchangés.
+Aucune migration de schéma. Les entries v0.3.1 existantes continuent de fonctionner telles quelles ; en v0.3.1, le second step n'écrivait que `*_time` *ou* `*_offset` selon le mode, donc une entrée sunrise n'a pas de `*_time` (et inversement). Avec le nouveau panneau unique, les champs éventuellement absents de `data` sont simplement pré-remplis avec les valeurs par défaut (`DEFAULT_OPEN_TIME`, `DEFAULT_CLOSE_OFFSET`, etc.) à l'affichage, et le scheduler ignore au runtime celui qui ne correspond pas au mode actif. Le scheduler, les entités, les services et les `entity_id` sont strictement inchangés.
 
 ### Pas de réactivité côté UI
 
