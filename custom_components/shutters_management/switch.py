@@ -11,7 +11,7 @@ from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from . import ShuttersScheduler
-from .const import DOMAIN, SIGNAL_STATE_UPDATE
+from .const import DOMAIN, signal_state_update
 
 
 async def async_setup_entry(
@@ -56,7 +56,9 @@ class ShuttersSimulationSwitch(SwitchEntity):
         """Subscribe to state updates."""
         self.async_on_remove(
             async_dispatcher_connect(
-                self.hass, SIGNAL_STATE_UPDATE, self._handle_update
+                self.hass,
+                signal_state_update(self._scheduler.entry.entry_id),
+                self._handle_update,
             )
         )
 

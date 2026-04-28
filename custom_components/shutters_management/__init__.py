@@ -44,7 +44,7 @@ from .const import (
     SERVICE_PAUSE,
     SERVICE_RESUME,
     SERVICE_RUN_NOW,
-    SIGNAL_STATE_UPDATE,
+    signal_state_update,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -317,7 +317,7 @@ class ShuttersScheduler:
             blocking=False,
         )
         _LOGGER.info("Called cover.%s on %s", service, covers)
-        async_dispatcher_send(self.hass, SIGNAL_STATE_UPDATE)
+        async_dispatcher_send(self.hass, signal_state_update(self.entry.entry_id))
 
     def _is_away(self, settings: dict[str, Any]) -> bool:
         """Return True when the configured presence entity reports away."""
@@ -378,4 +378,4 @@ class ShuttersScheduler:
             return
         self.paused = paused
         _LOGGER.info("Simulation %s", "paused" if paused else "resumed")
-        async_dispatcher_send(self.hass, SIGNAL_STATE_UPDATE)
+        async_dispatcher_send(self.hass, signal_state_update(self.entry.entry_id))
