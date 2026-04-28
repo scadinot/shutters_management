@@ -6,6 +6,34 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le pr
 
 ## [Non publié]
 
+## [0.3.1] — 2026-04-28
+
+### Ajouté
+
+- **Déclencheurs solaires** : chaque événement (ouverture / fermeture) peut désormais être configuré dans l'un des trois modes :
+  - `fixed` (défaut, comportement historique) — déclenchement à une heure fixe.
+  - `sunrise` — déclenchement au lever du soleil.
+  - `sunset` — déclenchement au coucher du soleil.
+
+  Pour les modes solaires, un **décalage signé en minutes** (-360 à +360) peut être appliqué, par exemple `+30` pour 30 minutes après le lever, ou `-15` pour 15 minutes avant le coucher. Le décalage aléatoire (`randomize` / `random_max_minutes`) reste appliqué **en plus** du décalage solaire.
+- Étape conditionnelle `triggers` dans le config flow et l'options flow : après avoir choisi les modes en étape 1, l'utilisateur ne voit en étape 2 que les champs pertinents (heure fixe **ou** offset signé) pour chaque événement.
+- 4 tests dans `tests/test_sun_trigger.py` :
+  - délégation à `get_astral_event_next` avec offset positif (sunrise),
+  - offset négatif (sunset -30 min),
+  - filtrage des jours inactifs (boucle jusqu'à un jour actif),
+  - chemin sunrise dans le config flow saute le champ `open_time`.
+
+### Modifié
+
+- Bump de la version de l'intégration `0.3.0` → `0.3.1` dans `manifest.json`.
+- `_build_schema` remplacé par deux helpers : `_build_step1_schema` (tout sauf time/offset) et `_build_triggers_schema` (time XOR offset selon le mode).
+- `_make_handler` accepte désormais un paramètre `now` optionnel : `async_track_time_change` passe `now`, `async_track_sunrise/sunset` rappellent sans argument.
+- `next_open()` / `next_close()` passent par un nouveau `_next_for(time_key, mode_key, offset_key, default_mode)` qui dispatche selon le mode. La logique solaire (`_next_sun`) boucle sur jusqu'à 8 jours pour atterrir sur un jour actif.
+
+### Pas de changement breaking
+
+Les entries v0.3.0 existantes n'ont pas `CONF_OPEN_MODE` / `CONF_CLOSE_MODE` dans leur `data` ; le code retombe sur `MODE_FIXED` par défaut, donc le comportement reste strictement identique. Aucune migration de schéma n'est nécessaire.
+
 ## [0.3.0] — 2026-04-27
 
 ### Ajouté
@@ -152,7 +180,8 @@ Aucun changement de code dans l'intégration. Seules les méta-données (`manife
 - Annulation propre des déclencheurs et des callbacks différés au déchargement / rechargement.
 - Traductions français et anglais.
 
-[Non publié]: https://github.com/scadinot/shutters_management/compare/v0.3.0...HEAD
+[Non publié]: https://github.com/scadinot/shutters_management/compare/v0.3.1...HEAD
+[0.3.1]: https://github.com/scadinot/shutters_management/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/scadinot/shutters_management/compare/v0.2.5...v0.3.0
 [0.2.5]: https://github.com/scadinot/shutters_management/compare/v0.2.3...v0.2.5
 [0.2.3]: https://github.com/scadinot/shutters_management/compare/v0.2.2...v0.2.3

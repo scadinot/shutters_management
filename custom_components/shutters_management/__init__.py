@@ -15,14 +15,19 @@ from homeassistant.const import (
     CONF_NAME,
     SERVICE_CLOSE_COVER,
     SERVICE_OPEN_COVER,
+    SUN_EVENT_SUNRISE,
+    SUN_EVENT_SUNSET,
 )
 from homeassistant.core import HomeAssistant, ServiceCall, callback
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.helpers.event import (
     async_call_later,
+    async_track_sunrise,
+    async_track_sunset,
     async_track_time_change,
 )
+from homeassistant.helpers.sun import get_astral_event_next
 from homeassistant.util import dt as dt_util
 
 from .const import (
@@ -30,21 +35,33 @@ from .const import (
     ACTION_OPEN,
     ATTR_ACTION,
     AWAY_STATES,
+    CONF_CLOSE_MODE,
+    CONF_CLOSE_OFFSET,
     CONF_CLOSE_TIME,
     CONF_COVERS,
     CONF_DAYS,
     CONF_ONLY_WHEN_AWAY,
+    CONF_OPEN_MODE,
+    CONF_OPEN_OFFSET,
     CONF_OPEN_TIME,
     CONF_PRESENCE_ENTITY,
     CONF_RANDOMIZE,
     CONF_RANDOM_MAX_MINUTES,
     DAYS,
+    DEFAULT_CLOSE_MODE,
+    DEFAULT_CLOSE_OFFSET,
+    DEFAULT_OPEN_MODE,
+    DEFAULT_OPEN_OFFSET,
     DEFAULT_RANDOM_MAX_MINUTES,
     DOMAIN,
+    MODE_FIXED,
+    MODE_SUNRISE,
+    MODE_SUNSET,
     PLATFORMS,
     SERVICE_PAUSE,
     SERVICE_RESUME,
     SERVICE_RUN_NOW,
+    TRIGGER_MODES,
     signal_state_update,
 )
 
@@ -205,37 +222,87 @@ class ShuttersScheduler:
 
     @callback
     def async_schedule(self) -> None:
-        """Register the time triggers."""
+        """Register the time triggers based on each event's mode."""
         settings = self._settings
 
-        open_t = _parse_time(settings[CONF_OPEN_TIME])
-        close_t = _parse_time(settings[CONF_CLOSE_TIME])
+        open_mode = self._resolve_mode(
+            settings.get(CONF_OPEN_MODE, DEFAULT_OPEN_MODE),
+            DEFAULT_OPEN_MODE,
+            f"{SERVICE_OPEN_COVER} mode",
+        )
+        close_mode = self._resolve_mode(
+            settings.get(CONF_CLOSE_MODE, DEFAULT_CLOSE_MODE),
+            DEFAULT_CLOSE_MODE,
+            f"{SERVICE_CLOSE_COVER} mode",
+        )
 
         self._unsubs.append(
-            async_track_time_change(
-                self.hass,
-                self._make_handler(SERVICE_OPEN_COVER),
-                hour=open_t.hour,
-                minute=open_t.minute,
-                second=open_t.second,
+            self._register_trigger(
+                SERVICE_OPEN_COVER,
+                open_mode,
+                settings.get(CONF_OPEN_TIME),
+                int(settings.get(CONF_OPEN_OFFSET, DEFAULT_OPEN_OFFSET)),
             )
         )
         self._unsubs.append(
-            async_track_time_change(
-                self.hass,
-                self._make_handler(SERVICE_CLOSE_COVER),
-                hour=close_t.hour,
-                minute=close_t.minute,
-                second=close_t.second,
+            self._register_trigger(
+                SERVICE_CLOSE_COVER,
+                close_mode,
+                settings.get(CONF_CLOSE_TIME),
+                int(settings.get(CONF_CLOSE_OFFSET, DEFAULT_CLOSE_OFFSET)),
             )
         )
 
         _LOGGER.debug(
-            "Scheduled covers %s: open=%s close=%s",
+            "Scheduled covers %s: open=(%s) close=(%s)",
             settings.get(CONF_COVERS),
-            open_t,
-            close_t,
+            open_mode,
+            close_mode,
         )
+
+    def _resolve_mode(
+        self, mode: str, default_mode: str, context: str
+    ) -> str:
+        """Return a known trigger mode, defaulting + warning on unknown values."""
+        if mode in TRIGGER_MODES:
+            return mode
+        _LOGGER.warning(
+            "Unknown trigger mode %r for %s on entry %s; falling back to %r",
+            mode,
+            context,
+            self.entry.entry_id,
+            default_mode,
+        )
+        return default_mode
+
+    def _register_trigger(
+        self,
+        service: str,
+        mode: str,
+        time_value: str | None,
+        offset_min: int,
+    ) -> Callable[[], None]:
+        """Register a single open/close trigger for the given mode.
+
+        ``mode`` must be one of ``TRIGGER_MODES``; callers should normalise
+        first via ``_resolve_mode``.
+        """
+        handler = self._make_handler(service)
+        if mode == MODE_FIXED:
+            time_obj = _parse_time(time_value)
+            return async_track_time_change(
+                self.hass,
+                handler,
+                hour=time_obj.hour,
+                minute=time_obj.minute,
+                second=time_obj.second,
+            )
+        offset_td = timedelta(minutes=offset_min)
+        if mode == MODE_SUNRISE:
+            return async_track_sunrise(self.hass, handler, offset_td)
+        if mode == MODE_SUNSET:
+            return async_track_sunset(self.hass, handler, offset_td)
+        raise ValueError(f"unexpected trigger mode {mode!r}")
 
     @callback
     def async_unschedule(self) -> None:
@@ -249,8 +316,11 @@ class ShuttersScheduler:
 
     def _make_handler(self, service: str):
         @callback
-        def _handle(now: datetime) -> None:
-            self.hass.async_create_task(self._async_trigger(service, now))
+        def _handle(now: datetime | None = None) -> None:
+            # async_track_time_change passes `now`; async_track_sunrise/sunset
+            # call the handler with no arguments.
+            current = now if now is not None else dt_util.utcnow()
+            self.hass.async_create_task(self._async_trigger(service, current))
 
         return _handle
 
@@ -369,26 +439,70 @@ class ShuttersScheduler:
 
     def next_open(self) -> datetime | None:
         """Return the next scheduled opening as a UTC datetime."""
-        return self._next_for(CONF_OPEN_TIME)
+        return self._next_for(
+            CONF_OPEN_TIME, CONF_OPEN_MODE, CONF_OPEN_OFFSET, DEFAULT_OPEN_MODE
+        )
 
     def next_close(self) -> datetime | None:
         """Return the next scheduled closing as a UTC datetime."""
-        return self._next_for(CONF_CLOSE_TIME)
+        return self._next_for(
+            CONF_CLOSE_TIME, CONF_CLOSE_MODE, CONF_CLOSE_OFFSET, DEFAULT_CLOSE_MODE
+        )
 
-    def _next_for(self, time_key: str) -> datetime | None:
-        """Compute the next scheduled trigger for the given time key."""
+    def _next_for(
+        self,
+        time_key: str,
+        mode_key: str,
+        offset_key: str,
+        default_mode: str,
+    ) -> datetime | None:
+        """Compute the next trigger, dispatching on the configured mode."""
         if self.paused:
             return None
         settings = self._settings
-        time_value = _parse_time(settings[time_key])
         days_keys: list[str] = settings.get(CONF_DAYS, DAYS)
         if not days_keys:
             return None
-        local_now = dt_util.as_local(dt_util.utcnow())
-        local_next = _next_datetime_for(local_now, time_value, days_keys)
-        if local_next is None:
+        mode = self._resolve_mode(
+            settings.get(mode_key, default_mode), default_mode, mode_key
+        )
+        if mode == MODE_FIXED:
+            time_value = _parse_time(settings[time_key])
+            local_now = dt_util.as_local(dt_util.utcnow())
+            local_next = _next_datetime_for(local_now, time_value, days_keys)
+            if local_next is None:
+                return None
+            return dt_util.as_utc(local_next)
+        if mode == MODE_SUNRISE:
+            event = SUN_EVENT_SUNRISE
+        elif mode == MODE_SUNSET:
+            event = SUN_EVENT_SUNSET
+        else:  # pragma: no cover — _resolve_mode already enforces TRIGGER_MODES
             return None
-        return dt_util.as_utc(local_next)
+        offset_min = int(settings.get(offset_key, 0))
+        return self._next_sun(event, offset_min, days_keys)
+
+    def _next_sun(
+        self, event: str, offset_min: int, days_keys: list[str]
+    ) -> datetime | None:
+        """Find the next sunrise/sunset (with offset) on an active day."""
+        offset_td = timedelta(minutes=offset_min)
+        candidate = get_astral_event_next(
+            self.hass, event, dt_util.utcnow(), offset_td
+        )
+        for _ in range(8):
+            if candidate is None:
+                return None
+            local = dt_util.as_local(candidate)
+            if DAYS[local.weekday()] in days_keys:
+                return candidate
+            candidate = get_astral_event_next(
+                self.hass,
+                event,
+                candidate + timedelta(seconds=1),
+                offset_td,
+            )
+        return None
 
     async def async_run_now(self, action: str) -> None:
         """Trigger an immediate open or close, bypassing all conditions."""

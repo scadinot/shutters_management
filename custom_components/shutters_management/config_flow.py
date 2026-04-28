@@ -17,34 +17,53 @@ from homeassistant.helpers import device_registry as dr, selector
 from homeassistant.util import slugify
 
 from .const import (
+    CONF_CLOSE_MODE,
+    CONF_CLOSE_OFFSET,
     CONF_CLOSE_TIME,
     CONF_COVERS,
     CONF_DAYS,
     CONF_ONLY_WHEN_AWAY,
+    CONF_OPEN_MODE,
+    CONF_OPEN_OFFSET,
     CONF_OPEN_TIME,
     CONF_PRESENCE_ENTITY,
     CONF_RANDOMIZE,
     CONF_RANDOM_MAX_MINUTES,
     DAYS,
+    DEFAULT_CLOSE_MODE,
+    DEFAULT_CLOSE_OFFSET,
     DEFAULT_CLOSE_TIME,
     DEFAULT_DAYS,
     DEFAULT_ONLY_WHEN_AWAY,
+    DEFAULT_OPEN_MODE,
+    DEFAULT_OPEN_OFFSET,
     DEFAULT_OPEN_TIME,
     DEFAULT_RANDOMIZE,
     DEFAULT_RANDOM_MAX_MINUTES,
     DOMAIN,
+    MODE_FIXED,
+    OFFSET_MAX_MINUTES,
+    OFFSET_MIN_MINUTES,
+    TRIGGER_MODES,
 )
 
 
-def _build_schema(
+def _build_step1_schema(
     defaults: dict[str, Any], *, include_name: bool = True
 ) -> vol.Schema:
-    """Build the form schema, prefilled with defaults."""
+    """Schema for step 1 (everything except per-event time/offset)."""
     fields: dict[Any, Any] = {}
     if include_name:
         fields[
             vol.Required(CONF_NAME, default=defaults.get(CONF_NAME, ""))
         ] = selector.TextSelector(selector.TextSelectorConfig())
+    mode_selector = selector.SelectSelector(
+        selector.SelectSelectorConfig(
+            options=TRIGGER_MODES,
+            mode=selector.SelectSelectorMode.DROPDOWN,
+            translation_key="trigger_modes",
+        )
+    )
     fields.update(
         {
             vol.Required(
@@ -54,13 +73,13 @@ def _build_schema(
                 selector.EntitySelectorConfig(domain="cover", multiple=True)
             ),
             vol.Required(
-                CONF_OPEN_TIME,
-                default=defaults.get(CONF_OPEN_TIME, DEFAULT_OPEN_TIME),
-            ): selector.TimeSelector(),
+                CONF_OPEN_MODE,
+                default=defaults.get(CONF_OPEN_MODE, DEFAULT_OPEN_MODE),
+            ): mode_selector,
             vol.Required(
-                CONF_CLOSE_TIME,
-                default=defaults.get(CONF_CLOSE_TIME, DEFAULT_CLOSE_TIME),
-            ): selector.TimeSelector(),
+                CONF_CLOSE_MODE,
+                default=defaults.get(CONF_CLOSE_MODE, DEFAULT_CLOSE_MODE),
+            ): mode_selector,
             vol.Required(
                 CONF_DAYS,
                 default=defaults.get(CONF_DAYS, DEFAULT_DAYS),
@@ -107,6 +126,51 @@ def _build_schema(
     return vol.Schema(fields)
 
 
+def _build_triggers_schema(
+    open_mode: str, close_mode: str, defaults: dict[str, Any]
+) -> vol.Schema:
+    """Schema for step 2: only the time XOR offset fields per chosen mode."""
+    offset_selector = selector.NumberSelector(
+        selector.NumberSelectorConfig(
+            min=OFFSET_MIN_MINUTES,
+            max=OFFSET_MAX_MINUTES,
+            step=1,
+            unit_of_measurement="min",
+            mode=selector.NumberSelectorMode.BOX,
+        )
+    )
+    fields: dict[Any, Any] = {}
+    if open_mode == MODE_FIXED:
+        fields[
+            vol.Required(
+                CONF_OPEN_TIME,
+                default=defaults.get(CONF_OPEN_TIME, DEFAULT_OPEN_TIME),
+            )
+        ] = selector.TimeSelector()
+    else:
+        fields[
+            vol.Required(
+                CONF_OPEN_OFFSET,
+                default=defaults.get(CONF_OPEN_OFFSET, DEFAULT_OPEN_OFFSET),
+            )
+        ] = offset_selector
+    if close_mode == MODE_FIXED:
+        fields[
+            vol.Required(
+                CONF_CLOSE_TIME,
+                default=defaults.get(CONF_CLOSE_TIME, DEFAULT_CLOSE_TIME),
+            )
+        ] = selector.TimeSelector()
+    else:
+        fields[
+            vol.Required(
+                CONF_CLOSE_OFFSET,
+                default=defaults.get(CONF_CLOSE_OFFSET, DEFAULT_CLOSE_OFFSET),
+            )
+        ] = offset_selector
+    return vol.Schema(fields)
+
+
 def _strip_name(data: dict[str, Any]) -> dict[str, Any]:
     """Drop CONF_NAME from a payload destined for entry.options.
 
@@ -147,7 +211,7 @@ class ShuttersManagementConfigFlow(ConfigFlow, domain=DOMAIN):
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
-        """Single-step user form."""
+        """Step 1: collect everything except per-event time/offset."""
         errors: dict[str, str] = {}
 
         if user_input is not None:
@@ -163,15 +227,37 @@ class ShuttersManagementConfigFlow(ConfigFlow, domain=DOMAIN):
                 data[CONF_NAME] = name
                 await self.async_set_unique_id(slugify(name))
                 self._abort_if_unique_id_configured()
-                if _needs_presence_warning(self.hass, data):
-                    self._pending_data = data
-                    return await self.async_step_confirm_no_presence()
-                return self.async_create_entry(title=name, data=data)
+                self._pending_data = data
+                return await self.async_step_triggers()
 
         return self.async_show_form(
             step_id="user",
-            data_schema=_build_schema(user_input or {}),
+            data_schema=_build_step1_schema(user_input or {}),
             errors=errors,
+        )
+
+    async def async_step_triggers(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Step 2: ask only the time XOR offset relevant for each chosen mode."""
+        assert self._pending_data is not None
+        open_mode = self._pending_data.get(CONF_OPEN_MODE, DEFAULT_OPEN_MODE)
+        close_mode = self._pending_data.get(CONF_CLOSE_MODE, DEFAULT_CLOSE_MODE)
+
+        if user_input is not None:
+            triggers = _normalize(user_input)
+            self._pending_data.update(triggers)
+            data = self._pending_data
+            if _needs_presence_warning(self.hass, data):
+                return await self.async_step_confirm_no_presence()
+            self._pending_data = None
+            return self.async_create_entry(title=data[CONF_NAME], data=data)
+
+        return self.async_show_form(
+            step_id="triggers",
+            data_schema=_build_triggers_schema(
+                open_mode, close_mode, self._pending_data
+            ),
         )
 
     async def async_step_confirm_no_presence(
@@ -207,7 +293,7 @@ class ShuttersManagementOptionsFlow(OptionsFlow):
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
-        """Edit the saved configuration."""
+        """Step 1: edit the saved configuration (everything except triggers)."""
         errors: dict[str, str] = {}
 
         if user_input is not None:
@@ -220,11 +306,9 @@ class ShuttersManagementOptionsFlow(OptionsFlow):
             elif not data.get(CONF_DAYS):
                 errors[CONF_DAYS] = "no_days"
             else:
-                if _needs_presence_warning(self.hass, data):
-                    self._pending_data = data
-                    return await self.async_step_confirm_no_presence()
-                self._sync_name(name)
-                return self.async_create_entry(title="", data=_strip_name(data))
+                data[CONF_NAME] = name
+                self._pending_data = data
+                return await self.async_step_triggers()
 
         defaults = {
             **self.config_entry.data,
@@ -233,8 +317,36 @@ class ShuttersManagementOptionsFlow(OptionsFlow):
         }
         return self.async_show_form(
             step_id="init",
-            data_schema=_build_schema(defaults),
+            data_schema=_build_step1_schema(defaults),
             errors=errors,
+        )
+
+    async def async_step_triggers(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Step 2: edit the time XOR offset for each chosen mode."""
+        assert self._pending_data is not None
+        open_mode = self._pending_data.get(CONF_OPEN_MODE, DEFAULT_OPEN_MODE)
+        close_mode = self._pending_data.get(CONF_CLOSE_MODE, DEFAULT_CLOSE_MODE)
+
+        if user_input is not None:
+            triggers = _normalize(user_input)
+            self._pending_data.update(triggers)
+            data = self._pending_data
+            if _needs_presence_warning(self.hass, data):
+                return await self.async_step_confirm_no_presence()
+            self._pending_data = None
+            self._sync_name(data[CONF_NAME])
+            return self.async_create_entry(title="", data=_strip_name(data))
+
+        defaults = {
+            **self.config_entry.data,
+            **self.config_entry.options,
+            **self._pending_data,
+        }
+        return self.async_show_form(
+            step_id="triggers",
+            data_schema=_build_triggers_schema(open_mode, close_mode, defaults),
         )
 
     def _sync_name(self, name: str) -> None:

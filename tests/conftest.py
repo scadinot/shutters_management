@@ -9,14 +9,22 @@ from homeassistant.const import CONF_NAME
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.shutters_management.const import (
+    CONF_CLOSE_MODE,
+    CONF_CLOSE_OFFSET,
     CONF_CLOSE_TIME,
     CONF_COVERS,
     CONF_DAYS,
     CONF_ONLY_WHEN_AWAY,
+    CONF_OPEN_MODE,
+    CONF_OPEN_OFFSET,
     CONF_OPEN_TIME,
     CONF_RANDOMIZE,
     CONF_RANDOM_MAX_MINUTES,
     DAYS,
+    DEFAULT_CLOSE_MODE,
+    DEFAULT_CLOSE_OFFSET,
+    DEFAULT_OPEN_MODE,
+    DEFAULT_OPEN_OFFSET,
     DOMAIN,
 )
 
@@ -35,8 +43,12 @@ def base_config() -> dict[str, Any]:
     return {
         CONF_NAME: "Bureau",
         CONF_COVERS: ["cover.living_room"],
+        CONF_OPEN_MODE: DEFAULT_OPEN_MODE,
         CONF_OPEN_TIME: "08:00:00",
+        CONF_OPEN_OFFSET: DEFAULT_OPEN_OFFSET,
+        CONF_CLOSE_MODE: DEFAULT_CLOSE_MODE,
         CONF_CLOSE_TIME: "20:00:00",
+        CONF_CLOSE_OFFSET: DEFAULT_CLOSE_OFFSET,
         CONF_DAYS: list(DAYS),
         CONF_RANDOMIZE: False,
         CONF_RANDOM_MAX_MINUTES: 30,

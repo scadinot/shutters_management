@@ -7,13 +7,23 @@
         "data": {
           "name": "Instance name",
           "covers": "Shutters to control",
-          "open_time": "Opening time",
-          "close_time": "Closing time",
+          "open_mode": "Opening trigger",
+          "close_mode": "Closing trigger",
           "days": "Active days",
           "randomize": "Randomize times",
           "random_max_minutes": "Maximum random offset (minutes)",
           "only_when_away": "Run only when away",
           "presence_entity": "Presence entity (person or group)"
+        }
+      },
+      "triggers": {
+        "title": "Trigger times",
+        "description": "Set the time for fixed triggers, or the offset (in minutes, signed) for sunrise/sunset triggers.",
+        "data": {
+          "open_time": "Opening time",
+          "open_offset": "Opening offset (minutes)",
+          "close_time": "Closing time",
+          "close_offset": "Closing offset (minutes)"
         }
       },
       "confirm_no_presence": {
@@ -38,13 +48,23 @@
         "data": {
           "name": "Instance name",
           "covers": "Shutters to control",
-          "open_time": "Opening time",
-          "close_time": "Closing time",
+          "open_mode": "Opening trigger",
+          "close_mode": "Closing trigger",
           "days": "Active days",
           "randomize": "Randomize times",
           "random_max_minutes": "Maximum random offset (minutes)",
           "only_when_away": "Run only when away",
           "presence_entity": "Presence entity (person or group)"
+        }
+      },
+      "triggers": {
+        "title": "Trigger times",
+        "description": "Set the time for fixed triggers, or the offset (in minutes, signed) for sunrise/sunset triggers.",
+        "data": {
+          "open_time": "Opening time",
+          "open_offset": "Opening offset (minutes)",
+          "close_time": "Closing time",
+          "close_offset": "Closing offset (minutes)"
         }
       },
       "confirm_no_presence": {
@@ -68,6 +88,13 @@
         "fri": "Friday",
         "sat": "Saturday",
         "sun": "Sunday"
+      }
+    },
+    "trigger_modes": {
+      "options": {
+        "fixed": "Fixed time",
+        "sunrise": "Sunrise",
+        "sunset": "Sunset"
       }
     }
   },
