@@ -6,6 +6,7 @@ from unittest.mock import patch
 
 from homeassistant.const import CONF_NAME, SUN_EVENT_SUNRISE, SUN_EVENT_SUNSET
 from homeassistant.core import HomeAssistant
+from homeassistant.data_entry_flow import FlowResultType
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.shutters_management.const import (
@@ -21,6 +22,7 @@ from custom_components.shutters_management.const import (
     CONF_RANDOMIZE,
     CONF_RANDOM_MAX_MINUTES,
     DAYS,
+    DEFAULT_CLOSE_MODE,
     DOMAIN,
     MODE_FIXED,
     MODE_SUNRISE,
@@ -140,3 +142,46 @@ async def test_sun_handler_filters_inactive_days(
 
     assert result == mon
     assert mock_next.call_count == 3
+
+
+async def test_config_flow_sunrise_path_skips_open_time(
+    hass: HomeAssistant,
+) -> None:
+    """When open_mode=sunrise the triggers step asks for open_offset, not open_time."""
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": "user"}
+    )
+    assert result["step_id"] == "user"
+
+    step1 = {
+        CONF_NAME: "Vacances",
+        CONF_COVERS: ["cover.living_room"],
+        CONF_OPEN_MODE: MODE_SUNRISE,
+        CONF_CLOSE_MODE: DEFAULT_CLOSE_MODE,
+        CONF_DAYS: list(DAYS),
+        CONF_RANDOMIZE: False,
+        CONF_RANDOM_MAX_MINUTES: 30,
+        CONF_ONLY_WHEN_AWAY: False,
+    }
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], user_input=step1
+    )
+    assert result["type"] == FlowResultType.FORM
+    assert result["step_id"] == "triggers"
+
+    # The schema must accept open_offset (sunrise) and close_time (fixed),
+    # but not open_time (it's the sunrise path).
+    schema_keys = set(result["data_schema"].schema.keys())
+    schema_key_names = {k.schema for k in schema_keys}
+    assert CONF_OPEN_OFFSET in schema_key_names
+    assert CONF_OPEN_TIME not in schema_key_names
+    assert CONF_CLOSE_TIME in schema_key_names
+
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"],
+        user_input={CONF_OPEN_OFFSET: 15, CONF_CLOSE_TIME: "20:00:00"},
+    )
+    assert result["type"] == FlowResultType.CREATE_ENTRY
+    assert result["data"][CONF_OPEN_MODE] == MODE_SUNRISE
+    assert result["data"][CONF_OPEN_OFFSET] == 15
+    assert result["data"][CONF_CLOSE_TIME] == "20:00:00"
