@@ -50,8 +50,8 @@ async def test_button_entity_ids_are_stable_english(
     close_id = registry.async_get_entity_id(
         "button", DOMAIN, f"{mock_config_entry.entry_id}_test_{ACTION_CLOSE}"
     )
-    assert open_id == "button.shutters_management_test_open"
-    assert close_id == "button.shutters_management_test_close"
+    assert open_id == "button.bureau_test_open"
+    assert close_id == "button.bureau_test_close"
 
 
 async def test_button_press_open_calls_run_now(

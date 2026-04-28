@@ -5,6 +5,7 @@ from collections.abc import Generator
 from typing import Any
 
 import pytest
+from homeassistant.const import CONF_NAME
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.shutters_management.const import (
@@ -32,6 +33,7 @@ def auto_enable_custom_integrations(
 def base_config() -> dict[str, Any]:
     """Default config dict matching what the config_flow would persist."""
     return {
+        CONF_NAME: "Bureau",
         CONF_COVERS: ["cover.living_room"],
         CONF_OPEN_TIME: "08:00:00",
         CONF_CLOSE_TIME: "20:00:00",
@@ -47,11 +49,12 @@ def mock_config_entry(base_config: dict[str, Any]) -> MockConfigEntry:
     """Provide a MockConfigEntry with a stable entry_id."""
     return MockConfigEntry(
         domain=DOMAIN,
-        title="Shutters Management",
+        title=base_config[CONF_NAME],
         data=base_config,
         options={},
         entry_id="test_entry_id",
-        unique_id=DOMAIN,
+        unique_id="bureau",
+        version=2,
     )
 
 

@@ -12,6 +12,7 @@ import voluptuous as vol
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
     ATTR_ENTITY_ID,
+    CONF_NAME,
     SERVICE_CLOSE_COVER,
     SERVICE_OPEN_COVER,
 )
@@ -44,7 +45,7 @@ from .const import (
     SERVICE_PAUSE,
     SERVICE_RESUME,
     SERVICE_RUN_NOW,
-    SIGNAL_STATE_UPDATE,
+    signal_state_update,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -129,6 +130,29 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 async def _async_update_listener(hass: HomeAssistant, entry: ConfigEntry) -> None:
     """Reload integration on options update."""
     await hass.config_entries.async_reload(entry.entry_id)
+
+
+async def async_migrate_entry(
+    hass: HomeAssistant, entry: ConfigEntry
+) -> bool:
+    """Migrate older config entries forward.
+
+    v1 entries (pre-multi-instance) had no CONF_NAME in entry.data. We
+    backfill it from entry.title so the new code paths that read the
+    instance name out of entry.data still work for upgraded users. From
+    v0.3.0 onward, entry.data[CONF_NAME] is the canonical source of the
+    instance name and the options flow keeps it in sync on rename.
+    """
+    if entry.version == 1:
+        new_data = {**entry.data}
+        new_data.setdefault(CONF_NAME, entry.title or "Shutters Management")
+        hass.config_entries.async_update_entry(entry, data=new_data, version=2)
+        _LOGGER.info(
+            "Migrated config entry %s from v1 to v2 (CONF_NAME=%s)",
+            entry.entry_id,
+            new_data[CONF_NAME],
+        )
+    return True
 
 
 @callback
@@ -317,7 +341,7 @@ class ShuttersScheduler:
             blocking=False,
         )
         _LOGGER.info("Called cover.%s on %s", service, covers)
-        async_dispatcher_send(self.hass, SIGNAL_STATE_UPDATE)
+        async_dispatcher_send(self.hass, signal_state_update(self.entry.entry_id))
 
     def _is_away(self, settings: dict[str, Any]) -> bool:
         """Return True when the configured presence entity reports away."""
@@ -378,4 +402,4 @@ class ShuttersScheduler:
             return
         self.paused = paused
         _LOGGER.info("Simulation %s", "paused" if paused else "resumed")
-        async_dispatcher_send(self.hass, SIGNAL_STATE_UPDATE)
+        async_dispatcher_send(self.hass, signal_state_update(self.entry.entry_id))

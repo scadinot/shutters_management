@@ -10,9 +10,11 @@ from homeassistant.config_entries import (
     ConfigFlow,
     OptionsFlow,
 )
+from homeassistant.const import CONF_NAME
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.data_entry_flow import FlowResult
-from homeassistant.helpers import selector
+from homeassistant.helpers import device_registry as dr, selector
+from homeassistant.util import slugify
 
 from .const import (
     CONF_CLOSE_TIME,
@@ -34,9 +36,16 @@ from .const import (
 )
 
 
-def _build_schema(defaults: dict[str, Any]) -> vol.Schema:
+def _build_schema(
+    defaults: dict[str, Any], *, include_name: bool = True
+) -> vol.Schema:
     """Build the form schema, prefilled with defaults."""
-    return vol.Schema(
+    fields: dict[Any, Any] = {}
+    if include_name:
+        fields[
+            vol.Required(CONF_NAME, default=defaults.get(CONF_NAME, ""))
+        ] = selector.TextSelector(selector.TextSelectorConfig())
+    fields.update(
         {
             vol.Required(
                 CONF_COVERS,
@@ -95,6 +104,16 @@ def _build_schema(defaults: dict[str, Any]) -> vol.Schema:
             ),
         }
     )
+    return vol.Schema(fields)
+
+
+def _strip_name(data: dict[str, Any]) -> dict[str, Any]:
+    """Drop CONF_NAME from a payload destined for entry.options.
+
+    The instance name lives in entry.data (and entry.title); keeping it
+    out of entry.options avoids a stale duplicate after a rename.
+    """
+    return {k: v for k, v in data.items() if k != CONF_NAME}
 
 
 def _normalize(user_input: dict[str, Any]) -> dict[str, Any]:
@@ -119,7 +138,7 @@ def _needs_presence_warning(hass: HomeAssistant, data: dict[str, Any]) -> bool:
 class ShuttersManagementConfigFlow(ConfigFlow, domain=DOMAIN):
     """Handle the initial UI configuration."""
 
-    VERSION = 1
+    VERSION = 2
 
     def __init__(self) -> None:
         super().__init__()
@@ -133,19 +152,21 @@ class ShuttersManagementConfigFlow(ConfigFlow, domain=DOMAIN):
 
         if user_input is not None:
             data = _normalize(user_input)
-            if not data.get(CONF_COVERS):
+            name = (data.get(CONF_NAME) or "").strip()
+            if not name:
+                errors[CONF_NAME] = "name_required"
+            elif not data.get(CONF_COVERS):
                 errors[CONF_COVERS] = "no_covers"
             elif not data.get(CONF_DAYS):
                 errors[CONF_DAYS] = "no_days"
             else:
-                await self.async_set_unique_id(DOMAIN)
+                data[CONF_NAME] = name
+                await self.async_set_unique_id(slugify(name))
                 self._abort_if_unique_id_configured()
                 if _needs_presence_warning(self.hass, data):
                     self._pending_data = data
                     return await self.async_step_confirm_no_presence()
-                return self.async_create_entry(
-                    title="Shutters Management", data=data
-                )
+                return self.async_create_entry(title=name, data=data)
 
         return self.async_show_form(
             step_id="user",
@@ -161,7 +182,7 @@ class ShuttersManagementConfigFlow(ConfigFlow, domain=DOMAIN):
             assert self._pending_data is not None
             data = self._pending_data
             self._pending_data = None
-            return self.async_create_entry(title="Shutters Management", data=data)
+            return self.async_create_entry(title=data[CONF_NAME], data=data)
 
         return self.async_show_form(
             step_id="confirm_no_presence",
@@ -191,7 +212,10 @@ class ShuttersManagementOptionsFlow(OptionsFlow):
 
         if user_input is not None:
             data = _normalize(user_input)
-            if not data.get(CONF_COVERS):
+            name = (data.get(CONF_NAME) or "").strip()
+            if not name:
+                errors[CONF_NAME] = "name_required"
+            elif not data.get(CONF_COVERS):
                 errors[CONF_COVERS] = "no_covers"
             elif not data.get(CONF_DAYS):
                 errors[CONF_DAYS] = "no_days"
@@ -199,14 +223,47 @@ class ShuttersManagementOptionsFlow(OptionsFlow):
                 if _needs_presence_warning(self.hass, data):
                     self._pending_data = data
                     return await self.async_step_confirm_no_presence()
-                return self.async_create_entry(title="", data=data)
+                self._sync_name(name)
+                return self.async_create_entry(title="", data=_strip_name(data))
 
-        defaults = {**self.config_entry.data, **self.config_entry.options}
+        defaults = {
+            **self.config_entry.data,
+            **self.config_entry.options,
+            CONF_NAME: self.config_entry.title,
+        }
         return self.async_show_form(
             step_id="init",
             data_schema=_build_schema(defaults),
             errors=errors,
         )
+
+    def _sync_name(self, name: str) -> None:
+        """Keep the instance name authoritative across data, title and device.
+
+        Stored in entry.data[CONF_NAME] (single source of truth), mirrored
+        on entry.title (what HA shows in the integrations list) and on the
+        device.name (what the device card displays). entry.options never
+        carries CONF_NAME; this avoids data/options/title drift after a
+        rename. The unique_id (built from the original name's slug at
+        creation) is left untouched intentionally — HA does not allow
+        unique_id changes after creation.
+        """
+        current_data_name = self.config_entry.data.get(CONF_NAME)
+        if (
+            name == self.config_entry.title
+            and current_data_name == name
+        ):
+            return
+        new_data = {**self.config_entry.data, CONF_NAME: name}
+        self.hass.config_entries.async_update_entry(
+            self.config_entry, title=name, data=new_data
+        )
+        device_registry = dr.async_get(self.hass)
+        device = device_registry.async_get_device(
+            identifiers={(DOMAIN, self.config_entry.entry_id)}
+        )
+        if device is not None:
+            device_registry.async_update_device(device.id, name=name)
 
     async def async_step_confirm_no_presence(
         self, user_input: dict[str, Any] | None = None
@@ -216,7 +273,8 @@ class ShuttersManagementOptionsFlow(OptionsFlow):
             assert self._pending_data is not None
             data = self._pending_data
             self._pending_data = None
-            return self.async_create_entry(title="", data=data)
+            self._sync_name(data[CONF_NAME])
+            return self.async_create_entry(title="", data=_strip_name(data))
 
         return self.async_show_form(
             step_id="confirm_no_presence",

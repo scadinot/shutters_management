@@ -35,4 +35,9 @@ ATTR_ACTION = "action"
 ACTION_OPEN = "open"
 ACTION_CLOSE = "close"
 
-SIGNAL_STATE_UPDATE = "shutters_management_state_update"
+SIGNAL_STATE_UPDATE_PREFIX = "shutters_management_state_update"
+
+
+def signal_state_update(entry_id: str) -> str:
+    """Return the dispatcher signal name scoped to a config entry."""
+    return f"{SIGNAL_STATE_UPDATE_PREFIX}_{entry_id}"

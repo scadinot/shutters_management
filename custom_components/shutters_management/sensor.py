@@ -11,7 +11,7 @@ from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from . import ShuttersScheduler
-from .const import DOMAIN, SIGNAL_STATE_UPDATE
+from .const import DOMAIN, signal_state_update
 
 
 async def async_setup_entry(
@@ -41,11 +41,9 @@ class ShuttersNextTriggerSensor(SensorEntity):
         self._kind = kind
         self._attr_unique_id = f"{scheduler.entry.entry_id}_next_{kind}"
         self._attr_translation_key = f"next_{kind}"
-        slug = "next_opening" if kind == "open" else "next_closing"
-        self._attr_suggested_object_id = f"{DOMAIN}_{slug}"
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, scheduler.entry.entry_id)},
-            name="Shutters Management",
+            name=scheduler.entry.title,
             manufacturer="Shutters Management",
             entry_type=DeviceEntryType.SERVICE,
         )
@@ -60,7 +58,9 @@ class ShuttersNextTriggerSensor(SensorEntity):
         """Subscribe to state updates."""
         self.async_on_remove(
             async_dispatcher_connect(
-                self.hass, SIGNAL_STATE_UPDATE, self._handle_update
+                self.hass,
+                signal_state_update(self._scheduler.entry.entry_id),
+                self._handle_update,
             )
         )
 

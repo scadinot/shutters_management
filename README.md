@@ -112,15 +112,17 @@ Quand `only_when_away` est activé, l'intégration applique l'ordre suivant :
 
 L'intégration crée cinq entités regroupées sous un device unique « Shutters Management » :
 
-| Entité | Type | Description |
+| Entité (instance « Bureau ») | Type | Description |
 |---|---|---|
-| `sensor.shutters_management_next_opening` | `timestamp` | Date et heure du prochain déclenchement d'ouverture (sans le décalage aléatoire). |
-| `sensor.shutters_management_next_closing` | `timestamp` | Date et heure du prochain déclenchement de fermeture. |
-| `switch.shutters_management_simulation_active` | `switch` | État actif/pause de la simulation. Basculable directement depuis le dashboard. |
-| `button.shutters_management_test_open` | `button` | Déclenche immédiatement une ouverture des volets configurés. |
-| `button.shutters_management_test_close` | `button` | Déclenche immédiatement une fermeture des volets configurés. |
+| `sensor.bureau_next_opening` | `timestamp` | Date et heure du prochain déclenchement d'ouverture (sans le décalage aléatoire). |
+| `sensor.bureau_next_closing` | `timestamp` | Date et heure du prochain déclenchement de fermeture. |
+| `switch.bureau_simulation_active` | `switch` | État actif/pause de la simulation. Basculable directement depuis le dashboard. |
+| `button.bureau_test_open` | `button` | Déclenche immédiatement une ouverture des volets configurés. |
+| `button.bureau_test_close` | `button` | Déclenche immédiatement une fermeture des volets configurés. |
 
-Depuis la v0.2.3, les `entity_id` listés ci-dessus sont stables : ils ne dépendent plus de la langue de Home Assistant pour les nouvelles installations. Le nom d'affichage (« Prochaine ouverture » en français, « Next opening » en anglais, etc.) reste piloté par les traductions. Les `unique_id` restent eux aussi stables (`<entry_id>_next_open`, `<entry_id>_next_close`, `<entry_id>_simulation_active`, `<entry_id>_test_open`, `<entry_id>_test_close`).
+Depuis la **v0.3.0** (multi-instance), le préfixe `bureau` dans les noms ci-dessus correspond au **nom que vous donnez à l'instance** lors de sa création. Si vous créez une seconde instance « RDC », ses entités s'appelleront `sensor.rdc_next_opening`, `switch.rdc_simulation_active`, etc. Les `unique_id` restent indépendants du nom (`<entry_id>_next_open`, etc.).
+
+> Les utilisateurs qui ont installé l'intégration avant v0.3.0 conservent leurs anciens `entity_id` (par exemple `sensor.shutters_management_next_opening`) — ils sont gelés dans le registre Home Assistant. Pour les renommer vers le nouveau format, allez dans **Paramètres → Appareils et services → Shutters Management → cliquer sur l'entité → modifier l'`entity_id`**.
 
 Les capteurs `next_*` n'incluent pas le décalage aléatoire : ils annoncent l'heure programmée. Le décalage est appliqué au moment du déclenchement. Quand le switch est sur `off` (simulation en pause), les capteurs renvoient `unknown`.
 
@@ -240,7 +242,7 @@ Le rechargement est automatique. Si rien ne change, supprimez l'intégration et 
 ## FAQ
 
 **Puis-je avoir plusieurs profils horaires (semaine / week-end / vacances) ?**
-Pas dans la version actuelle : une seule instance est gérée. C'est prévu dans la [roadmap](ROADMAP.md).
+Pas directement, mais depuis v0.3.0 vous pouvez créer **plusieurs instances** de l'intégration (par exemple une par étage ou une par profil horaire) et activer/désactiver celles dont vous n'avez pas besoin via leur switch `simulation_active`. Le support natif des profils horaires est prévu dans la [roadmap](ROADMAP.md).
 
 **Puis-je piloter par des heures relatives au coucher du soleil ?**
 Pas encore. Voir la [roadmap](ROADMAP.md) (v0.3).
@@ -253,8 +255,8 @@ Le délai en attente est perdu (comportement standard d'`async_call_later`). Le 
 
 ## Limitations connues
 
-- Une seule instance de l'intégration peut être configurée par installation Home Assistant.
 - Pas de support des déclencheurs liés au soleil (`sunset` / `sunrise`).
+- Les services `shutters_management.run_now` / `pause` / `resume` agissent sur **toutes** les instances simultanément (broadcast). Le ciblage par `target` est prévu dans une release future. En attendant, pour cibler une instance spécifique depuis une automation, utilisez le bouton/switch correspondant (`button.<nom>_test_open`, `switch.<nom>_simulation_active`, etc.).
 
 Ces limitations sont suivies dans la [roadmap](ROADMAP.md).
 

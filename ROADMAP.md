@@ -15,7 +15,7 @@ utilisateurs.
 
 | Horizon | Objectif principal | Effort estimé |
 |---|---|---|
-| [Statut actuel](#statut-actuel) | Version courante v0.2.5 — voir CHANGELOG pour l'historique | livré |
+| [Statut actuel](#statut-actuel) | Version courante v0.3.0 — voir CHANGELOG pour l'historique | livré |
 | [Moyen terme](#moyen-terme--fonctionnalités-v030) | Profils horaires, déclencheurs solaires, multi-instance | quelques jours par lot |
 | [Long terme](#long-terme--stabilisation-v10) | Templates, notifications, statistiques, API publique stabilisée | plusieurs semaines |
 | [Pistes exploratoires](#pistes-exploratoires) | Météo, luminosité, jours fériés, ouverture partielle | à évaluer au cas par cas |
@@ -24,7 +24,7 @@ utilisateurs.
 
 ## Statut actuel
 
-La version courante est **v0.2.5**. Pour la liste des fonctionnalités
+La version courante est **v0.3.0**. Pour la liste des fonctionnalités
 déjà disponibles, voir la section [Fonctionnalités](README.md#fonctionnalités)
 du README. Pour l'historique détaillé des versions livrées, voir le
 [CHANGELOG.md](CHANGELOG.md).
@@ -65,23 +65,15 @@ sélection via un nouveau `select.shutters_management_profile` ou un
 `input_boolean.vacances` exposé par l'utilisateur. La logique du
 scheduler résout le profil actif à chaque déclenchement.
 
-### 3. Multi-instance
+### 3. Multi-instance — ✅ livré en v0.3.0
 
-**Motivation.** Une seule entrée du domaine est aujourd'hui autorisée
-(`async_set_unique_id(DOMAIN)` puis
-`_abort_if_unique_id_configured()` dans `config_flow.py`). Or
-beaucoup d'utilisateurs ont plusieurs zones (étage / RDC / garage /
-résidence secondaire) avec des horaires distincts.
+Plusieurs entrées indépendantes peuvent désormais coexister sous le
+même domaine. Chaque entrée a son propre nom (`CONF_NAME`), son propre
+device, ses propres entités préfixées par le slug du nom. Voir le
+[CHANGELOG](CHANGELOG.md#030--2026-04-27).
 
-**Piste technique.** Retirer l'abort unique dans `async_step_user` ;
-dériver l'`unique_id` du config_entry de l'`entry_id` lui-même. Les
-`unique_id` des entités sont déjà préfixés par `entry.entry_id`
-(depuis v0.2.1) — pas de migration nécessaire. Scoper
-`SIGNAL_STATE_UPDATE` par `entry_id` pour éviter les rafraîchissements
-croisés. Adapter les services `run_now` / `pause` / `resume` pour
-accepter un `target` (device_id ou entity_id), avec broadcast par
-défaut pour rétro-compatibilité. Les tests v0.2.2 ont été conçus
-pour survivre à ce refactor (~95 % de réutilisation prévue).
+Le ciblage des services `run_now` / `pause` / `resume` par `target`
+reste à faire (broadcast actuellement) — reporté à v0.3.1+.
 
 ### 4. Réglages avancés du décalage aléatoire
 
