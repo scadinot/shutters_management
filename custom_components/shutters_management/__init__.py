@@ -61,6 +61,7 @@ from .const import (
     SERVICE_PAUSE,
     SERVICE_RESUME,
     SERVICE_RUN_NOW,
+    TRIGGER_MODES,
     signal_state_update,
 )
 
@@ -224,10 +225,21 @@ class ShuttersScheduler:
         """Register the time triggers based on each event's mode."""
         settings = self._settings
 
+        open_mode = self._resolve_mode(
+            settings.get(CONF_OPEN_MODE, DEFAULT_OPEN_MODE),
+            DEFAULT_OPEN_MODE,
+            f"{SERVICE_OPEN_COVER} mode",
+        )
+        close_mode = self._resolve_mode(
+            settings.get(CONF_CLOSE_MODE, DEFAULT_CLOSE_MODE),
+            DEFAULT_CLOSE_MODE,
+            f"{SERVICE_CLOSE_COVER} mode",
+        )
+
         self._unsubs.append(
             self._register_trigger(
                 SERVICE_OPEN_COVER,
-                settings.get(CONF_OPEN_MODE, DEFAULT_OPEN_MODE),
+                open_mode,
                 settings.get(CONF_OPEN_TIME),
                 int(settings.get(CONF_OPEN_OFFSET, DEFAULT_OPEN_OFFSET)),
             )
@@ -235,7 +247,7 @@ class ShuttersScheduler:
         self._unsubs.append(
             self._register_trigger(
                 SERVICE_CLOSE_COVER,
-                settings.get(CONF_CLOSE_MODE, DEFAULT_CLOSE_MODE),
+                close_mode,
                 settings.get(CONF_CLOSE_TIME),
                 int(settings.get(CONF_CLOSE_OFFSET, DEFAULT_CLOSE_OFFSET)),
             )
@@ -244,9 +256,24 @@ class ShuttersScheduler:
         _LOGGER.debug(
             "Scheduled covers %s: open=(%s) close=(%s)",
             settings.get(CONF_COVERS),
-            settings.get(CONF_OPEN_MODE, DEFAULT_OPEN_MODE),
-            settings.get(CONF_CLOSE_MODE, DEFAULT_CLOSE_MODE),
+            open_mode,
+            close_mode,
         )
+
+    def _resolve_mode(
+        self, mode: str, default_mode: str, context: str
+    ) -> str:
+        """Return a known trigger mode, defaulting + warning on unknown values."""
+        if mode in TRIGGER_MODES:
+            return mode
+        _LOGGER.warning(
+            "Unknown trigger mode %r for %s on entry %s; falling back to %r",
+            mode,
+            context,
+            self.entry.entry_id,
+            default_mode,
+        )
+        return default_mode
 
     def _register_trigger(
         self,
@@ -255,7 +282,11 @@ class ShuttersScheduler:
         time_value: str | None,
         offset_min: int,
     ) -> Callable[[], None]:
-        """Register a single open/close trigger for the given mode."""
+        """Register a single open/close trigger for the given mode.
+
+        ``mode`` must be one of ``TRIGGER_MODES``; callers should normalise
+        first via ``_resolve_mode``.
+        """
         handler = self._make_handler(service)
         if mode == MODE_FIXED:
             time_obj = _parse_time(time_value)
@@ -269,7 +300,9 @@ class ShuttersScheduler:
         offset_td = timedelta(minutes=offset_min)
         if mode == MODE_SUNRISE:
             return async_track_sunrise(self.hass, handler, offset_td)
-        return async_track_sunset(self.hass, handler, offset_td)
+        if mode == MODE_SUNSET:
+            return async_track_sunset(self.hass, handler, offset_td)
+        raise ValueError(f"unexpected trigger mode {mode!r}")
 
     @callback
     def async_unschedule(self) -> None:
@@ -430,7 +463,9 @@ class ShuttersScheduler:
         days_keys: list[str] = settings.get(CONF_DAYS, DAYS)
         if not days_keys:
             return None
-        mode = settings.get(mode_key, default_mode)
+        mode = self._resolve_mode(
+            settings.get(mode_key, default_mode), default_mode, mode_key
+        )
         if mode == MODE_FIXED:
             time_value = _parse_time(settings[time_key])
             local_now = dt_util.as_local(dt_util.utcnow())
@@ -438,7 +473,12 @@ class ShuttersScheduler:
             if local_next is None:
                 return None
             return dt_util.as_utc(local_next)
-        event = SUN_EVENT_SUNRISE if mode == MODE_SUNRISE else SUN_EVENT_SUNSET
+        if mode == MODE_SUNRISE:
+            event = SUN_EVENT_SUNRISE
+        elif mode == MODE_SUNSET:
+            event = SUN_EVENT_SUNSET
+        else:  # pragma: no cover — _resolve_mode already enforces TRIGGER_MODES
+            return None
         offset_min = int(settings.get(offset_key, 0))
         return self._next_sun(event, offset_min, days_keys)
 

@@ -185,3 +185,36 @@ async def test_config_flow_sunrise_path_skips_open_time(
     assert result["data"][CONF_OPEN_MODE] == MODE_SUNRISE
     assert result["data"][CONF_OPEN_OFFSET] == 15
     assert result["data"][CONF_CLOSE_TIME] == "20:00:00"
+
+
+async def test_unknown_mode_falls_back_safely(
+    hass: HomeAssistant, caplog,
+) -> None:
+    """An unrecognised mode value must not silently default to sunset."""
+    entry = _build_entry(open_mode=MODE_FIXED, close_mode=MODE_FIXED)
+    # Inject an invalid mode AFTER the fixture builds a valid one — simulates
+    # a manual edit of core.config_entries or a future mode rename.
+    bad_data = {**entry.data, CONF_OPEN_MODE: "moonrise"}
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="Bureau",
+        data=bad_data,
+        options={},
+        entry_id="bad_mode_entry",
+        unique_id="bad_mode",
+        version=2,
+    )
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    # The setup must have succeeded with a warning log for the bad mode.
+    assert any(
+        "moonrise" in record.message for record in caplog.records
+        if record.levelname == "WARNING"
+    )
+
+    # next_open() also logs and falls back to fixed → returns a datetime.
+    scheduler = hass.data[DOMAIN][entry.entry_id]
+    result = scheduler.next_open()
+    assert result is not None
