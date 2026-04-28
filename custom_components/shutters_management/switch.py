@@ -34,10 +34,9 @@ class ShuttersSimulationSwitch(SwitchEntity):
     def __init__(self, scheduler: ShuttersScheduler) -> None:
         self._scheduler = scheduler
         self._attr_unique_id = f"{scheduler.entry.entry_id}_simulation_active"
-        self._attr_suggested_object_id = f"{DOMAIN}_simulation_active"
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, scheduler.entry.entry_id)},
-            name="Shutters Management",
+            name=scheduler.entry.title,
             manufacturer="Shutters Management",
             entry_type=DeviceEntryType.SERVICE,
         )

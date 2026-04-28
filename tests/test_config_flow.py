@@ -1,6 +1,7 @@
 """Tests for the Shutters Management config and options flows."""
 from __future__ import annotations
 
+from homeassistant.const import CONF_NAME
 from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
 from pytest_homeassistant_custom_component.common import MockConfigEntry
@@ -20,6 +21,7 @@ from custom_components.shutters_management.const import (
 
 def _valid_user_input(**overrides):
     data = {
+        CONF_NAME: "Bureau",
         CONF_COVERS: ["cover.living_room"],
         CONF_OPEN_TIME: "08:00:00",
         CONF_CLOSE_TIME: "20:00:00",
@@ -44,7 +46,8 @@ async def test_user_flow_success(hass: HomeAssistant) -> None:
         result["flow_id"], user_input=_valid_user_input()
     )
     assert result["type"] == FlowResultType.CREATE_ENTRY
-    assert result["title"] == "Shutters Management"
+    assert result["title"] == "Bureau"
+    assert result["data"][CONF_NAME] == "Bureau"
     assert result["data"][CONF_OPEN_TIME] == "08:00:00"
     assert result["data"][CONF_CLOSE_TIME] == "20:00:00"
 

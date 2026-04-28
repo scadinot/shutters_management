@@ -5,6 +5,7 @@
         "title": "Shutters Management",
         "description": "Configurer les volets pour simuler une présence.",
         "data": {
+          "name": "Nom de l'instance",
           "covers": "Volets à piloter",
           "open_time": "Heure d'ouverture",
           "close_time": "Heure de fermeture",
@@ -21,11 +22,12 @@
       }
     },
     "error": {
+      "name_required": "Choisissez un nom pour cette instance.",
       "no_covers": "Sélectionnez au moins un volet.",
       "no_days": "Sélectionnez au moins un jour."
     },
     "abort": {
-      "already_configured": "Shutters Management est déjà configuré."
+      "already_configured": "Une instance portant ce nom est déjà configurée."
     }
   },
   "options": {
@@ -34,6 +36,7 @@
         "title": "Modifier la configuration",
         "description": "Mettre à jour la configuration.",
         "data": {
+          "name": "Nom de l'instance",
           "covers": "Volets à piloter",
           "open_time": "Heure d'ouverture",
           "close_time": "Heure de fermeture",
@@ -50,6 +53,7 @@
       }
     },
     "error": {
+      "name_required": "Choisissez un nom pour cette instance.",
       "no_covers": "Sélectionnez au moins un volet.",
       "no_days": "Sélectionnez au moins un jour."
     }

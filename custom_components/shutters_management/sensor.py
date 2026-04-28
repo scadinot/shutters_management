@@ -41,11 +41,9 @@ class ShuttersNextTriggerSensor(SensorEntity):
         self._kind = kind
         self._attr_unique_id = f"{scheduler.entry.entry_id}_next_{kind}"
         self._attr_translation_key = f"next_{kind}"
-        slug = "next_opening" if kind == "open" else "next_closing"
-        self._attr_suggested_object_id = f"{DOMAIN}_{slug}"
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, scheduler.entry.entry_id)},
-            name="Shutters Management",
+            name=scheduler.entry.title,
             manufacturer="Shutters Management",
             entry_type=DeviceEntryType.SERVICE,
         )

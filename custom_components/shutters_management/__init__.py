@@ -12,6 +12,7 @@ import voluptuous as vol
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
     ATTR_ENTITY_ID,
+    CONF_NAME,
     SERVICE_CLOSE_COVER,
     SERVICE_OPEN_COVER,
 )
@@ -129,6 +130,27 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 async def _async_update_listener(hass: HomeAssistant, entry: ConfigEntry) -> None:
     """Reload integration on options update."""
     await hass.config_entries.async_reload(entry.entry_id)
+
+
+async def async_migrate_entry(
+    hass: HomeAssistant, entry: ConfigEntry
+) -> bool:
+    """Migrate older config entries forward.
+
+    v1 entries (pre-multi-instance) had no CONF_NAME. We backfill it from
+    the entry title so the rest of the integration can rely on
+    entry.data[CONF_NAME] being present.
+    """
+    if entry.version == 1:
+        new_data = {**entry.data}
+        new_data.setdefault(CONF_NAME, entry.title or "Shutters Management")
+        hass.config_entries.async_update_entry(entry, data=new_data, version=2)
+        _LOGGER.info(
+            "Migrated config entry %s from v1 to v2 (CONF_NAME=%s)",
+            entry.entry_id,
+            new_data[CONF_NAME],
+        )
+    return True
 
 
 @callback

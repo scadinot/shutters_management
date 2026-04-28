@@ -5,6 +5,7 @@
         "title": "Shutters Management",
         "description": "Configure shutters to simulate presence.",
         "data": {
+          "name": "Instance name",
           "covers": "Shutters to control",
           "open_time": "Opening time",
           "close_time": "Closing time",
@@ -21,11 +22,12 @@
       }
     },
     "error": {
+      "name_required": "Choose a name for this instance.",
       "no_covers": "Select at least one cover.",
       "no_days": "Select at least one day."
     },
     "abort": {
-      "already_configured": "Shutters Management is already configured."
+      "already_configured": "An instance with this name is already configured."
     }
   },
   "options": {
@@ -34,6 +36,7 @@
         "title": "Edit configuration",
         "description": "Update the configuration.",
         "data": {
+          "name": "Instance name",
           "covers": "Shutters to control",
           "open_time": "Opening time",
           "close_time": "Closing time",
@@ -50,6 +53,7 @@
       }
     },
     "error": {
+      "name_required": "Choose a name for this instance.",
       "no_covers": "Select at least one cover.",
       "no_days": "Select at least one day."
     }
