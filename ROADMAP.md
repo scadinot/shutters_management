@@ -40,9 +40,11 @@ Le présent document décrit uniquement les évolutions **à venir**.
 Chaque événement (ouverture / fermeture) peut être configuré en mode
 `fixed`, `sunrise` ou `sunset` avec un offset signé en minutes
 (-360..+360). Le décalage aléatoire reste appliqué en plus du
-décalage solaire. Le config flow utilise une étape conditionnelle qui
-n'expose que les champs pertinents selon le mode choisi. Voir le
-[CHANGELOG](CHANGELOG.md#031--2026-04-28).
+décalage solaire. Depuis v0.3.2, le config flow présente tous les
+champs dans un **panneau unique** avec deux sections « Ouverture »
+et « Fermeture » regroupant chacune `mode`, `time` et `offset` ; le
+scheduler ignore au runtime le champ qui ne correspond pas au mode
+actif. Voir le [CHANGELOG](CHANGELOG.md#031--2026-04-28).
 
 ### 2. Profils horaires
 

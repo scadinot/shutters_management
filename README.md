@@ -70,6 +70,8 @@ Intégration personnalisée Home Assistant (HACS) qui simule une présence en pi
 
 L'intégration ne se configure pas en YAML. Tout passe par l'assistant graphique au moment de l'ajout, puis par l'écran **Options** ensuite.
 
+> Depuis la **v0.3.2**, l'écran de configuration tient sur un **seul panneau** : les champs `*_mode` / `*_time` / `*_offset` sont regroupés dans deux sections repliables « Ouverture » et « Fermeture » (ouvertes par défaut). Selon le mode choisi, seuls `*_time` (`fixed`) ou `*_offset` (`sunrise` / `sunset`) sont effectivement utilisés au runtime ; l'autre est ignoré.
+
 | Champ | Type | Valeur par défaut | Description |
 |---|---|---|---|
 | `covers` | Liste d'entités `cover.*` | _(aucune)_ | Volets pilotés par l'intégration. Au moins un est requis. |
