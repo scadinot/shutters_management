@@ -144,42 +144,40 @@ async def test_sun_handler_filters_inactive_days(
     assert mock_next.call_count == 3
 
 
-async def test_config_flow_sunrise_path_skips_open_time(
+async def test_config_flow_sunrise_path_in_single_panel(
     hass: HomeAssistant,
 ) -> None:
-    """When open_mode=sunrise the triggers step asks for open_offset, not open_time."""
+    """The single-panel form exposes mode + time + offset for both events.
+
+    With open_mode=sunrise, the user enters open_offset and the open_time
+    default is preserved; the scheduler will ignore open_time at runtime
+    because the mode dispatches to async_track_sunrise.
+    """
     result = await hass.config_entries.flow.async_init(
         DOMAIN, context={"source": "user"}
     )
     assert result["step_id"] == "user"
 
-    step1 = {
+    user_input = {
         CONF_NAME: "Vacances",
         CONF_COVERS: ["cover.living_room"],
-        CONF_OPEN_MODE: MODE_SUNRISE,
-        CONF_CLOSE_MODE: DEFAULT_CLOSE_MODE,
+        "open": {
+            CONF_OPEN_MODE: MODE_SUNRISE,
+            CONF_OPEN_TIME: "08:00:00",
+            CONF_OPEN_OFFSET: 15,
+        },
+        "close": {
+            CONF_CLOSE_MODE: MODE_FIXED,
+            CONF_CLOSE_TIME: "20:00:00",
+            "close_offset": 0,
+        },
         CONF_DAYS: list(DAYS),
         CONF_RANDOMIZE: False,
         CONF_RANDOM_MAX_MINUTES: 30,
         CONF_ONLY_WHEN_AWAY: False,
     }
     result = await hass.config_entries.flow.async_configure(
-        result["flow_id"], user_input=step1
-    )
-    assert result["type"] == FlowResultType.FORM
-    assert result["step_id"] == "triggers"
-
-    # The schema must accept open_offset (sunrise) and close_time (fixed),
-    # but not open_time (it's the sunrise path).
-    schema_keys = set(result["data_schema"].schema.keys())
-    schema_key_names = {k.schema for k in schema_keys}
-    assert CONF_OPEN_OFFSET in schema_key_names
-    assert CONF_OPEN_TIME not in schema_key_names
-    assert CONF_CLOSE_TIME in schema_key_names
-
-    result = await hass.config_entries.flow.async_configure(
-        result["flow_id"],
-        user_input={CONF_OPEN_OFFSET: 15, CONF_CLOSE_TIME: "20:00:00"},
+        result["flow_id"], user_input=user_input
     )
     assert result["type"] == FlowResultType.CREATE_ENTRY
     assert result["data"][CONF_OPEN_MODE] == MODE_SUNRISE
