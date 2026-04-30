@@ -78,13 +78,13 @@ async def test_two_entries_can_coexist(hass: HomeAssistant) -> None:
         registry.async_get_entity_id(
             "sensor", DOMAIN, f"{entry_a.entry_id}_next_open"
         )
-        == "sensor.bureau_next_opening"
+        == "sensor.bureau_next_open"
     )
     assert (
         registry.async_get_entity_id(
             "sensor", DOMAIN, f"{entry_b.entry_id}_next_open"
         )
-        == "sensor.rdc_next_opening"
+        == "sensor.rdc_next_open"
     )
 
 
