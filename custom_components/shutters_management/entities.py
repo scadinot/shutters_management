@@ -29,8 +29,12 @@ def _build_entity_id(
     The per-instance prefix uses ``entry.unique_id`` (already a slug,
     set once at config flow time and never modified) with a fallback
     to ``slugify(entry.title)`` for legacy entries that may not have
-    a unique_id yet. This keeps the prefix stable even if the user
-    later renames the config entry.
+    a unique_id yet. When ``unique_id`` is set, the prefix stays
+    rename-proof. When the helper falls back to the slugified title,
+    a later rename of the entry *would* shift this computed value;
+    in practice that does not affect already-registered entities,
+    because HA stores the chosen ``entity_id`` in the registry at
+    creation time and does not recompute it on subsequent reloads.
     """
 
     if entry is None:
