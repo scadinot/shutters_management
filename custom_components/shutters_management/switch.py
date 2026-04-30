@@ -12,6 +12,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from . import ShuttersScheduler
 from .const import DOMAIN, signal_state_update
+from .entities import _build_suggested_object_id
 
 
 async def async_setup_entry(
@@ -34,6 +35,9 @@ class ShuttersSimulationSwitch(SwitchEntity):
     def __init__(self, scheduler: ShuttersScheduler) -> None:
         self._scheduler = scheduler
         self._attr_unique_id = f"{scheduler.entry.entry_id}_simulation_active"
+        self._attr_suggested_object_id = _build_suggested_object_id(
+            scheduler.entry, self._attr_translation_key
+        )
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, scheduler.entry.entry_id)},
             name=scheduler.entry.title,

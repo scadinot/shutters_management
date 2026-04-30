@@ -6,6 +6,31 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le pr
 
 ## [Non publié]
 
+## [0.3.4] — 2026-04-30
+
+### Corrigé
+
+- Bump de la version de l'intégration `0.3.3` → `0.3.4` dans `manifest.json`.
+- **Correction d'un bug latent côté Home Assistant** : sans `_attr_suggested_object_id`, HA dérive l'`object_id` d'une entité du **nom traduit dans la langue active au moment de la création**. Concrètement, une instance ajoutée alors que l'UI HA est en français produisait des `entity_id` français (par ex. `button.bureau_tester_l_ouverture`, `sensor.bureau_prochaine_fermeture`) plutôt que les identifiants anglais stables attendus (`button.bureau_test_open`, `sensor.bureau_next_close`), et ce **même si le `translation_key` est anglais**.
+- 4 entités sur 5 étaient sensibles à la langue de création : `sensor next_open`, `sensor next_close`, `button test_open`, `button test_close`. Le `switch simulation_active` n'était pas impacté car son libellé fr/en est identique.
+- Le correctif (transposé du fix `pool_control` v0.0.21) introduit une helper partagée `custom_components/shutters_management/entities.py::_build_suggested_object_id(entry, translation_key)` qui calcule un `object_id` stable :
+  - `f"{entry.unique_id}_{translation_key}"` quand `entry.unique_id` est défini ;
+  - `f"{slugify(entry.title)}_{translation_key}"` en fallback pour les entries héritées sans `unique_id`.
+- Chaque classe d'entité (`ShuttersNextTriggerSensor`, `ShuttersSimulationSwitch`, `ShuttersRunNowButton`) pose `self._attr_suggested_object_id` dans son `__init__` après la fixation du `translation_key`.
+
+### Note de migration
+
+- **Les entités créées avant ce correctif conservent leur `entity_id` historique** tant que leur `unique_id` reste inchangé : HA stocke l'`entity_id` au moment de la création initiale dans le registry et ne le recalcule pas à partir du `suggested_object_id` lors d'un rechargement.
+- Pour bénéficier des nouveaux IDs anglais, deux options :
+  1. Renommer manuellement chaque entité depuis **Paramètres → Appareils et services → Shutters Management → cliquer sur l'entité → modifier l'`entity_id`**.
+  2. Supprimer puis recréer l'instance (les `entity_id` régénérés à la nouvelle création seront stables et anglais quelle que soit la langue HA).
+- Aucune migration de schéma n'est nécessaire ; le `unique_id`, le `translation_key` et la logique métier (scheduler, services, config_flow) sont strictement inchangés.
+
+### Tests
+
+- Ajout de `tests/test_entities.py` : 5 cas couvrent la helper (`entry=None`, `unique_id` défini, renommage du titre sans impact, fallback `slugify(entry.title)` quand `unique_id` est `None` ou `""`).
+- Suite complète : **49 tests verts** (44 + 5 nouveaux).
+
 ## [0.3.3] — 2026-04-28
 
 ### Modifié
@@ -214,7 +239,8 @@ Aucun changement de code dans l'intégration. Seules les méta-données (`manife
 - Annulation propre des déclencheurs et des callbacks différés au déchargement / rechargement.
 - Traductions français et anglais.
 
-[Non publié]: https://github.com/scadinot/shutters_management/compare/v0.3.3...HEAD
+[Non publié]: https://github.com/scadinot/shutters_management/compare/v0.3.4...HEAD
+[0.3.4]: https://github.com/scadinot/shutters_management/compare/v0.3.3...v0.3.4
 [0.3.3]: https://github.com/scadinot/shutters_management/compare/v0.3.2...v0.3.3
 [0.3.2]: https://github.com/scadinot/shutters_management/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/scadinot/shutters_management/compare/v0.3.0...v0.3.1
