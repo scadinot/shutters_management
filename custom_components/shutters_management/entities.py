@@ -1,15 +1,13 @@
 """Shared entity helpers for the Shutters Management integration."""
 from __future__ import annotations
 
-from typing import Optional
-
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.util import slugify
 
 
 def _build_suggested_object_id(
-    entry: Optional[ConfigEntry], translation_key: str
-) -> Optional[str]:
+    entry: ConfigEntry | None, translation_key: str
+) -> str | None:
     """Force a stable, language-agnostic object_id for new entities.
 
     Without this, HA derives the object_id from the translated entity name
