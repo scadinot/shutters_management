@@ -43,8 +43,8 @@ async def test_sensor_entity_ids_are_stable_english(
     close_id = registry.async_get_entity_id(
         "sensor", DOMAIN, f"{mock_config_entry.entry_id}_next_close"
     )
-    assert open_id == "sensor.bureau_next_opening"
-    assert close_id == "sensor.bureau_next_closing"
+    assert open_id == "sensor.bureau_next_open"
+    assert close_id == "sensor.bureau_next_close"
 
 
 async def test_sensors_have_timestamp_state_when_active(

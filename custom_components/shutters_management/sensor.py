@@ -12,7 +12,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from . import ShuttersScheduler
 from .const import DOMAIN, signal_state_update
-from .entities import _build_suggested_object_id
+from .entities import _build_entity_id
 
 
 async def async_setup_entry(
@@ -42,9 +42,11 @@ class ShuttersNextTriggerSensor(SensorEntity):
         self._kind = kind
         self._attr_unique_id = f"{scheduler.entry.entry_id}_next_{kind}"
         self._attr_translation_key = f"next_{kind}"
-        self._attr_suggested_object_id = _build_suggested_object_id(
-            scheduler.entry, self._attr_translation_key
+        suggested = _build_entity_id(
+            "sensor", scheduler.entry, self._attr_translation_key
         )
+        if suggested is not None:
+            self.entity_id = suggested
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, scheduler.entry.entry_id)},
             name=scheduler.entry.title,

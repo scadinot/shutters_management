@@ -6,6 +6,33 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le pr
 
 ## [Non publié]
 
+## [0.3.5] — 2026-04-30
+
+### Corrigé
+
+- Bump de la version de l'intégration `0.3.4` → `0.3.5` dans `manifest.json`.
+- **Vraie correction du bug d'`entity_id` traduit** introduit par HA quand `_attr_has_entity_name = True` + `_attr_translation_key` + `_attr_device_info[name]` sont combinés.
+- La v0.3.4 utilisait `_attr_suggested_object_id`, **propriété fantôme** : Home Assistant ne lit jamais cet attribut comme source d'`entity_id`. Dans `homeassistant/helpers/entity.py`, seule la *property* `Entity.suggested_object_id` est consultée — et elle retourne le nom traduit. La valeur passée via `_attr_suggested_object_id` finissait dans `object_id_base` (priorité plus basse que le nom traduit), donc le bug subsistait pour 4 entités sur 5 (`next_open`, `next_close`, `test_open`, `test_close`).
+- v0.3.5 utilise le **pattern documenté** par `entity_platform.py:823-845` : assignation directe de `self.entity_id = "<platform>.<prefix>_<translation_key>"` dans `__init__`. HA capte alors la valeur dans `internal_integration_suggested_object_id` (priorité maximale), bypassant entièrement la lookup de traduction.
+- La helper `_build_suggested_object_id(entry, translation_key)` est remplacée par `_build_entity_id(platform, entry, translation_key)` dans `custom_components/shutters_management/entities.py` :
+  - `f"{platform}.{entry.unique_id}_{translation_key}"` quand `unique_id` est défini ;
+  - `f"{platform}.{slugify(entry.title)}_{translation_key}"` en fallback.
+- Chaque classe d'entité (`ShuttersNextTriggerSensor`, `ShuttersSimulationSwitch`, `ShuttersRunNowButton`) pose désormais `self.entity_id = suggested` dans son `__init__` lorsque la helper renvoie une valeur non `None`.
+- Vérifié empiriquement : les `entity_id` sont maintenant `sensor.<slug>_next_open`, `sensor.<slug>_next_close`, `button.<slug>_test_open`, `button.<slug>_test_close`, `switch.<slug>_simulation_active` quelle que soit la langue HA active. Les libellés affichés dans les cartes du dashboard restent localisés (ils dépendent du `translation_key`, pas de l'`entity_id`).
+
+### Note de migration
+
+- **Identique à v0.3.4** : les entités créées avant ce correctif conservent leur `entity_id` historique, le registry HA stocke l'`entity_id` à la création initiale et ne le recalcule pas. Pour basculer sur les nouveaux IDs anglais, deux options :
+  1. Renommer manuellement chaque entité depuis **Paramètres → Appareils et services → Shutters Management → cliquer sur l'entité → modifier l'`entity_id`**.
+  2. Supprimer puis recréer l'instance après redémarrage HA.
+- Aucune migration de schéma. Le `unique_id`, le `translation_key`, le scheduler, les services et le config_flow sont strictement inchangés.
+
+### Tests
+
+- `tests/test_entities.py` : la classe `TestBuildSuggestedObjectId` est renommée `TestBuildEntityId` et chaque cas est mis à jour pour la nouvelle signature `_build_entity_id(platform, entry, translation_key)`. Ajout d'un test `test_platform_prefix_is_respected` qui couvre les 3 plateformes (`sensor`, `button`, `switch`).
+- `tests/test_sensor.py` et `tests/test_multi_instance.py` : 3 assertions hardcodées (`next_opening` / `next_closing`) ajustées vers les nouveaux IDs anglais stables (`next_open` / `next_close`).
+- Suite complète : **50 tests verts** (49 existants ajustés + 1 nouveau).
+
 ## [0.3.4] — 2026-04-30
 
 ### Corrigé
@@ -239,7 +266,8 @@ Aucun changement de code dans l'intégration. Seules les méta-données (`manife
 - Annulation propre des déclencheurs et des callbacks différés au déchargement / rechargement.
 - Traductions français et anglais.
 
-[Non publié]: https://github.com/scadinot/shutters_management/compare/v0.3.4...HEAD
+[Non publié]: https://github.com/scadinot/shutters_management/compare/v0.3.5...HEAD
+[0.3.5]: https://github.com/scadinot/shutters_management/compare/v0.3.4...v0.3.5
 [0.3.4]: https://github.com/scadinot/shutters_management/compare/v0.3.3...v0.3.4
 [0.3.3]: https://github.com/scadinot/shutters_management/compare/v0.3.2...v0.3.3
 [0.3.2]: https://github.com/scadinot/shutters_management/compare/v0.3.1...v0.3.2
