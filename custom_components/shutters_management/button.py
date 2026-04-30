@@ -9,6 +9,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from . import ShuttersScheduler
 from .const import ACTION_CLOSE, ACTION_OPEN, DOMAIN
+from .entities import _build_suggested_object_id
 
 
 async def async_setup_entry(
@@ -37,6 +38,9 @@ class ShuttersRunNowButton(ButtonEntity):
         self._action = action
         self._attr_unique_id = f"{scheduler.entry.entry_id}_test_{action}"
         self._attr_translation_key = f"test_{action}"
+        self._attr_suggested_object_id = _build_suggested_object_id(
+            scheduler.entry, self._attr_translation_key
+        )
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, scheduler.entry.entry_id)},
             name=scheduler.entry.title,
