@@ -11,16 +11,16 @@
           "notifications": {
             "name": "Notifications push",
             "data": {
-              "notify_services": "Services de notification (laisser vide pour désactiver)",
-              "notify_when_away_only": "Envoyer le push uniquement en absence"
+              "notify_services": "Services de notification (laisser vide si aucun)",
+              "notify_mode": "Quand envoyer"
             }
           },
           "voice_announcement": {
             "name": "Annonce vocale",
             "data": {
               "tts_engine": "Moteur TTS",
-              "tts_targets": "Enceintes connectées (laisser vide pour désactiver)",
-              "tts_when_away_only": "Annoncer uniquement en absence"
+              "tts_targets": "Enceintes connectées (laisser vide si aucune)",
+              "tts_mode": "Quand annoncer"
             }
           }
         }
@@ -42,16 +42,16 @@
           "notifications": {
             "name": "Notifications push",
             "data": {
-              "notify_services": "Services de notification (laisser vide pour désactiver)",
-              "notify_when_away_only": "Envoyer le push uniquement en absence"
+              "notify_services": "Services de notification (laisser vide si aucun)",
+              "notify_mode": "Quand envoyer"
             }
           },
           "voice_announcement": {
             "name": "Annonce vocale",
             "data": {
               "tts_engine": "Moteur TTS",
-              "tts_targets": "Enceintes connectées (laisser vide pour désactiver)",
-              "tts_when_away_only": "Annoncer uniquement en absence"
+              "tts_targets": "Enceintes connectées (laisser vide si aucune)",
+              "tts_mode": "Quand annoncer"
             }
           }
         }
@@ -144,6 +144,13 @@
     }
   },
   "selector": {
+    "notification_mode": {
+      "options": {
+        "disabled": "Sans",
+        "always": "Toujours",
+        "away_only": "Absence uniquement"
+      }
+    },
     "days": {
       "options": {
         "mon": "Lundi",

@@ -11,16 +11,16 @@
           "notifications": {
             "name": "Push notifications",
             "data": {
-              "notify_services": "Notification services (leave empty to disable)",
-              "notify_when_away_only": "Send push only when away"
+              "notify_services": "Notification services (leave empty if none)",
+              "notify_mode": "When to send"
             }
           },
           "voice_announcement": {
             "name": "Voice announcement",
             "data": {
               "tts_engine": "TTS engine",
-              "tts_targets": "Smart speakers (leave empty to disable)",
-              "tts_when_away_only": "Announce only when away"
+              "tts_targets": "Smart speakers (leave empty if none)",
+              "tts_mode": "When to announce"
             }
           }
         }
@@ -42,16 +42,16 @@
           "notifications": {
             "name": "Push notifications",
             "data": {
-              "notify_services": "Notification services (leave empty to disable)",
-              "notify_when_away_only": "Send push only when away"
+              "notify_services": "Notification services (leave empty if none)",
+              "notify_mode": "When to send"
             }
           },
           "voice_announcement": {
             "name": "Voice announcement",
             "data": {
               "tts_engine": "TTS engine",
-              "tts_targets": "Smart speakers (leave empty to disable)",
-              "tts_when_away_only": "Announce only when away"
+              "tts_targets": "Smart speakers (leave empty if none)",
+              "tts_mode": "When to announce"
             }
           }
         }
@@ -144,6 +144,13 @@
     }
   },
   "selector": {
+    "notification_mode": {
+      "options": {
+        "disabled": "Disabled",
+        "always": "Always",
+        "away_only": "Only when away"
+      }
+    },
     "days": {
       "options": {
         "mon": "Monday",

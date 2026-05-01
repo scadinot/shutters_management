@@ -34,13 +34,13 @@ from .const import (
     CONF_CLOSE_TIME,
     CONF_COVERS,
     CONF_DAYS,
+    CONF_NOTIFY_MODE,
     CONF_NOTIFY_SERVICES,
-    CONF_NOTIFY_WHEN_AWAY_ONLY,
     CONF_ONLY_WHEN_AWAY,
     CONF_SEQUENTIAL_COVERS,
     CONF_TTS_ENGINE,
+    CONF_TTS_MODE,
     CONF_TTS_TARGETS,
-    CONF_TTS_WHEN_AWAY_ONLY,
     CONF_OPEN_MODE,
     CONF_OPEN_OFFSET,
     CONF_OPEN_TIME,
@@ -53,17 +53,20 @@ from .const import (
     DEFAULT_CLOSE_OFFSET,
     DEFAULT_CLOSE_TIME,
     DEFAULT_DAYS,
+    DEFAULT_NOTIFY_MODE,
     DEFAULT_NOTIFY_SERVICES,
-    DEFAULT_NOTIFY_WHEN_AWAY_ONLY,
     DEFAULT_ONLY_WHEN_AWAY,
     DEFAULT_SEQUENTIAL_COVERS,
+    DEFAULT_TTS_MODE,
     DEFAULT_TTS_TARGETS,
-    DEFAULT_TTS_WHEN_AWAY_ONLY,
     DEFAULT_OPEN_MODE,
     DEFAULT_OPEN_OFFSET,
     DEFAULT_OPEN_TIME,
     DEFAULT_RANDOMIZE,
     DEFAULT_RANDOM_MAX_MINUTES,
+    MODE_ALWAYS,
+    MODE_AWAY_ONLY,
+    MODE_DISABLED,
     DOMAIN,
     HUB_TITLE,
     HUB_UNIQUE_ID,
@@ -133,14 +136,20 @@ def _build_hub_schema(
                     )
                 ),
                 vol.Required(
-                    CONF_NOTIFY_WHEN_AWAY_ONLY,
+                    CONF_NOTIFY_MODE,
                     default=_section_default(
                         defaults,
                         SECTION_NOTIFICATIONS,
-                        CONF_NOTIFY_WHEN_AWAY_ONLY,
-                        DEFAULT_NOTIFY_WHEN_AWAY_ONLY,
+                        CONF_NOTIFY_MODE,
+                        DEFAULT_NOTIFY_MODE,
                     ),
-                ): selector.BooleanSelector(),
+                ): selector.SelectSelector(
+                    selector.SelectSelectorConfig(
+                        options=[MODE_DISABLED, MODE_ALWAYS, MODE_AWAY_ONLY],
+                        mode=selector.SelectSelectorMode.LIST,
+                        translation_key="notification_mode",
+                    )
+                ),
             }
         ),
         {"collapsed": False},
@@ -176,14 +185,20 @@ def _build_hub_schema(
                     )
                 ),
                 vol.Required(
-                    CONF_TTS_WHEN_AWAY_ONLY,
+                    CONF_TTS_MODE,
                     default=_section_default(
                         defaults,
                         SECTION_VOICE_ANNOUNCEMENT,
-                        CONF_TTS_WHEN_AWAY_ONLY,
-                        DEFAULT_TTS_WHEN_AWAY_ONLY,
+                        CONF_TTS_MODE,
+                        DEFAULT_TTS_MODE,
                     ),
-                ): selector.BooleanSelector(),
+                ): selector.SelectSelector(
+                    selector.SelectSelectorConfig(
+                        options=[MODE_DISABLED, MODE_ALWAYS, MODE_AWAY_ONLY],
+                        mode=selector.SelectSelectorMode.LIST,
+                        translation_key="notification_mode",
+                    )
+                ),
             }
         ),
         {"collapsed": False},
@@ -399,7 +414,7 @@ def _normalize_hub(user_input: dict[str, Any]) -> dict[str, Any]:
         flat[CONF_NOTIFY_SERVICES] = [services]
     else:
         flat[CONF_NOTIFY_SERVICES] = list(services)
-    flat.setdefault(CONF_NOTIFY_WHEN_AWAY_ONLY, DEFAULT_NOTIFY_WHEN_AWAY_ONLY)
+    flat.setdefault(CONF_NOTIFY_MODE, DEFAULT_NOTIFY_MODE)
     flat.setdefault(CONF_SEQUENTIAL_COVERS, DEFAULT_SEQUENTIAL_COVERS)
 
     tts_engine = flat.get(CONF_TTS_ENGINE)
@@ -411,7 +426,7 @@ def _normalize_hub(user_input: dict[str, Any]) -> dict[str, Any]:
         flat[CONF_TTS_TARGETS] = [targets]
     else:
         flat[CONF_TTS_TARGETS] = list(targets)
-    flat.setdefault(CONF_TTS_WHEN_AWAY_ONLY, DEFAULT_TTS_WHEN_AWAY_ONLY)
+    flat.setdefault(CONF_TTS_MODE, DEFAULT_TTS_MODE)
     return flat
 
 
@@ -433,7 +448,7 @@ class ShuttersManagementConfigFlow(ConfigFlow, domain=DOMAIN):
     :class:`ShuttersInstanceSubentryFlow`.
     """
 
-    VERSION = 3
+    VERSION = 4
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
@@ -485,8 +500,8 @@ class ShuttersHubOptionsFlow(OptionsFlow):
             CONF_NOTIFY_SERVICES: self.config_entry.data.get(
                 CONF_NOTIFY_SERVICES, DEFAULT_NOTIFY_SERVICES
             ),
-            CONF_NOTIFY_WHEN_AWAY_ONLY: self.config_entry.data.get(
-                CONF_NOTIFY_WHEN_AWAY_ONLY, DEFAULT_NOTIFY_WHEN_AWAY_ONLY
+            CONF_NOTIFY_MODE: self.config_entry.data.get(
+                CONF_NOTIFY_MODE, DEFAULT_NOTIFY_MODE
             ),
             CONF_SEQUENTIAL_COVERS: self.config_entry.data.get(
                 CONF_SEQUENTIAL_COVERS, DEFAULT_SEQUENTIAL_COVERS
@@ -495,8 +510,8 @@ class ShuttersHubOptionsFlow(OptionsFlow):
             CONF_TTS_TARGETS: self.config_entry.data.get(
                 CONF_TTS_TARGETS, DEFAULT_TTS_TARGETS
             ),
-            CONF_TTS_WHEN_AWAY_ONLY: self.config_entry.data.get(
-                CONF_TTS_WHEN_AWAY_ONLY, DEFAULT_TTS_WHEN_AWAY_ONLY
+            CONF_TTS_MODE: self.config_entry.data.get(
+                CONF_TTS_MODE, DEFAULT_TTS_MODE
             ),
         }
         return self.async_show_form(

@@ -28,11 +28,18 @@ CONF_ONLY_WHEN_AWAY = "only_when_away"
 CONF_PRESENCE_ENTITY = "presence_entity"
 
 CONF_NOTIFY_SERVICES = "notify_services"
-CONF_NOTIFY_WHEN_AWAY_ONLY = "notify_when_away_only"
+CONF_NOTIFY_WHEN_AWAY_ONLY = "notify_when_away_only"  # kept for v3→v4 migration
+CONF_NOTIFY_MODE = "notify_mode"
 CONF_SEQUENTIAL_COVERS = "sequential_covers"
 CONF_TTS_ENGINE = "tts_engine"
 CONF_TTS_TARGETS = "tts_targets"
-CONF_TTS_WHEN_AWAY_ONLY = "tts_when_away_only"
+CONF_TTS_WHEN_AWAY_ONLY = "tts_when_away_only"  # kept for v3→v4 migration
+CONF_TTS_MODE = "tts_mode"
+
+# Three-state notification mode (replaces the boolean away_only flags from v0.4.4).
+MODE_DISABLED = "disabled"   # channel never fires
+MODE_ALWAYS = "always"       # channel fires on every action
+MODE_AWAY_ONLY = "away_only" # channel fires only when presence is detected away
 
 DEFAULT_OPEN_TIME = "08:00:00"
 DEFAULT_CLOSE_TIME = "21:00:00"
@@ -40,11 +47,11 @@ DEFAULT_RANDOMIZE = True
 DEFAULT_RANDOM_MAX_MINUTES = 30
 DEFAULT_ONLY_WHEN_AWAY = False
 DEFAULT_NOTIFY_SERVICES: list[str] = []
-DEFAULT_NOTIFY_WHEN_AWAY_ONLY = False
+DEFAULT_NOTIFY_MODE = MODE_ALWAYS
 DEFAULT_SEQUENTIAL_COVERS = False
 DEFAULT_TTS_ENGINE: str | None = None
 DEFAULT_TTS_TARGETS: list[str] = []
-DEFAULT_TTS_WHEN_AWAY_ONLY = False
+DEFAULT_TTS_MODE = MODE_DISABLED
 
 # Hard cap for waiting on a cover to reach its target state in
 # sequential mode. Most motorised shutters take 20–40 s; 90 s covers

@@ -15,10 +15,13 @@ from custom_components.shutters_management import ShuttersScheduler
 from custom_components.shutters_management.const import (
     ACTION_CLOSE,
     ACTION_OPEN,
+    CONF_NOTIFY_MODE,
     CONF_NOTIFY_SERVICES,
-    CONF_NOTIFY_WHEN_AWAY_ONLY,
     CONF_PRESENCE_ENTITY,
     DOMAIN,
+    MODE_ALWAYS,
+    MODE_AWAY_ONLY,
+    MODE_DISABLED,
 )
 
 from .conftest import build_hub_with_instance, get_only_subentry_id
@@ -29,17 +32,15 @@ async def _setup_hub(
     base_config: dict,
     *,
     notify_services: list[str] | None = None,
-    notify_when_away_only: bool = False,
+    notify_mode: str = MODE_ALWAYS,
     presence_entity: str | None = None,
 ) -> tuple[MockConfigEntry, ShuttersScheduler]:
     """Build, register and set up a hub with the requested notify settings."""
     if presence_entity is not None:
         base_config[CONF_PRESENCE_ENTITY] = presence_entity
-    hub_overrides: dict = {}
+    hub_overrides: dict = {CONF_NOTIFY_MODE: notify_mode}
     if notify_services is not None:
         hub_overrides[CONF_NOTIFY_SERVICES] = notify_services
-    if notify_when_away_only:
-        hub_overrides[CONF_NOTIFY_WHEN_AWAY_ONLY] = True
 
     entry = build_hub_with_instance(
         instance_data=base_config, hub_data=hub_overrides
@@ -60,6 +61,24 @@ async def test_no_notification_when_services_list_empty(
     notify_calls = async_mock_service(hass, "notify", "iphone")
 
     _, scheduler = await _setup_hub(hass, base_config)
+    await scheduler.async_run_now(ACTION_OPEN)
+    await hass.async_block_till_done()
+
+    assert notify_calls == []
+
+
+async def test_no_notification_when_mode_disabled(
+    hass: HomeAssistant, base_config
+) -> None:
+    """mode=disabled must silence push even when services are configured."""
+    async_mock_service(hass, "cover", SERVICE_OPEN_COVER)
+    notify_calls = async_mock_service(hass, "notify", "iphone")
+
+    _, scheduler = await _setup_hub(
+        hass, base_config,
+        notify_services=["notify.iphone"],
+        notify_mode=MODE_DISABLED,
+    )
     await scheduler.async_run_now(ACTION_OPEN)
     await hass.async_block_till_done()
 
@@ -117,6 +136,7 @@ async def test_notification_lists_covers_in_processing_order(
         instance_data=base_config,
         hub_data={
             CONF_NOTIFY_SERVICES: ["notify.iphone"],
+            CONF_NOTIFY_MODE: MODE_ALWAYS,
             CONF_SEQUENTIAL_COVERS: True,
         },
     )
@@ -166,6 +186,7 @@ async def test_no_notification_if_scheduler_unloaded_mid_call(
         instance_data=base_config,
         hub_data={
             CONF_NOTIFY_SERVICES: ["notify.iphone"],
+            CONF_NOTIFY_MODE: MODE_ALWAYS,
             CONF_SEQUENTIAL_COVERS: True,
         },
     )
@@ -249,7 +270,7 @@ async def test_multiple_services_each_called(
 async def test_no_notification_when_away_only_and_home(
     hass: HomeAssistant, base_config
 ) -> None:
-    """notify_when_away_only=True + presence detected at home → no notify call."""
+    """notify_mode=away_only + presence detected at home → no notify call."""
     hass.states.async_set("person.someone", "home")
     async_mock_service(hass, "cover", SERVICE_OPEN_COVER)
     notify_calls = async_mock_service(hass, "notify", "iphone")
@@ -258,7 +279,7 @@ async def test_no_notification_when_away_only_and_home(
         hass,
         base_config,
         notify_services=["notify.iphone"],
-        notify_when_away_only=True,
+        notify_mode=MODE_AWAY_ONLY,
         presence_entity="person.someone",
     )
     await scheduler.async_run_now(ACTION_OPEN)
@@ -270,7 +291,7 @@ async def test_no_notification_when_away_only_and_home(
 async def test_notification_when_away_only_and_away(
     hass: HomeAssistant, base_config
 ) -> None:
-    """notify_when_away_only=True + presence away → notification fires."""
+    """notify_mode=away_only + presence away → notification fires."""
     hass.states.async_set("person.someone", "not_home")
     async_mock_service(hass, "cover", SERVICE_OPEN_COVER)
     notify_calls = async_mock_service(hass, "notify", "iphone")
@@ -279,7 +300,7 @@ async def test_notification_when_away_only_and_away(
         hass,
         base_config,
         notify_services=["notify.iphone"],
-        notify_when_away_only=True,
+        notify_mode=MODE_AWAY_ONLY,
         presence_entity="person.someone",
     )
     await scheduler.async_run_now(ACTION_OPEN)

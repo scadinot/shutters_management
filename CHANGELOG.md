@@ -10,39 +10,44 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le pr
 
 ### Modifié
 
-- **Simplification du panneau hub** : le formulaire de configuration
-  passe de 3 sections à **2 sections autonomes** pour clarifier
-  l'écran. La section « Notifier uniquement en mode absence » qui
-  contenait les deux toggles `notify_when_away_only` et
-  `tts_when_away_only` est supprimée : chaque toggle migre dans la
-  section du canal qu'il contrôle.
-  - **Notifications push** : `notify_services` + « Envoyer le push
-    uniquement en absence ».
-  - **Annonce vocale** : `tts_engine`, `tts_targets` + « Annoncer
-    uniquement en absence ».
-- **Libellés raccourcis** pour améliorer la lisibilité — le label de
-  `sequential_covers` notamment passe d'une longue phrase à
-  « Actionner les volets successivement dans un ordre aléatoire ».
-- Renommage des libellés FR : « Moteur d'annonce vocale (TTS) » →
-  « Moteur TTS », « Enceintes connectées pour les annonces » →
-  « Enceintes connectées », etc.
-- L'**options flow** du hub adopte le même libellé clarifié et
-  s'intitule désormais « Paramètres du hub » (au lieu de
-  « Modifier les notifications »), puisqu'il édite aussi
-  `sequential_covers` qui n'est pas un paramètre de notification.
-- **Données stockées inchangées** : `_normalize_hub` aplatit toujours
-  les sections après soumission, `entry.data` garde sa structure
-  plate (clés `notify_services`, `notify_when_away_only`, etc.). Les
-  installs existantes continuent de marcher tel quel — pas de
-  migration de schéma.
+- **Sélecteur radio « Quand envoyer »** (3 boutons) à la place des
+  cases à cocher `notify_when_away_only` / `tts_when_away_only` :
+  chaque section de canal expose désormais un seul sélecteur avec les
+  options **Sans / Toujours / Absence uniquement**, traduit en FR et EN.
+  - **Sans** : canal désactivé (même si des services/enceintes sont
+    renseignés).
+  - **Toujours** : envoi après chaque action d'ouverture ou fermeture.
+  - **Absence uniquement** : envoi seulement quand la présence est
+    détectée absente.
+- **Panneau hub en 2 sections autonomes** (suppression de la section
+  intermédiaire « Notifier uniquement en mode absence »). Chaque
+  canal est désormais auto-suffisant :
+  - **Notifications push** : `notify_services` + sélecteur de mode.
+  - **Annonce vocale** : `tts_engine`, `tts_targets` + sélecteur de
+    mode.
+- **Libellés raccourcis** et options flow renommé en
+  « Paramètres du hub ».
+
+### Schéma — migration v3 → v4
+
+- Les booléens `notify_when_away_only` et `tts_when_away_only` sont
+  remplacés par `notify_mode` et `tts_mode` (valeurs : `disabled` /
+  `always` / `away_only`).
+- `async_migrate_entry` fait la conversion automatiquement au
+  premier démarrage après la mise à jour : si les services push
+  étaient vides → `disabled` ; si `notify_when_away_only=True` →
+  `away_only` ; sinon → `always`.  Identique côté TTS.
+- `config_flow.py` passe à `VERSION = 4`.
 
 ### Tests
 
-- Adaptation des deux tests `test_hub_user_flow_creates_singleton` et
-  `test_hub_options_flow_updates_notification_settings` à la nouvelle
-  forme du `user_input` (deux sections au lieu de trois, chaque
-  toggle d'absence dans sa section parente).
-- Suite complète : **88 tests verts**.
+- Réécriture des helpers `_setup_hub` / `_setup_tts_hub` avec les
+  nouveaux paramètres `notify_mode` / `tts_mode`.
+- Nouveau test `test_no_notification_when_mode_disabled` et
+  `test_no_tts_when_mode_disabled`.
+- `test_migration_v3_to_v4_converts_boolean_flags` remplace le
+  précédent test « noop » de la v3.
+- Suite complète : **90 tests verts**.
 
 ## [0.4.4] — 2026-05-01
 

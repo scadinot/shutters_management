@@ -45,6 +45,7 @@ from .const import (
     CONF_CLOSE_TIME,
     CONF_COVERS,
     CONF_DAYS,
+    CONF_NOTIFY_MODE,
     CONF_NOTIFY_SERVICES,
     CONF_NOTIFY_WHEN_AWAY_ONLY,
     CONF_ONLY_WHEN_AWAY,
@@ -56,6 +57,7 @@ from .const import (
     CONF_RANDOM_MAX_MINUTES,
     CONF_SEQUENTIAL_COVERS,
     CONF_TTS_ENGINE,
+    CONF_TTS_MODE,
     CONF_TTS_TARGETS,
     CONF_TTS_WHEN_AWAY_ONLY,
     CONF_TYPE,
@@ -63,17 +65,20 @@ from .const import (
     DAYS,
     DEFAULT_CLOSE_MODE,
     DEFAULT_CLOSE_OFFSET,
+    DEFAULT_NOTIFY_MODE,
     DEFAULT_NOTIFY_SERVICES,
-    DEFAULT_NOTIFY_WHEN_AWAY_ONLY,
     DEFAULT_OPEN_MODE,
     DEFAULT_OPEN_OFFSET,
     DEFAULT_RANDOM_MAX_MINUTES,
     DEFAULT_SEQUENTIAL_COVERS,
+    DEFAULT_TTS_MODE,
     DEFAULT_TTS_TARGETS,
-    DEFAULT_TTS_WHEN_AWAY_ONLY,
     DOMAIN,
     HUB_TITLE,
     HUB_UNIQUE_ID,
+    MODE_ALWAYS,
+    MODE_AWAY_ONLY,
+    MODE_DISABLED,
     MODE_FIXED,
     MODE_SUNRISE,
     MODE_SUNSET,
@@ -378,22 +383,53 @@ async def async_migrate_entry(
 ) -> bool:
     """Migrate older config entries forward.
 
-    The actual conversion of legacy v2 entries into a hub + subentries
-    happens in :func:`_async_migrate_legacy_entries` during
-    ``async_setup``. By the time HA calls ``async_migrate_entry`` on an
-    entry, that entry is either already at v3 (the hub) or it failed
-    to be migrated; in the latter case we refuse to load it so the user
-    notices.
+    The actual v2→v3 conversion (hub + subentries promotion) happens in
+    :func:`_async_migrate_legacy_entries` during ``async_setup``. By the
+    time HA calls ``async_migrate_entry`` the entry is either already at
+    v3+ (ready) or failed migration (we refuse and let the user notice).
+
+    v3→v4: Replace the two boolean ``*_when_away_only`` flags with a
+    three-state mode constant (``disabled`` / ``always`` / ``away_only``)
+    on each notification channel.
     """
-    if entry.version >= 3:
+    if entry.version >= 4:
         return True
 
-    _LOGGER.warning(
-        "Entry %s is still at version %s after pre-setup migration; refusing to load",
-        entry.entry_id,
-        entry.version,
-    )
-    return False
+    if entry.version < 3:
+        _LOGGER.warning(
+            "Entry %s is still at version %s after pre-setup migration; refusing to load",
+            entry.entry_id,
+            entry.version,
+        )
+        return False
+
+    # v3 → v4
+    data = dict(entry.data)
+
+    if CONF_NOTIFY_MODE not in data:
+        services = data.get(CONF_NOTIFY_SERVICES, [])
+        away_only = data.pop(CONF_NOTIFY_WHEN_AWAY_ONLY, False)
+        if not services:
+            data[CONF_NOTIFY_MODE] = MODE_DISABLED
+        elif away_only:
+            data[CONF_NOTIFY_MODE] = MODE_AWAY_ONLY
+        else:
+            data[CONF_NOTIFY_MODE] = MODE_ALWAYS
+
+    if CONF_TTS_MODE not in data:
+        engine = data.get(CONF_TTS_ENGINE)
+        tts_targets = data.get(CONF_TTS_TARGETS, [])
+        tts_away_only = data.pop(CONF_TTS_WHEN_AWAY_ONLY, False)
+        if not engine and not tts_targets:
+            data[CONF_TTS_MODE] = MODE_DISABLED
+        elif tts_away_only:
+            data[CONF_TTS_MODE] = MODE_AWAY_ONLY
+        else:
+            data[CONF_TTS_MODE] = MODE_ALWAYS
+
+    hass.config_entries.async_update_entry(entry, data=data, version=4)
+    _LOGGER.info("Migrated entry %s from version 3 to 4", entry.entry_id)
+    return True
 
 
 @callback
@@ -793,14 +829,15 @@ class ShuttersScheduler:
         processed_covers: list[str],
     ) -> None:
         """Send a push notification through every configured ``notify.*`` service."""
+        notify_mode = hub_data.get(CONF_NOTIFY_MODE, DEFAULT_NOTIFY_MODE)
+        if notify_mode == MODE_DISABLED:
+            return
+        if notify_mode == MODE_AWAY_ONLY and not is_away:
+            return
         targets: list[str] = list(
             hub_data.get(CONF_NOTIFY_SERVICES, DEFAULT_NOTIFY_SERVICES)
         )
         if not targets:
-            return
-        if hub_data.get(
-            CONF_NOTIFY_WHEN_AWAY_ONLY, DEFAULT_NOTIFY_WHEN_AWAY_ONLY
-        ) and not is_away:
             return
 
         title = self.subentry.title
@@ -837,15 +874,16 @@ class ShuttersScheduler:
         processed_covers: list[str],
     ) -> None:
         """Speak the action on every configured ``media_player.*`` via ``tts.speak``."""
+        tts_mode = hub_data.get(CONF_TTS_MODE, DEFAULT_TTS_MODE)
+        if tts_mode == MODE_DISABLED:
+            return
+        if tts_mode == MODE_AWAY_ONLY and not is_away:
+            return
         engine = hub_data.get(CONF_TTS_ENGINE)
         targets: list[str] = list(
             hub_data.get(CONF_TTS_TARGETS, DEFAULT_TTS_TARGETS)
         )
         if not engine or not targets:
-            return
-        if hub_data.get(
-            CONF_TTS_WHEN_AWAY_ONLY, DEFAULT_TTS_WHEN_AWAY_ONLY
-        ) and not is_away:
             return
 
         message = _tts_message(self.hass, language, action, processed_covers)

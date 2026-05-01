@@ -9,17 +9,22 @@ from custom_components.shutters_management.const import (
     CONF_CLOSE_TIME,
     CONF_COVERS,
     CONF_DAYS,
+    CONF_NOTIFY_MODE,
     CONF_NOTIFY_SERVICES,
     CONF_NOTIFY_WHEN_AWAY_ONLY,
     CONF_ONLY_WHEN_AWAY,
     CONF_OPEN_TIME,
     CONF_RANDOMIZE,
     CONF_RANDOM_MAX_MINUTES,
+    CONF_TTS_MODE,
     CONF_TYPE,
     DAYS,
     DOMAIN,
     HUB_TITLE,
     HUB_UNIQUE_ID,
+    MODE_ALWAYS,
+    MODE_AWAY_ONLY,
+    MODE_DISABLED,
     SUBENTRY_TYPE_INSTANCE,
     TYPE_HUB,
 )
@@ -62,17 +67,19 @@ async def test_migration_promotes_single_legacy_entry_to_hub(
     assert await hass.config_entries.async_setup(legacy.entry_id)
     await hass.async_block_till_done()
 
-    # The original entry was promoted to a v3 hub in place.
+    # The original entry was promoted to a hub (v2→v3) then migrated to v4.
     entries = hass.config_entries.async_entries(DOMAIN)
     assert len(entries) == 1
     hub = entries[0]
     assert hub.entry_id == "legacy_a"
-    assert hub.version == 3
+    assert hub.version == 4
     assert hub.title == HUB_TITLE
     assert hub.unique_id == HUB_UNIQUE_ID
     assert hub.data[CONF_TYPE] == TYPE_HUB
     assert hub.data[CONF_NOTIFY_SERVICES] == []
-    assert hub.data[CONF_NOTIFY_WHEN_AWAY_ONLY] is False
+    # v3→v4: empty services → mode=disabled; CONF_NOTIFY_WHEN_AWAY_ONLY removed.
+    assert hub.data[CONF_NOTIFY_MODE] == MODE_DISABLED
+    assert CONF_NOTIFY_WHEN_AWAY_ONLY not in hub.data
 
     # The instance lives on as the hub's first subentry.
     assert len(hub.subentries) == 1
@@ -108,7 +115,7 @@ async def test_migration_folds_two_legacy_entries_into_one_hub(
         f"Expected exactly one hub, got {[(e.entry_id, e.title) for e in entries]}"
     )
     hub = entries[0]
-    assert hub.version == 3
+    assert hub.version == 4
     assert hub.data[CONF_TYPE] == TYPE_HUB
 
     titles = sorted(s.title for s in hub.subentries.values())
@@ -123,10 +130,15 @@ async def test_migration_folds_two_legacy_entries_into_one_hub(
     assert by_title["RDC"].data[CONF_COVERS] == ["cover.rdc"]
 
 
-async def test_migration_is_noop_for_native_v3_hub(
+async def test_migration_v3_to_v4_converts_boolean_flags(
     hass: HomeAssistant,
 ) -> None:
-    """A pre-existing v3 hub is left alone by the migration step."""
+    """A v3 hub with boolean away-only flags is migrated to v4 mode constants.
+
+    v3 hub had:
+      notify_when_away_only: True  + notify_services non-empty → mode=away_only
+      no tts_engine / no tts_targets                            → tts_mode=disabled
+    """
     hub = MockConfigEntry(
         domain=DOMAIN,
         title=HUB_TITLE,
@@ -147,10 +159,15 @@ async def test_migration_is_noop_for_native_v3_hub(
 
     entries = hass.config_entries.async_entries(DOMAIN)
     assert len(entries) == 1
-    assert entries[0].entry_id == "native_hub"
-    assert entries[0].data[CONF_NOTIFY_SERVICES] == [
+    entry = entries[0]
+    assert entry.entry_id == "native_hub"
+    assert entry.version == 4
+    assert entry.data[CONF_NOTIFY_SERVICES] == [
         "notify.persistent_notification"
     ]
+    assert entry.data[CONF_NOTIFY_MODE] == MODE_AWAY_ONLY
+    assert CONF_NOTIFY_WHEN_AWAY_ONLY not in entry.data
+    assert entry.data[CONF_TTS_MODE] == MODE_DISABLED
 
 
 async def test_migration_reuses_legacy_entry_id_as_subentry_id(
