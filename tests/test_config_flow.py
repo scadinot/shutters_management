@@ -1,6 +1,7 @@
-"""Tests for the Shutters Management config and options flows."""
+"""Tests for the Shutters Management config and subentry flows."""
 from __future__ import annotations
 
+from homeassistant.config_entries import SOURCE_USER
 from homeassistant.const import CONF_NAME
 from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
@@ -12,27 +13,27 @@ from custom_components.shutters_management.const import (
     CONF_CLOSE_TIME,
     CONF_COVERS,
     CONF_DAYS,
+    CONF_NOTIFY_SERVICES,
+    CONF_NOTIFY_WHEN_AWAY_ONLY,
     CONF_ONLY_WHEN_AWAY,
     CONF_OPEN_MODE,
     CONF_OPEN_OFFSET,
     CONF_OPEN_TIME,
     CONF_RANDOMIZE,
     CONF_RANDOM_MAX_MINUTES,
+    CONF_TYPE,
     DAYS,
     DEFAULT_CLOSE_MODE,
     DEFAULT_OPEN_MODE,
     DOMAIN,
+    HUB_TITLE,
+    SUBENTRY_TYPE_INSTANCE,
+    TYPE_HUB,
 )
 
 
-def _valid_user_input(**overrides):
-    """User input matching the section-based schema.
-
-    Top-level keys are flat; trigger-related keys live inside the `open`
-    and `close` section sub-dicts as data_entry_flow.section produces.
-    Overrides are applied at the top level if their key is a top-level
-    field, or merged into the matching section otherwise.
-    """
+def _valid_instance_input(**overrides):
+    """Subentry user input matching the section-based instance schema."""
     data: dict[str, object] = {
         CONF_NAME: "Bureau",
         CONF_COVERS: ["cover.living_room"],
@@ -63,72 +64,46 @@ def _valid_user_input(**overrides):
     return data
 
 
-async def test_user_flow_success(hass: HomeAssistant) -> None:
-    """A complete, valid form should create an entry in a single submit."""
+# ---- Hub config flow ---------------------------------------------------------
+
+
+async def test_hub_user_flow_creates_singleton(hass: HomeAssistant) -> None:
+    """The hub flow creates one entry with shared notification settings."""
     result = await hass.config_entries.flow.async_init(
-        DOMAIN, context={"source": "user"}
+        DOMAIN, context={"source": SOURCE_USER}
     )
     assert result["type"] == FlowResultType.FORM
     assert result["step_id"] == "user"
 
     result = await hass.config_entries.flow.async_configure(
-        result["flow_id"], user_input=_valid_user_input()
-    )
-    assert result["type"] == FlowResultType.CREATE_ENTRY
-    assert result["title"] == "Bureau"
-    assert result["data"][CONF_NAME] == "Bureau"
-    assert result["data"][CONF_OPEN_TIME] == "08:00:00"
-    assert result["data"][CONF_CLOSE_TIME] == "20:00:00"
-
-
-async def test_user_flow_no_covers_error(hass: HomeAssistant) -> None:
-    """Submitting an empty covers list should surface a validation error."""
-    result = await hass.config_entries.flow.async_init(
-        DOMAIN, context={"source": "user"}
-    )
-    result = await hass.config_entries.flow.async_configure(
-        result["flow_id"], user_input=_valid_user_input(**{CONF_COVERS: []})
-    )
-    assert result["type"] == FlowResultType.FORM
-    assert result["errors"] == {CONF_COVERS: "no_covers"}
-
-
-async def test_user_flow_no_days_error(hass: HomeAssistant) -> None:
-    """Submitting an empty days list should surface a validation error."""
-    result = await hass.config_entries.flow.async_init(
-        DOMAIN, context={"source": "user"}
-    )
-    result = await hass.config_entries.flow.async_configure(
-        result["flow_id"], user_input=_valid_user_input(**{CONF_DAYS: []})
-    )
-    assert result["type"] == FlowResultType.FORM
-    assert result["errors"] == {CONF_DAYS: "no_days"}
-
-
-async def test_user_flow_confirms_when_no_presence_source(
-    hass: HomeAssistant,
-) -> None:
-    """only_when_away with no person.* and no presence_entity must confirm."""
-    result = await hass.config_entries.flow.async_init(
-        DOMAIN, context={"source": "user"}
-    )
-    result = await hass.config_entries.flow.async_configure(
         result["flow_id"],
-        user_input=_valid_user_input(**{CONF_ONLY_WHEN_AWAY: True}),
-    )
-    assert result["type"] == FlowResultType.FORM
-    assert result["step_id"] == "confirm_no_presence"
-
-    result = await hass.config_entries.flow.async_configure(
-        result["flow_id"], user_input={}
+        user_input={
+            CONF_NOTIFY_SERVICES: [],
+            CONF_NOTIFY_WHEN_AWAY_ONLY: False,
+        },
     )
     assert result["type"] == FlowResultType.CREATE_ENTRY
+    assert result["title"] == HUB_TITLE
+    assert result["data"][CONF_TYPE] == TYPE_HUB
+    assert result["data"][CONF_NOTIFY_SERVICES] == []
+    assert result["data"][CONF_NOTIFY_WHEN_AWAY_ONLY] is False
 
 
-async def test_options_flow_edits_configuration(
+async def test_hub_user_flow_aborts_when_already_configured(
+    hass: HomeAssistant, setup_integration
+) -> None:
+    """A second hub creation must abort with already_configured."""
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": SOURCE_USER}
+    )
+    assert result["type"] == FlowResultType.ABORT
+    assert result["reason"] == "already_configured"
+
+
+async def test_hub_options_flow_updates_notification_settings(
     hass: HomeAssistant, setup_integration, mock_config_entry: MockConfigEntry
 ) -> None:
-    """The options flow now creates the entry in a single submit."""
+    """The hub options flow rewrites entry.data with new notify settings."""
     result = await hass.config_entries.options.async_init(
         mock_config_entry.entry_id
     )
@@ -137,31 +112,182 @@ async def test_options_flow_edits_configuration(
 
     result = await hass.config_entries.options.async_configure(
         result["flow_id"],
-        user_input=_valid_user_input(
-            **{CONF_OPEN_TIME: "07:30:00", CONF_CLOSE_TIME: "21:30:00"}
-        ),
+        user_input={
+            CONF_NOTIFY_SERVICES: ["notify.persistent_notification"],
+            CONF_NOTIFY_WHEN_AWAY_ONLY: True,
+        },
     )
     assert result["type"] == FlowResultType.CREATE_ENTRY
-    assert result["data"][CONF_OPEN_TIME] == "07:30:00"
-    assert result["data"][CONF_CLOSE_TIME] == "21:30:00"
-    # CONF_NAME is kept out of entry.options so it can't drift from entry.data
-    assert CONF_NAME not in result["data"]
+    assert mock_config_entry.data[CONF_NOTIFY_SERVICES] == [
+        "notify.persistent_notification"
+    ]
+    assert mock_config_entry.data[CONF_NOTIFY_WHEN_AWAY_ONLY] is True
 
 
-async def test_options_flow_rename_keeps_data_in_sync(
+# ---- Instance subentry flow --------------------------------------------------
+
+
+async def test_subentry_user_flow_success(
     hass: HomeAssistant, setup_integration, mock_config_entry: MockConfigEntry
 ) -> None:
-    """Renaming via the options flow must update entry.data[CONF_NAME] and entry.title."""
-    result = await hass.config_entries.options.async_init(
-        mock_config_entry.entry_id
+    """Adding a new instance subentry to the hub must succeed."""
+    initial_count = len(mock_config_entry.subentries)
+
+    result = await hass.config_entries.subentries.async_init(
+        (mock_config_entry.entry_id, SUBENTRY_TYPE_INSTANCE),
+        context={"source": SOURCE_USER},
     )
-    result = await hass.config_entries.options.async_configure(
+    assert result["type"] == FlowResultType.FORM
+    assert result["step_id"] == "user"
+
+    result = await hass.config_entries.subentries.async_configure(
         result["flow_id"],
-        user_input=_valid_user_input(**{CONF_NAME: "Étage"}),
+        user_input=_valid_instance_input(**{CONF_NAME: "RDC"}),
     )
     assert result["type"] == FlowResultType.CREATE_ENTRY
-    # entry.data[CONF_NAME] is the canonical name, kept in sync with title
-    assert mock_config_entry.data[CONF_NAME] == "Étage"
-    assert mock_config_entry.title == "Étage"
-    # And entry.options must not carry CONF_NAME (no duplicate)
-    assert CONF_NAME not in mock_config_entry.options
+    assert result["title"] == "RDC"
+
+    assert len(mock_config_entry.subentries) == initial_count + 1
+    new_subentry = next(
+        s for s in mock_config_entry.subentries.values() if s.title == "RDC"
+    )
+    assert new_subentry.unique_id == "rdc"
+    assert new_subentry.data[CONF_OPEN_TIME] == "08:00:00"
+    assert CONF_NAME not in new_subentry.data
+
+
+async def test_subentry_user_flow_no_covers_error(
+    hass: HomeAssistant, setup_integration, mock_config_entry: MockConfigEntry
+) -> None:
+    """Submitting an empty covers list surfaces a validation error."""
+    result = await hass.config_entries.subentries.async_init(
+        (mock_config_entry.entry_id, SUBENTRY_TYPE_INSTANCE),
+        context={"source": SOURCE_USER},
+    )
+    result = await hass.config_entries.subentries.async_configure(
+        result["flow_id"],
+        user_input=_valid_instance_input(
+            **{CONF_NAME: "RDC", CONF_COVERS: []}
+        ),
+    )
+    assert result["type"] == FlowResultType.FORM
+    assert result["errors"] == {CONF_COVERS: "no_covers"}
+
+
+async def test_subentry_user_flow_no_days_error(
+    hass: HomeAssistant, setup_integration, mock_config_entry: MockConfigEntry
+) -> None:
+    """Submitting an empty days list surfaces a validation error."""
+    result = await hass.config_entries.subentries.async_init(
+        (mock_config_entry.entry_id, SUBENTRY_TYPE_INSTANCE),
+        context={"source": SOURCE_USER},
+    )
+    result = await hass.config_entries.subentries.async_configure(
+        result["flow_id"],
+        user_input=_valid_instance_input(
+            **{CONF_NAME: "RDC", CONF_DAYS: []}
+        ),
+    )
+    assert result["type"] == FlowResultType.FORM
+    assert result["errors"] == {CONF_DAYS: "no_days"}
+
+
+async def test_subentry_user_flow_aborts_on_duplicate_name(
+    hass: HomeAssistant, setup_integration, mock_config_entry: MockConfigEntry
+) -> None:
+    """Reusing an existing subentry name must abort with already_configured."""
+    result = await hass.config_entries.subentries.async_init(
+        (mock_config_entry.entry_id, SUBENTRY_TYPE_INSTANCE),
+        context={"source": SOURCE_USER},
+    )
+    result = await hass.config_entries.subentries.async_configure(
+        result["flow_id"],
+        # The fixture's hub already contains a subentry titled "Bureau".
+        user_input=_valid_instance_input(**{CONF_NAME: "Bureau"}),
+    )
+    assert result["type"] == FlowResultType.ABORT
+    assert result["reason"] == "already_configured"
+
+
+async def test_subentry_user_flow_aborts_on_title_collision_after_rename(
+    hass: HomeAssistant, setup_integration, mock_config_entry: MockConfigEntry
+) -> None:
+    """A rename can leave a stale unique_id; a new subentry with the renamed
+    title must still be rejected on title collision.
+
+    Scenario: the fixture's "Bureau" gets reconfigured to title "Étage"
+    (its unique_id stays "bureau" because subentry unique_id is immutable
+    on rename). Creating a fresh "Étage" would slugify to "etage", which
+    is a different unique_id — but the visible title would clash. The
+    flow must abort.
+    """
+    subentry_id = next(iter(mock_config_entry.subentries))
+    result = await mock_config_entry.start_subentry_reconfigure_flow(
+        hass, subentry_id
+    )
+    await hass.config_entries.subentries.async_configure(
+        result["flow_id"],
+        user_input=_valid_instance_input(**{CONF_NAME: "Étage"}),
+    )
+    assert mock_config_entry.subentries[subentry_id].title == "Étage"
+
+    result = await hass.config_entries.subentries.async_init(
+        (mock_config_entry.entry_id, SUBENTRY_TYPE_INSTANCE),
+        context={"source": SOURCE_USER},
+    )
+    result = await hass.config_entries.subentries.async_configure(
+        result["flow_id"],
+        user_input=_valid_instance_input(**{CONF_NAME: "Étage"}),
+    )
+    assert result["type"] == FlowResultType.ABORT
+    assert result["reason"] == "already_configured"
+
+
+async def test_subentry_user_flow_confirms_when_no_presence_source(
+    hass: HomeAssistant, setup_integration, mock_config_entry: MockConfigEntry
+) -> None:
+    """only_when_away with no person.* and no presence_entity must confirm."""
+    result = await hass.config_entries.subentries.async_init(
+        (mock_config_entry.entry_id, SUBENTRY_TYPE_INSTANCE),
+        context={"source": SOURCE_USER},
+    )
+    result = await hass.config_entries.subentries.async_configure(
+        result["flow_id"],
+        user_input=_valid_instance_input(
+            **{CONF_NAME: "RDC", CONF_ONLY_WHEN_AWAY: True}
+        ),
+    )
+    assert result["type"] == FlowResultType.FORM
+    assert result["step_id"] == "confirm_no_presence"
+
+    result = await hass.config_entries.subentries.async_configure(
+        result["flow_id"], user_input={}
+    )
+    assert result["type"] == FlowResultType.CREATE_ENTRY
+
+
+async def test_subentry_reconfigure_updates_existing(
+    hass: HomeAssistant, setup_integration, mock_config_entry: MockConfigEntry
+) -> None:
+    """Reconfigure flow rewrites an existing subentry's title and data."""
+    subentry_id = next(iter(mock_config_entry.subentries))
+
+    result = await mock_config_entry.start_subentry_reconfigure_flow(
+        hass, subentry_id
+    )
+    assert result["type"] == FlowResultType.FORM
+    assert result["step_id"] == "reconfigure"
+
+    result = await hass.config_entries.subentries.async_configure(
+        result["flow_id"],
+        user_input=_valid_instance_input(
+            **{CONF_NAME: "Étage", CONF_OPEN_TIME: "07:30:00"}
+        ),
+    )
+    assert result["type"] == FlowResultType.ABORT
+    assert result["reason"] == "reconfigure_successful"
+
+    updated = mock_config_entry.subentries[subentry_id]
+    assert updated.title == "Étage"
+    assert updated.data[CONF_OPEN_TIME] == "07:30:00"
+    assert CONF_NAME not in updated.data

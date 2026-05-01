@@ -5,11 +5,12 @@ import logging
 import random
 from collections.abc import Callable
 from datetime import datetime, time, timedelta
+from types import MappingProxyType
 from typing import Any
 
 import voluptuous as vol
 
-from homeassistant.config_entries import ConfigEntry
+from homeassistant.config_entries import ConfigEntry, ConfigSubentry
 from homeassistant.const import (
     ATTR_ENTITY_ID,
     CONF_NAME,
@@ -40,6 +41,8 @@ from .const import (
     CONF_CLOSE_TIME,
     CONF_COVERS,
     CONF_DAYS,
+    CONF_NOTIFY_SERVICES,
+    CONF_NOTIFY_WHEN_AWAY_ONLY,
     CONF_ONLY_WHEN_AWAY,
     CONF_OPEN_MODE,
     CONF_OPEN_OFFSET,
@@ -47,13 +50,18 @@ from .const import (
     CONF_PRESENCE_ENTITY,
     CONF_RANDOMIZE,
     CONF_RANDOM_MAX_MINUTES,
+    CONF_TYPE,
     DAYS,
     DEFAULT_CLOSE_MODE,
     DEFAULT_CLOSE_OFFSET,
+    DEFAULT_NOTIFY_SERVICES,
+    DEFAULT_NOTIFY_WHEN_AWAY_ONLY,
     DEFAULT_OPEN_MODE,
     DEFAULT_OPEN_OFFSET,
     DEFAULT_RANDOM_MAX_MINUTES,
     DOMAIN,
+    HUB_TITLE,
+    HUB_UNIQUE_ID,
     MODE_FIXED,
     MODE_SUNRISE,
     MODE_SUNSET,
@@ -61,7 +69,9 @@ from .const import (
     SERVICE_PAUSE,
     SERVICE_RESUME,
     SERVICE_RUN_NOW,
+    SUBENTRY_TYPE_INSTANCE,
     TRIGGER_MODES,
+    TYPE_HUB,
     signal_state_update,
 )
 
@@ -72,6 +82,25 @@ CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 RUN_NOW_SCHEMA = vol.Schema(
     {vol.Required(ATTR_ACTION): vol.In([ACTION_OPEN, ACTION_CLOSE])}
 )
+
+
+_NOTIFY_MESSAGES: dict[str, dict[str, str]] = {
+    "fr": {
+        ACTION_OPEN: "Volets ouverts ({count})",
+        ACTION_CLOSE: "Volets fermés ({count})",
+    },
+    "en": {
+        ACTION_OPEN: "Shutters opened ({count})",
+        ACTION_CLOSE: "Shutters closed ({count})",
+    },
+}
+
+
+def _notify_message(language: str, action: str, count: int) -> str:
+    """Localized notification message; ``en`` fallback for other locales."""
+    bucket = _NOTIFY_MESSAGES.get(language, _NOTIFY_MESSAGES["en"])
+    template = bucket.get(action, _NOTIFY_MESSAGES["en"][action])
+    return template.format(count=count)
 
 
 def _parse_time(value: str | time) -> time:
@@ -103,20 +132,128 @@ def _next_datetime_for(
     return None
 
 
+def _strip_name(data: dict[str, Any]) -> dict[str, Any]:
+    """Drop CONF_NAME from a payload destined to ``ConfigSubentry.data``."""
+    return {k: v for k, v in data.items() if k != CONF_NAME}
+
+
 async def async_setup(hass: HomeAssistant, config: dict) -> bool:
-    """Set up the integration (YAML not supported)."""
+    """Set up the integration (YAML not supported).
+
+    Pre-v0.4.0 entries are migrated here, before per-entry setup runs:
+    legacy single-instance entries are folded into a single hub entry as
+    subentries. This must happen in ``async_setup`` rather than
+    ``async_migrate_entry`` because the migration creates / deletes
+    sibling entries — operations that would race if performed
+    per-entry during their individual migration step.
+    """
     hass.data.setdefault(DOMAIN, {})
+    await _async_migrate_legacy_entries(hass)
     return True
 
 
+async def _async_migrate_legacy_entries(hass: HomeAssistant) -> None:
+    """Promote any v2 legacy entries to subentries of a hub entry."""
+    all_entries = hass.config_entries.async_entries(DOMAIN)
+    legacy = [e for e in all_entries if e.version < 3]
+    if not legacy:
+        return
+
+    hub = next(
+        (e for e in all_entries if e.data.get(CONF_TYPE) == TYPE_HUB),
+        None,
+    )
+
+    if hub is None:
+        # Promote the first legacy entry into the hub itself, keeping its
+        # original instance configuration as the first subentry. The new
+        # subentry reuses the legacy ``entry.entry_id`` as its
+        # ``subentry_id`` so existing entity unique_ids
+        # (``f"{entry.entry_id}_next_open"``, etc.) keep matching after
+        # the move — HA finds the registry entry by unique_id and
+        # updates ``config_subentry_id`` in place rather than creating
+        # a duplicate.
+        seed = legacy.pop(0)
+        original_data = dict(seed.data)
+        original_options = dict(seed.options)
+        instance_data = _strip_name({**original_data, **original_options})
+        instance_title = seed.title or original_data.get(CONF_NAME) or HUB_TITLE
+        instance_unique_id = seed.unique_id
+        legacy_id = seed.entry_id
+
+        hass.config_entries.async_update_entry(
+            seed,
+            title=HUB_TITLE,
+            data={
+                CONF_TYPE: TYPE_HUB,
+                CONF_NOTIFY_SERVICES: DEFAULT_NOTIFY_SERVICES,
+                CONF_NOTIFY_WHEN_AWAY_ONLY: DEFAULT_NOTIFY_WHEN_AWAY_ONLY,
+            },
+            options={},
+            unique_id=HUB_UNIQUE_ID,
+            version=3,
+        )
+        hass.config_entries.async_add_subentry(
+            seed,
+            ConfigSubentry(
+                subentry_id=legacy_id,
+                subentry_type=SUBENTRY_TYPE_INSTANCE,
+                title=instance_title,
+                unique_id=instance_unique_id,
+                data=MappingProxyType(instance_data),
+            ),
+        )
+        hub = seed
+        _LOGGER.info(
+            "Migrated legacy entry %s to hub with first subentry %s",
+            seed.entry_id,
+            instance_title,
+        )
+
+    for entry in legacy:
+        # Same trick: reuse the legacy entry_id as subentry_id so the
+        # entity registry can re-bind by unique_id once the legacy
+        # entry is gone.
+        instance_data = _strip_name({**entry.data, **entry.options})
+        instance_title = entry.title or entry.data.get(CONF_NAME) or "Instance"
+        hass.config_entries.async_add_subentry(
+            hub,
+            ConfigSubentry(
+                subentry_id=entry.entry_id,
+                subentry_type=SUBENTRY_TYPE_INSTANCE,
+                title=instance_title,
+                unique_id=entry.unique_id,
+                data=MappingProxyType(instance_data),
+            ),
+        )
+        await hass.config_entries.async_remove(entry.entry_id)
+        _LOGGER.info(
+            "Migrated legacy entry %s into hub subentry %s",
+            entry.entry_id,
+            instance_title,
+        )
+
+
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    """Set up Shutters Management from a config entry."""
+    """Set up the hub entry: spawn one scheduler per subentry."""
     hass.data.setdefault(DOMAIN, {})
 
-    manager = ShuttersScheduler(hass, entry)
-    manager.async_schedule()
+    if entry.data.get(CONF_TYPE) != TYPE_HUB:
+        # Defensive guard: any entry that did not get migrated to the
+        # hub model is not loadable in v0.4.0+.
+        _LOGGER.error(
+            "Entry %s is not a hub (type=%s); refusing to load",
+            entry.entry_id,
+            entry.data.get(CONF_TYPE),
+        )
+        return False
 
-    hass.data[DOMAIN][entry.entry_id] = manager
+    for subentry in entry.subentries.values():
+        if subentry.subentry_type != SUBENTRY_TYPE_INSTANCE:
+            continue
+        scheduler = ShuttersScheduler(hass, entry, subentry)
+        scheduler.async_schedule()
+        hass.data[DOMAIN][subentry.subentry_id] = scheduler
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     _async_register_services(hass)
@@ -127,16 +264,17 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    """Unload a config entry."""
+    """Unload a hub entry and tear down all of its subentry schedulers."""
     unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     if not unload_ok:
         return False
 
-    manager: ShuttersScheduler | None = hass.data.get(DOMAIN, {}).pop(
-        entry.entry_id, None
-    )
-    if manager is not None:
-        manager.async_unschedule()
+    for subentry in entry.subentries.values():
+        scheduler: ShuttersScheduler | None = hass.data.get(DOMAIN, {}).pop(
+            subentry.subentry_id, None
+        )
+        if scheduler is not None:
+            scheduler.async_unschedule()
 
     if not hass.data.get(DOMAIN):
         _async_unregister_services(hass)
@@ -145,7 +283,30 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
 
 async def _async_update_listener(hass: HomeAssistant, entry: ConfigEntry) -> None:
-    """Reload integration on options update."""
+    """Reload only when the set of instance subentries actually changed.
+
+    The hub options flow rewrites ``entry.data`` to update the shared
+    notification settings, which would otherwise trigger a reload here.
+    But notifications already re-read ``hub_entry.data`` on every send,
+    so a reload is just churn (entities flicker, schedulers respawn).
+
+    The listener still fires on subentry add / remove / reconfigure
+    because those changes mutate ``entry.subentries``; in that case we
+    do reload so the per-subentry schedulers and entity lists are
+    rebuilt.
+    """
+    current = {
+        sub.subentry_id: dict(sub.data)
+        for sub in entry.subentries.values()
+        if sub.subentry_type == SUBENTRY_TYPE_INSTANCE
+    }
+    loaded = {
+        sid: dict(scheduler.subentry.data)
+        for sid, scheduler in hass.data.get(DOMAIN, {}).items()
+        if scheduler.hub_entry is entry
+    }
+    if current == loaded:
+        return
     await hass.config_entries.async_reload(entry.entry_id)
 
 
@@ -154,22 +315,22 @@ async def async_migrate_entry(
 ) -> bool:
     """Migrate older config entries forward.
 
-    v1 entries (pre-multi-instance) had no CONF_NAME in entry.data. We
-    backfill it from entry.title so the new code paths that read the
-    instance name out of entry.data still work for upgraded users. From
-    v0.3.0 onward, entry.data[CONF_NAME] is the canonical source of the
-    instance name and the options flow keeps it in sync on rename.
+    The actual conversion of legacy v2 entries into a hub + subentries
+    happens in :func:`_async_migrate_legacy_entries` during
+    ``async_setup``. By the time HA calls ``async_migrate_entry`` on an
+    entry, that entry is either already at v3 (the hub) or it failed
+    to be migrated; in the latter case we refuse to load it so the user
+    notices.
     """
-    if entry.version == 1:
-        new_data = {**entry.data}
-        new_data.setdefault(CONF_NAME, entry.title or "Shutters Management")
-        hass.config_entries.async_update_entry(entry, data=new_data, version=2)
-        _LOGGER.info(
-            "Migrated config entry %s from v1 to v2 (CONF_NAME=%s)",
-            entry.entry_id,
-            new_data[CONF_NAME],
-        )
-    return True
+    if entry.version >= 3:
+        return True
+
+    _LOGGER.warning(
+        "Entry %s is still at version %s after pre-setup migration; refusing to load",
+        entry.entry_id,
+        entry.version,
+    )
+    return False
 
 
 @callback
@@ -207,18 +368,28 @@ def _async_unregister_services(hass: HomeAssistant) -> None:
 
 
 class ShuttersScheduler:
-    """Schedule open/close actions for the configured covers."""
+    """Schedule open/close actions for one instance subentry."""
 
-    def __init__(self, hass: HomeAssistant, entry: ConfigEntry) -> None:
+    def __init__(
+        self,
+        hass: HomeAssistant,
+        hub_entry: ConfigEntry,
+        subentry: ConfigSubentry,
+    ) -> None:
         self.hass = hass
-        self.entry = entry
+        self.hub_entry = hub_entry
+        self.subentry = subentry
         self.paused = False
         self._unsubs: list[Callable[[], None]] = []
         self._pending_unsubs: list[Callable[[], None]] = []
 
     @property
+    def subentry_id(self) -> str:
+        return self.subentry.subentry_id
+
+    @property
     def _settings(self) -> dict[str, Any]:
-        return {**self.entry.data, **self.entry.options}
+        return dict(self.subentry.data)
 
     @callback
     def async_schedule(self) -> None:
@@ -267,10 +438,10 @@ class ShuttersScheduler:
         if mode in TRIGGER_MODES:
             return mode
         _LOGGER.warning(
-            "Unknown trigger mode %r for %s on entry %s; falling back to %r",
+            "Unknown trigger mode %r for %s on subentry %s; falling back to %r",
             mode,
             context,
-            self.entry.entry_id,
+            self.subentry_id,
             default_mode,
         )
         return default_mode
@@ -282,11 +453,7 @@ class ShuttersScheduler:
         time_value: str | None,
         offset_min: int,
     ) -> Callable[[], None]:
-        """Register a single open/close trigger for the given mode.
-
-        ``mode`` must be one of ``TRIGGER_MODES``; callers should normalise
-        first via ``_resolve_mode``.
-        """
+        """Register a single open/close trigger for the given mode."""
         handler = self._make_handler(service)
         if mode == MODE_FIXED:
             time_obj = _parse_time(time_value)
@@ -317,8 +484,6 @@ class ShuttersScheduler:
     def _make_handler(self, service: str):
         @callback
         def _handle(now: datetime | None = None) -> None:
-            # async_track_time_change passes `now`; async_track_sunrise/sunset
-            # call the handler with no arguments.
             current = now if now is not None else dt_util.utcnow()
             self.hass.async_create_task(self._async_trigger(service, current))
 
@@ -392,7 +557,7 @@ class ShuttersScheduler:
 
     async def _async_deferred_call(self, service: str) -> None:
         """Re-check conditions before firing a delayed action."""
-        if self.hass.data.get(DOMAIN, {}).get(self.entry.entry_id) is not self:
+        if self.hass.data.get(DOMAIN, {}).get(self.subentry_id) is not self:
             return
         if not self._conditions_met(service, dt_util.utcnow()):
             return
@@ -411,7 +576,59 @@ class ShuttersScheduler:
             blocking=False,
         )
         _LOGGER.info("Called cover.%s on %s", service, covers)
-        async_dispatcher_send(self.hass, signal_state_update(self.entry.entry_id))
+        await self._async_send_notifications(service, covers)
+        async_dispatcher_send(self.hass, signal_state_update(self.subentry_id))
+
+    async def _async_send_notifications(
+        self, cover_service: str, covers: list[str]
+    ) -> None:
+        """Notify each configured ``notify.*`` service about the action.
+
+        Settings are read from the hub entry on every call (not cached)
+        so that the hub options flow takes effect without a reload.
+        Per-notifier failures are logged but never propagated, so a
+        broken notify integration cannot block the cover action that
+        already succeeded above.
+        """
+        hub_data = self.hub_entry.data
+        targets: list[str] = list(
+            hub_data.get(CONF_NOTIFY_SERVICES, DEFAULT_NOTIFY_SERVICES)
+        )
+        if not targets:
+            return
+
+        if hub_data.get(
+            CONF_NOTIFY_WHEN_AWAY_ONLY, DEFAULT_NOTIFY_WHEN_AWAY_ONLY
+        ) and not self._is_away(self._settings):
+            return
+
+        action = ACTION_OPEN if cover_service == SERVICE_OPEN_COVER else ACTION_CLOSE
+        title = self.subentry.title
+        message = _notify_message(
+            self.hass.config.language, action, len(covers)
+        )
+
+        for target in targets:
+            if "." not in target:
+                _LOGGER.warning("Invalid notify target: %s", target)
+                continue
+            domain, service_name = target.split(".", 1)
+            if domain != "notify":
+                _LOGGER.warning(
+                    "Notify target not in notify domain: %s", target
+                )
+                continue
+            try:
+                await self.hass.services.async_call(
+                    "notify",
+                    service_name,
+                    {"title": title, "message": message},
+                    blocking=False,
+                )
+            except Exception:  # noqa: BLE001 — never break the cover action
+                _LOGGER.exception(
+                    "Failed to send notification via %s", target
+                )
 
     def _is_away(self, settings: dict[str, Any]) -> bool:
         """Return True when the configured presence entity reports away."""
@@ -516,4 +733,4 @@ class ShuttersScheduler:
             return
         self.paused = paused
         _LOGGER.info("Simulation %s", "paused" if paused else "resumed")
-        async_dispatcher_send(self.hass, signal_state_update(self.entry.entry_id))
+        async_dispatcher_send(self.hass, signal_state_update(self.subentry_id))

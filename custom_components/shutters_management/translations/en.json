@@ -3,91 +3,111 @@
     "step": {
       "user": {
         "title": "Shutters Management",
-        "description": "Configure shutters to simulate presence.",
+        "description": "Configure shared notification settings. Add shutter schedules afterwards by adding instances on the integration's hub.",
         "data": {
-          "name": "Instance name",
-          "covers": "Shutters to control",
-          "days": "Active days",
-          "randomize": "Randomize times",
-          "random_max_minutes": "Maximum random offset (minutes)",
-          "only_when_away": "Run only when away",
-          "presence_entity": "Presence entity (person or group)"
-        },
-        "sections": {
-          "open": {
-            "name": "Opening",
-            "data": {
-              "open_mode": "Opening trigger",
-              "open_time": "Opening time (used when trigger is fixed)",
-              "open_offset": "Opening offset in minutes (used when trigger is sunrise/sunset)"
-            }
-          },
-          "close": {
-            "name": "Closing",
-            "data": {
-              "close_mode": "Closing trigger",
-              "close_time": "Closing time (used when trigger is fixed)",
-              "close_offset": "Closing offset in minutes (used when trigger is sunrise/sunset)"
-            }
-          }
+          "notify_services": "Notification services to call after each action (leave empty to disable)",
+          "notify_when_away_only": "Notify only when away"
         }
-      },
-      "confirm_no_presence": {
-        "title": "No presence source detected",
-        "description": "You enabled \"Run only when away\" but no presence entity is configured and no person.* entity exists. The simulation will run anyway. Continue?"
       }
     },
-    "error": {
-      "name_required": "Choose a name for this instance.",
-      "no_covers": "Select at least one cover.",
-      "no_days": "Select at least one day."
-    },
     "abort": {
-      "already_configured": "An instance with this name is already configured."
+      "already_configured": "Shutters Management is already configured. Add a new schedule by creating an instance on the existing hub."
     }
   },
   "options": {
     "step": {
       "init": {
-        "title": "Edit configuration",
-        "description": "Update the configuration.",
+        "title": "Edit notifications",
+        "description": "Update the shared notification settings.",
         "data": {
-          "name": "Instance name",
-          "covers": "Shutters to control",
-          "days": "Active days",
-          "randomize": "Randomize times",
-          "random_max_minutes": "Maximum random offset (minutes)",
-          "only_when_away": "Run only when away",
-          "presence_entity": "Presence entity (person or group)"
-        },
-        "sections": {
-          "open": {
-            "name": "Opening",
-            "data": {
-              "open_mode": "Opening trigger",
-              "open_time": "Opening time (used when trigger is fixed)",
-              "open_offset": "Opening offset in minutes (used when trigger is sunrise/sunset)"
-            }
+          "notify_services": "Notification services to call after each action (leave empty to disable)",
+          "notify_when_away_only": "Notify only when away"
+        }
+      }
+    }
+  },
+  "config_subentries": {
+    "instance": {
+      "entry_type": "service",
+      "initiate_flow": {
+        "user": "Add a shutter schedule"
+      },
+      "error": {
+        "name_required": "Choose a name for this instance.",
+        "no_covers": "Select at least one cover.",
+        "no_days": "Select at least one day."
+      },
+      "abort": {
+        "already_configured": "An instance with this name is already configured."
+      },
+      "step": {
+        "user": {
+          "title": "Add a shutter schedule",
+          "description": "Configure shutters to simulate presence.",
+          "data": {
+            "name": "Instance name",
+            "covers": "Shutters to control",
+            "days": "Active days",
+            "randomize": "Randomize times",
+            "random_max_minutes": "Maximum random offset (minutes)",
+            "only_when_away": "Run only when away",
+            "presence_entity": "Presence entity (person or group)"
           },
-          "close": {
-            "name": "Closing",
-            "data": {
-              "close_mode": "Closing trigger",
-              "close_time": "Closing time (used when trigger is fixed)",
-              "close_offset": "Closing offset in minutes (used when trigger is sunrise/sunset)"
+          "sections": {
+            "open": {
+              "name": "Opening",
+              "data": {
+                "open_mode": "Opening trigger",
+                "open_time": "Opening time (used when trigger is fixed)",
+                "open_offset": "Opening offset in minutes (used when trigger is sunrise/sunset)"
+              }
+            },
+            "close": {
+              "name": "Closing",
+              "data": {
+                "close_mode": "Closing trigger",
+                "close_time": "Closing time (used when trigger is fixed)",
+                "close_offset": "Closing offset in minutes (used when trigger is sunrise/sunset)"
+              }
             }
           }
+        },
+        "reconfigure": {
+          "title": "Edit shutter schedule",
+          "description": "Update the configuration.",
+          "data": {
+            "name": "Instance name",
+            "covers": "Shutters to control",
+            "days": "Active days",
+            "randomize": "Randomize times",
+            "random_max_minutes": "Maximum random offset (minutes)",
+            "only_when_away": "Run only when away",
+            "presence_entity": "Presence entity (person or group)"
+          },
+          "sections": {
+            "open": {
+              "name": "Opening",
+              "data": {
+                "open_mode": "Opening trigger",
+                "open_time": "Opening time (used when trigger is fixed)",
+                "open_offset": "Opening offset in minutes (used when trigger is sunrise/sunset)"
+              }
+            },
+            "close": {
+              "name": "Closing",
+              "data": {
+                "close_mode": "Closing trigger",
+                "close_time": "Closing time (used when trigger is fixed)",
+                "close_offset": "Closing offset in minutes (used when trigger is sunrise/sunset)"
+              }
+            }
+          }
+        },
+        "confirm_no_presence": {
+          "title": "No presence source detected",
+          "description": "You enabled \"Run only when away\" but no presence entity is configured and no person.* entity exists. The simulation will run anyway. Continue?"
         }
-      },
-      "confirm_no_presence": {
-        "title": "No presence source detected",
-        "description": "You enabled \"Run only when away\" but no presence entity is configured and no person.* entity exists. The simulation will run anyway. Continue?"
       }
-    },
-    "error": {
-      "name_required": "Choose a name for this instance.",
-      "no_covers": "Select at least one cover.",
-      "no_days": "Select at least one day."
     }
   },
   "selector": {
@@ -136,7 +156,7 @@
   "services": {
     "run_now": {
       "name": "Run now",
-      "description": "Trigger an immediate opening or closing of the configured shutters, bypassing day, randomization and presence conditions.",
+      "description": "Trigger an immediate opening or closing of every configured schedule, bypassing day, randomization and presence conditions.",
       "fields": {
         "action": {
           "name": "Action",
@@ -146,11 +166,11 @@
     },
     "pause": {
       "name": "Pause",
-      "description": "Pause the simulation. Scheduled triggers are ignored until resumed."
+      "description": "Pause every schedule. Scheduled triggers are ignored until resumed."
     },
     "resume": {
       "name": "Resume",
-      "description": "Resume the simulation after a pause."
+      "description": "Resume every schedule after a pause."
     }
   }
 }

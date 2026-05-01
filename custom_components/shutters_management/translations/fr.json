@@ -3,91 +3,111 @@
     "step": {
       "user": {
         "title": "Shutters Management",
-        "description": "Configurer les volets pour simuler une présence.",
+        "description": "Configurer les paramètres de notification partagés. Vous ajouterez ensuite des plannings de volets en créant des instances sur le hub de l'intégration.",
         "data": {
-          "name": "Nom de l'instance",
-          "covers": "Volets à piloter",
-          "days": "Jours actifs",
-          "randomize": "Activer le décalage aléatoire",
-          "random_max_minutes": "Amplitude maximale (minutes)",
-          "only_when_away": "Exécuter uniquement en absence",
-          "presence_entity": "Entité de présence (personne ou groupe)"
-        },
-        "sections": {
-          "open": {
-            "name": "Ouverture",
-            "data": {
-              "open_mode": "Déclencheur d'ouverture",
-              "open_time": "Heure d'ouverture (utilisée si déclencheur = heure fixe)",
-              "open_offset": "Décalage d'ouverture en minutes (utilisé si déclencheur = lever/coucher)"
-            }
-          },
-          "close": {
-            "name": "Fermeture",
-            "data": {
-              "close_mode": "Déclencheur de fermeture",
-              "close_time": "Heure de fermeture (utilisée si déclencheur = heure fixe)",
-              "close_offset": "Décalage de fermeture en minutes (utilisé si déclencheur = lever/coucher)"
-            }
-          }
+          "notify_services": "Services de notification à appeler après chaque action (laisser vide pour désactiver)",
+          "notify_when_away_only": "Notifier uniquement en mode absence"
         }
-      },
-      "confirm_no_presence": {
-        "title": "Aucune source de présence détectée",
-        "description": "L'option « Exécuter uniquement en absence » est activée mais aucune entité de présence n'est configurée et aucune entité person.* n'existe. La simulation s'exécutera quand même. Continuer ?"
       }
     },
-    "error": {
-      "name_required": "Choisissez un nom pour cette instance.",
-      "no_covers": "Sélectionnez au moins un volet.",
-      "no_days": "Sélectionnez au moins un jour."
-    },
     "abort": {
-      "already_configured": "Une instance portant ce nom est déjà configurée."
+      "already_configured": "Shutters Management est déjà configuré. Ajoutez un nouveau planning en créant une instance sur le hub existant."
     }
   },
   "options": {
     "step": {
       "init": {
-        "title": "Modifier la configuration",
-        "description": "Mettre à jour la configuration.",
+        "title": "Modifier les notifications",
+        "description": "Mettre à jour les paramètres de notification partagés.",
         "data": {
-          "name": "Nom de l'instance",
-          "covers": "Volets à piloter",
-          "days": "Jours actifs",
-          "randomize": "Activer le décalage aléatoire",
-          "random_max_minutes": "Amplitude maximale (minutes)",
-          "only_when_away": "Exécuter uniquement en absence",
-          "presence_entity": "Entité de présence (personne ou groupe)"
-        },
-        "sections": {
-          "open": {
-            "name": "Ouverture",
-            "data": {
-              "open_mode": "Déclencheur d'ouverture",
-              "open_time": "Heure d'ouverture (utilisée si déclencheur = heure fixe)",
-              "open_offset": "Décalage d'ouverture en minutes (utilisé si déclencheur = lever/coucher)"
-            }
+          "notify_services": "Services de notification à appeler après chaque action (laisser vide pour désactiver)",
+          "notify_when_away_only": "Notifier uniquement en mode absence"
+        }
+      }
+    }
+  },
+  "config_subentries": {
+    "instance": {
+      "entry_type": "service",
+      "initiate_flow": {
+        "user": "Ajouter un planning de volets"
+      },
+      "error": {
+        "name_required": "Choisissez un nom pour cette instance.",
+        "no_covers": "Sélectionnez au moins un volet.",
+        "no_days": "Sélectionnez au moins un jour."
+      },
+      "abort": {
+        "already_configured": "Une instance portant ce nom est déjà configurée."
+      },
+      "step": {
+        "user": {
+          "title": "Ajouter un planning de volets",
+          "description": "Configurer les volets pour simuler une présence.",
+          "data": {
+            "name": "Nom de l'instance",
+            "covers": "Volets à piloter",
+            "days": "Jours actifs",
+            "randomize": "Activer le décalage aléatoire",
+            "random_max_minutes": "Amplitude maximale (minutes)",
+            "only_when_away": "Exécuter uniquement en absence",
+            "presence_entity": "Entité de présence (personne ou groupe)"
           },
-          "close": {
-            "name": "Fermeture",
-            "data": {
-              "close_mode": "Déclencheur de fermeture",
-              "close_time": "Heure de fermeture (utilisée si déclencheur = heure fixe)",
-              "close_offset": "Décalage de fermeture en minutes (utilisé si déclencheur = lever/coucher)"
+          "sections": {
+            "open": {
+              "name": "Ouverture",
+              "data": {
+                "open_mode": "Déclencheur d'ouverture",
+                "open_time": "Heure d'ouverture (utilisée si déclencheur = heure fixe)",
+                "open_offset": "Décalage d'ouverture en minutes (utilisé si déclencheur = lever/coucher)"
+              }
+            },
+            "close": {
+              "name": "Fermeture",
+              "data": {
+                "close_mode": "Déclencheur de fermeture",
+                "close_time": "Heure de fermeture (utilisée si déclencheur = heure fixe)",
+                "close_offset": "Décalage de fermeture en minutes (utilisé si déclencheur = lever/coucher)"
+              }
             }
           }
+        },
+        "reconfigure": {
+          "title": "Modifier le planning de volets",
+          "description": "Mettre à jour la configuration.",
+          "data": {
+            "name": "Nom de l'instance",
+            "covers": "Volets à piloter",
+            "days": "Jours actifs",
+            "randomize": "Activer le décalage aléatoire",
+            "random_max_minutes": "Amplitude maximale (minutes)",
+            "only_when_away": "Exécuter uniquement en absence",
+            "presence_entity": "Entité de présence (personne ou groupe)"
+          },
+          "sections": {
+            "open": {
+              "name": "Ouverture",
+              "data": {
+                "open_mode": "Déclencheur d'ouverture",
+                "open_time": "Heure d'ouverture (utilisée si déclencheur = heure fixe)",
+                "open_offset": "Décalage d'ouverture en minutes (utilisé si déclencheur = lever/coucher)"
+              }
+            },
+            "close": {
+              "name": "Fermeture",
+              "data": {
+                "close_mode": "Déclencheur de fermeture",
+                "close_time": "Heure de fermeture (utilisée si déclencheur = heure fixe)",
+                "close_offset": "Décalage de fermeture en minutes (utilisé si déclencheur = lever/coucher)"
+              }
+            }
+          }
+        },
+        "confirm_no_presence": {
+          "title": "Aucune source de présence détectée",
+          "description": "L'option « Exécuter uniquement en absence » est activée mais aucune entité de présence n'est configurée et aucune entité person.* n'existe. La simulation s'exécutera quand même. Continuer ?"
         }
-      },
-      "confirm_no_presence": {
-        "title": "Aucune source de présence détectée",
-        "description": "L'option « Exécuter uniquement en absence » est activée mais aucune entité de présence n'est configurée et aucune entité person.* n'existe. La simulation s'exécutera quand même. Continuer ?"
       }
-    },
-    "error": {
-      "name_required": "Choisissez un nom pour cette instance.",
-      "no_covers": "Sélectionnez au moins un volet.",
-      "no_days": "Sélectionnez au moins un jour."
     }
   },
   "selector": {
@@ -136,7 +156,7 @@
   "services": {
     "run_now": {
       "name": "Déclencher maintenant",
-      "description": "Déclenche immédiatement une ouverture ou une fermeture des volets configurés, sans tenir compte des jours, du décalage aléatoire ou de la présence.",
+      "description": "Déclenche immédiatement une ouverture ou une fermeture de tous les plannings configurés, sans tenir compte des jours, du décalage aléatoire ou de la présence.",
       "fields": {
         "action": {
           "name": "Action",
@@ -146,11 +166,11 @@
     },
     "pause": {
       "name": "Mettre en pause",
-      "description": "Met la simulation en pause. Les déclenchements programmés sont ignorés jusqu'à la reprise."
+      "description": "Met tous les plannings en pause. Les déclenchements programmés sont ignorés jusqu'à la reprise."
     },
     "resume": {
       "name": "Reprendre",
-      "description": "Reprend la simulation après une pause."
+      "description": "Reprend tous les plannings après une pause."
     }
   }
 }

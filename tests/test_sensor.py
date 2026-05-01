@@ -8,26 +8,29 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.shutters_management.const import DOMAIN
 
+from .conftest import get_only_subentry_id
+
 
 def _entity_id_for(
-    hass: HomeAssistant, entry: MockConfigEntry, suffix: str
+    hass: HomeAssistant, subentry_id: str, suffix: str
 ) -> str:
-    """Look up the sensor entity_id by its scoped unique_id."""
+    """Look up the sensor entity_id by its subentry-scoped unique_id."""
     registry = er.async_get(hass)
     entity_id = registry.async_get_entity_id(
-        "sensor", DOMAIN, f"{entry.entry_id}_{suffix}"
+        "sensor", DOMAIN, f"{subentry_id}_{suffix}"
     )
     assert entity_id is not None, f"Missing sensor entity for suffix: {suffix}"
     return entity_id
 
 
-async def test_sensor_unique_ids_are_entry_scoped(
+async def test_sensor_unique_ids_are_subentry_scoped(
     hass: HomeAssistant, setup_integration, mock_config_entry: MockConfigEntry
 ) -> None:
-    """Both sensor unique_ids must include the entry_id (multi-instance safe)."""
+    """Both sensor unique_ids must include the subentry_id (multi-instance safe)."""
     registry = er.async_get(hass)
-    expected_open = f"{mock_config_entry.entry_id}_next_open"
-    expected_close = f"{mock_config_entry.entry_id}_next_close"
+    subentry_id = get_only_subentry_id(mock_config_entry)
+    expected_open = f"{subentry_id}_next_open"
+    expected_close = f"{subentry_id}_next_close"
     assert registry.async_get_entity_id("sensor", DOMAIN, expected_open) is not None
     assert registry.async_get_entity_id("sensor", DOMAIN, expected_close) is not None
 
@@ -37,11 +40,12 @@ async def test_sensor_entity_ids_are_stable_english(
 ) -> None:
     """Resolved entity_ids must use the English slug regardless of locale."""
     registry = er.async_get(hass)
+    subentry_id = get_only_subentry_id(mock_config_entry)
     open_id = registry.async_get_entity_id(
-        "sensor", DOMAIN, f"{mock_config_entry.entry_id}_next_open"
+        "sensor", DOMAIN, f"{subentry_id}_next_open"
     )
     close_id = registry.async_get_entity_id(
-        "sensor", DOMAIN, f"{mock_config_entry.entry_id}_next_close"
+        "sensor", DOMAIN, f"{subentry_id}_next_close"
     )
     assert open_id == "sensor.bureau_next_open"
     assert close_id == "sensor.bureau_next_close"
@@ -51,8 +55,9 @@ async def test_sensors_have_timestamp_state_when_active(
     hass: HomeAssistant, setup_integration, mock_config_entry: MockConfigEntry
 ) -> None:
     """Both sensors must expose a non-empty timestamp when not paused."""
-    open_id = _entity_id_for(hass, mock_config_entry, "next_open")
-    close_id = _entity_id_for(hass, mock_config_entry, "next_close")
+    subentry_id = get_only_subentry_id(mock_config_entry)
+    open_id = _entity_id_for(hass, subentry_id, "next_open")
+    close_id = _entity_id_for(hass, subentry_id, "next_close")
     open_state = hass.states.get(open_id)
     close_state = hass.states.get(close_id)
     assert open_state is not None and open_state.state not in (None, STATE_UNKNOWN, "")
@@ -67,8 +72,9 @@ async def test_sensors_become_unknown_when_paused(
     await scheduler.async_set_paused(True)
     await hass.async_block_till_done()
 
-    open_id = _entity_id_for(hass, mock_config_entry, "next_open")
-    close_id = _entity_id_for(hass, mock_config_entry, "next_close")
+    subentry_id = get_only_subentry_id(mock_config_entry)
+    open_id = _entity_id_for(hass, subentry_id, "next_open")
+    close_id = _entity_id_for(hass, subentry_id, "next_close")
     assert hass.states.get(open_id).state == STATE_UNKNOWN
     assert hass.states.get(close_id).state == STATE_UNKNOWN
 
@@ -83,5 +89,6 @@ async def test_sensors_recover_after_resume(
     await scheduler.async_set_paused(False)
     await hass.async_block_till_done()
 
-    open_id = _entity_id_for(hass, mock_config_entry, "next_open")
+    subentry_id = get_only_subentry_id(mock_config_entry)
+    open_id = _entity_id_for(hass, subentry_id, "next_open")
     assert hass.states.get(open_id).state not in (STATE_UNKNOWN, "", None)
