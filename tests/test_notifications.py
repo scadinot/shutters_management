@@ -72,6 +72,9 @@ async def test_notification_sent_after_open_action(
     """A configured notify service receives a notification after open."""
     async_mock_service(hass, "cover", SERVICE_OPEN_COVER)
     notify_calls = async_mock_service(hass, "notify", "iphone")
+    hass.states.async_set(
+        "cover.living_room", "closed", {"friendly_name": "Living Room"}
+    )
 
     _, scheduler = await _setup_hub(
         hass, base_config, notify_services=["notify.iphone"]
@@ -82,7 +85,81 @@ async def test_notification_sent_after_open_action(
     assert len(notify_calls) == 1
     payload = notify_calls[0].data
     assert payload["title"] == "Bureau"
-    assert "1" in payload["message"]
+    # Header on its own line, then one cover per line.
+    assert payload["message"].splitlines() == [
+        "Shutters opened:",
+        "Living Room",
+    ]
+
+
+async def test_notification_lists_covers_in_processing_order(
+    hass: HomeAssistant, base_config
+) -> None:
+    """The body must enumerate covers in the order the scheduler fired them."""
+    from custom_components.shutters_management.const import (
+        CONF_COVERS,
+        CONF_SEQUENTIAL_COVERS,
+    )
+
+    async_mock_service(hass, "cover", SERVICE_OPEN_COVER)
+    notify_calls = async_mock_service(hass, "notify", "iphone")
+
+    base_config[CONF_COVERS] = [
+        "cover.left",
+        "cover.middle",
+        "cover.right",
+    ]
+    hass.states.async_set("cover.left", "open", {"friendly_name": "Left"})
+    hass.states.async_set("cover.middle", "open", {"friendly_name": "Middle"})
+    hass.states.async_set("cover.right", "open", {"friendly_name": "Right"})
+
+    from .conftest import build_hub_with_instance
+
+    entry = build_hub_with_instance(
+        instance_data=base_config,
+        hub_data={
+            CONF_NOTIFY_SERVICES: ["notify.iphone"],
+            CONF_SEQUENTIAL_COVERS: True,
+        },
+    )
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    scheduler = hass.data[DOMAIN][get_only_subentry_id(entry)]
+
+    # Force a deterministic shuffle so the test is repeatable.
+    from unittest.mock import patch
+
+    with patch(
+        "custom_components.shutters_management.random.shuffle",
+        side_effect=lambda seq: seq.reverse(),
+    ):
+        await scheduler.async_run_now(ACTION_OPEN)
+        await hass.async_block_till_done()
+
+    body_lines = notify_calls[0].data["message"].splitlines()
+    # Header + 3 covers in reversed order.
+    assert body_lines[0].endswith(":")
+    assert body_lines[1:] == ["Right", "Middle", "Left"]
+
+
+async def test_notification_falls_back_to_entity_id_without_friendly_name(
+    hass: HomeAssistant, base_config
+) -> None:
+    """A cover with no state / no friendly_name renders as its entity_id."""
+    async_mock_service(hass, "cover", SERVICE_OPEN_COVER)
+    notify_calls = async_mock_service(hass, "notify", "iphone")
+
+    _, scheduler = await _setup_hub(
+        hass, base_config, notify_services=["notify.iphone"]
+    )
+    await scheduler.async_run_now(ACTION_OPEN)
+    await hass.async_block_till_done()
+
+    body_lines = notify_calls[0].data["message"].splitlines()
+    # The fixture's only cover has no state set in this test, so we
+    # fall back to the raw entity_id.
+    assert body_lines[1:] == ["cover.living_room"]
 
 
 async def test_notification_sent_after_close_action(
@@ -177,7 +254,7 @@ async def test_notification_message_localized_fr(
     await scheduler.async_run_now(ACTION_OPEN)
     await hass.async_block_till_done()
 
-    assert "Volets" in notify_calls[0].data["message"]
+    assert notify_calls[0].data["message"].startswith("Volets ouverts :")
 
 
 async def test_notification_message_localized_en(
@@ -194,7 +271,7 @@ async def test_notification_message_localized_en(
     await scheduler.async_run_now(ACTION_CLOSE)
     await hass.async_block_till_done()
 
-    assert "Shutters" in notify_calls[0].data["message"]
+    assert notify_calls[0].data["message"].startswith("Shutters closed:")
 
 
 async def test_notification_failure_does_not_break_cover_action(
