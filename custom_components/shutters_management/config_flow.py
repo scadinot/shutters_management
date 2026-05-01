@@ -101,11 +101,12 @@ def _build_hub_schema(
     Layout (top → bottom):
 
     1. ``sequential_covers`` (top-level toggle, scheduler behaviour).
-    2. Section ``notifications`` — push services + their own away-only toggle.
+    2. Section ``notifications`` — push services + their own three-state
+       mode selector (disabled / always / away_only).
     3. Section ``voice_announcement`` — TTS engine + speakers + their own
-       away-only toggle.
+       three-state mode selector.
 
-    Each channel section is **self-contained**: its away-only toggle sits
+    Each channel section is **self-contained**: its mode selector sits
     next to the fields it gates. There used to be a third ``away_only``
     section grouping both toggles together, but it required users to
     cross-reference the other sections — confusing in practice.

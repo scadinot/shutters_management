@@ -22,7 +22,6 @@ from custom_components.shutters_management.const import (
     DOMAIN,
     HUB_TITLE,
     HUB_UNIQUE_ID,
-    MODE_ALWAYS,
     MODE_AWAY_ONLY,
     MODE_DISABLED,
     SUBENTRY_TYPE_INSTANCE,

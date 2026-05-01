@@ -78,8 +78,8 @@ async def test_hub_user_flow_creates_singleton(hass: HomeAssistant) -> None:
 
     The form is laid out in 2 collapsible HA sections (``notifications``
     and ``voice_announcement``) plus the top-level ``sequential_covers``
-    toggle. Each section embeds its own away-only toggle, so user_input
-    must mirror that shape.
+    toggle. Each section embeds its own three-state mode selector
+    (disabled / always / away_only), so user_input must mirror that shape.
     """
     result = await hass.config_entries.flow.async_init(
         DOMAIN, context={"source": SOURCE_USER}

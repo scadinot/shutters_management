@@ -255,7 +255,7 @@ async def _async_migrate_legacy_entries(hass: HomeAssistant) -> None:
             data={
                 CONF_TYPE: TYPE_HUB,
                 CONF_NOTIFY_SERVICES: DEFAULT_NOTIFY_SERVICES,
-                CONF_NOTIFY_WHEN_AWAY_ONLY: DEFAULT_NOTIFY_WHEN_AWAY_ONLY,
+                CONF_NOTIFY_WHEN_AWAY_ONLY: False,
             },
             options={},
             unique_id=HUB_UNIQUE_ID,
@@ -420,7 +420,7 @@ async def async_migrate_entry(
         engine = data.get(CONF_TTS_ENGINE)
         tts_targets = data.get(CONF_TTS_TARGETS, [])
         tts_away_only = data.pop(CONF_TTS_WHEN_AWAY_ONLY, False)
-        if not engine and not tts_targets:
+        if not engine or not tts_targets:
             data[CONF_TTS_MODE] = MODE_DISABLED
         elif tts_away_only:
             data[CONF_TTS_MODE] = MODE_AWAY_ONLY

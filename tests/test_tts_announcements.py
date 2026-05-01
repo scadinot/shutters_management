@@ -51,9 +51,8 @@ async def _setup_tts_hub(
     hub_overrides[CONF_TTS_TARGETS] = targets if targets is not None else [
         "media_player.kitchen"
     ]
-    if notify_services is not None:
-        hub_overrides[CONF_NOTIFY_SERVICES] = notify_services
-        hub_overrides[CONF_NOTIFY_MODE] = notify_mode
+    hub_overrides[CONF_NOTIFY_SERVICES] = notify_services if notify_services is not None else []
+    hub_overrides[CONF_NOTIFY_MODE] = notify_mode
 
     entry = build_hub_with_instance(
         instance_data=base_config, hub_data=hub_overrides

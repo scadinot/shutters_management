@@ -33,7 +33,6 @@ from custom_components.shutters_management.const import (
     DOMAIN,
     HUB_TITLE,
     HUB_UNIQUE_ID,
-    MODE_ALWAYS,
     SUBENTRY_TYPE_INSTANCE,
     TYPE_HUB,
 )
