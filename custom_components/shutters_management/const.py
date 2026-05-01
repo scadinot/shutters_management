@@ -30,6 +30,9 @@ CONF_PRESENCE_ENTITY = "presence_entity"
 CONF_NOTIFY_SERVICES = "notify_services"
 CONF_NOTIFY_WHEN_AWAY_ONLY = "notify_when_away_only"
 CONF_SEQUENTIAL_COVERS = "sequential_covers"
+CONF_TTS_ENGINE = "tts_engine"
+CONF_TTS_TARGETS = "tts_targets"
+CONF_TTS_WHEN_AWAY_ONLY = "tts_when_away_only"
 
 DEFAULT_OPEN_TIME = "08:00:00"
 DEFAULT_CLOSE_TIME = "21:00:00"
@@ -39,6 +42,9 @@ DEFAULT_ONLY_WHEN_AWAY = False
 DEFAULT_NOTIFY_SERVICES: list[str] = []
 DEFAULT_NOTIFY_WHEN_AWAY_ONLY = False
 DEFAULT_SEQUENTIAL_COVERS = False
+DEFAULT_TTS_ENGINE: str | None = None
+DEFAULT_TTS_TARGETS: list[str] = []
+DEFAULT_TTS_WHEN_AWAY_ONLY = False
 
 # Hard cap for waiting on a cover to reach its target state in
 # sequential mode. Most motorised shutters take 20–40 s; 90 s covers
