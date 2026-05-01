@@ -3,29 +3,24 @@
     "step": {
       "user": {
         "title": "Shutters Management",
-        "description": "Configurer les paramètres de notification partagés. Vous ajouterez ensuite des plannings de volets en créant des instances sur le hub de l'intégration.",
+        "description": "Configurer les paramètres partagés du hub. Vous ajouterez ensuite des plannings de volets en créant des instances sur le hub de l'intégration.",
         "data": {
-          "sequential_covers": "Actionner les volets l'un après l'autre, dans un ordre aléatoire (attend la fin de chaque volet avant de démarrer le suivant)"
+          "sequential_covers": "Actionner les volets successivement dans un ordre aléatoire"
         },
         "sections": {
-          "away_only": {
-            "name": "Notifier uniquement en mode absence",
-            "data": {
-              "notify_when_away_only": "Appliquer aux services de notification",
-              "tts_when_away_only": "Appliquer aux annonces vocales"
-            }
-          },
           "notifications": {
-            "name": "Services de notification",
+            "name": "Notifications push",
             "data": {
-              "notify_services": "Services de notification à appeler après chaque action (laisser vide pour désactiver)"
+              "notify_services": "Services de notification (laisser vide pour désactiver)",
+              "notify_when_away_only": "Envoyer le push uniquement en absence"
             }
           },
           "voice_announcement": {
             "name": "Annonce vocale",
             "data": {
-              "tts_engine": "Moteur d'annonce vocale (TTS)",
-              "tts_targets": "Enceintes connectées pour les annonces (laisser vide pour désactiver)"
+              "tts_engine": "Moteur TTS",
+              "tts_targets": "Enceintes connectées (laisser vide pour désactiver)",
+              "tts_when_away_only": "Annoncer uniquement en absence"
             }
           }
         }
@@ -38,30 +33,25 @@
   "options": {
     "step": {
       "init": {
-        "title": "Modifier les notifications",
-        "description": "Mettre à jour les paramètres de notification partagés.",
+        "title": "Paramètres du hub",
+        "description": "Mettre à jour les paramètres partagés du hub.",
         "data": {
-          "sequential_covers": "Actionner les volets l'un après l'autre, dans un ordre aléatoire (attend la fin de chaque volet avant de démarrer le suivant)"
+          "sequential_covers": "Actionner les volets successivement dans un ordre aléatoire"
         },
         "sections": {
-          "away_only": {
-            "name": "Notifier uniquement en mode absence",
-            "data": {
-              "notify_when_away_only": "Appliquer aux services de notification",
-              "tts_when_away_only": "Appliquer aux annonces vocales"
-            }
-          },
           "notifications": {
-            "name": "Services de notification",
+            "name": "Notifications push",
             "data": {
-              "notify_services": "Services de notification à appeler après chaque action (laisser vide pour désactiver)"
+              "notify_services": "Services de notification (laisser vide pour désactiver)",
+              "notify_when_away_only": "Envoyer le push uniquement en absence"
             }
           },
           "voice_announcement": {
             "name": "Annonce vocale",
             "data": {
-              "tts_engine": "Moteur d'annonce vocale (TTS)",
-              "tts_targets": "Enceintes connectées pour les annonces (laisser vide pour désactiver)"
+              "tts_engine": "Moteur TTS",
+              "tts_targets": "Enceintes connectées (laisser vide pour désactiver)",
+              "tts_when_away_only": "Annoncer uniquement en absence"
             }
           }
         }

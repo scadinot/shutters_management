@@ -76,11 +76,10 @@ from .const import (
 
 SECTION_OPEN = "open"
 SECTION_CLOSE = "close"
-SECTION_AWAY_ONLY = "away_only"
 SECTION_NOTIFICATIONS = "notifications"
 SECTION_VOICE_ANNOUNCEMENT = "voice_announcement"
 
-_HUB_SECTIONS = (SECTION_AWAY_ONLY, SECTION_NOTIFICATIONS, SECTION_VOICE_ANNOUNCEMENT)
+_HUB_SECTIONS = (SECTION_NOTIFICATIONS, SECTION_VOICE_ANNOUNCEMENT)
 
 
 def _available_notify_services(hass: HomeAssistant | None) -> list[str]:
@@ -94,46 +93,25 @@ def _available_notify_services(hass: HomeAssistant | None) -> list[str]:
 def _build_hub_schema(
     hass: HomeAssistant | None, defaults: dict[str, Any]
 ) -> vol.Schema:
-    """Schema for the hub: scheduler option + 3 collapsible notification sections.
+    """Schema for the hub: scheduler option + 2 self-contained channel sections.
 
     Layout (top → bottom):
 
     1. ``sequential_covers`` (top-level toggle, scheduler behaviour).
-    2. Section ``away_only`` — two independent toggles, one per channel.
-    3. Section ``notifications`` — push notifications config.
-    4. Section ``voice_announcement`` — TTS engine + speakers.
+    2. Section ``notifications`` — push services + their own away-only toggle.
+    3. Section ``voice_announcement`` — TTS engine + speakers + their own
+       away-only toggle.
+
+    Each channel section is **self-contained**: its away-only toggle sits
+    next to the fields it gates. There used to be a third ``away_only``
+    section grouping both toggles together, but it required users to
+    cross-reference the other sections — confusing in practice.
 
     The ``defaults`` dict can be **either** flat (e.g. fresh ``user_input``
     from a previous validation pass) **or** already nested under the
     section keys (e.g. when re-rendering after the user opened a section).
     ``_section_default`` handles both shapes transparently.
     """
-
-    away_only_section = data_entry_flow.section(
-        vol.Schema(
-            {
-                vol.Required(
-                    CONF_NOTIFY_WHEN_AWAY_ONLY,
-                    default=_section_default(
-                        defaults,
-                        SECTION_AWAY_ONLY,
-                        CONF_NOTIFY_WHEN_AWAY_ONLY,
-                        DEFAULT_NOTIFY_WHEN_AWAY_ONLY,
-                    ),
-                ): selector.BooleanSelector(),
-                vol.Required(
-                    CONF_TTS_WHEN_AWAY_ONLY,
-                    default=_section_default(
-                        defaults,
-                        SECTION_AWAY_ONLY,
-                        CONF_TTS_WHEN_AWAY_ONLY,
-                        DEFAULT_TTS_WHEN_AWAY_ONLY,
-                    ),
-                ): selector.BooleanSelector(),
-            }
-        ),
-        {"collapsed": False},
-    )
 
     notifications_section = data_entry_flow.section(
         vol.Schema(
@@ -154,6 +132,15 @@ def _build_hub_schema(
                         mode=selector.SelectSelectorMode.DROPDOWN,
                     )
                 ),
+                vol.Required(
+                    CONF_NOTIFY_WHEN_AWAY_ONLY,
+                    default=_section_default(
+                        defaults,
+                        SECTION_NOTIFICATIONS,
+                        CONF_NOTIFY_WHEN_AWAY_ONLY,
+                        DEFAULT_NOTIFY_WHEN_AWAY_ONLY,
+                    ),
+                ): selector.BooleanSelector(),
             }
         ),
         {"collapsed": False},
@@ -188,6 +175,15 @@ def _build_hub_schema(
                         domain="media_player", multiple=True
                     )
                 ),
+                vol.Required(
+                    CONF_TTS_WHEN_AWAY_ONLY,
+                    default=_section_default(
+                        defaults,
+                        SECTION_VOICE_ANNOUNCEMENT,
+                        CONF_TTS_WHEN_AWAY_ONLY,
+                        DEFAULT_TTS_WHEN_AWAY_ONLY,
+                    ),
+                ): selector.BooleanSelector(),
             }
         ),
         {"collapsed": False},
@@ -201,7 +197,6 @@ def _build_hub_schema(
                     CONF_SEQUENTIAL_COVERS, DEFAULT_SEQUENTIAL_COVERS
                 ),
             ): selector.BooleanSelector(),
-            vol.Required(SECTION_AWAY_ONLY): away_only_section,
             vol.Required(SECTION_NOTIFICATIONS): notifications_section,
             vol.Required(SECTION_VOICE_ANNOUNCEMENT): tts_section,
         }
@@ -377,11 +372,12 @@ def _normalize_instance(user_input: dict[str, Any]) -> dict[str, Any]:
 def _normalize_hub(user_input: dict[str, Any]) -> dict[str, Any]:
     """Flatten section sub-dicts and harden multi-value fields.
 
-    The hub form ships its three notification-related blocks inside HA
-    ``data_entry_flow.section`` containers. After submission they come
-    back as ``{section_key: {field: value}, ...}``; we flatten them so
-    the rest of the integration keeps reading flat ``hub_entry.data``
-    keys (``CONF_NOTIFY_SERVICES``, ``CONF_TTS_ENGINE``, ...).
+    The hub form ships its two channel blocks (``notifications`` and
+    ``voice_announcement``) inside HA ``data_entry_flow.section``
+    containers. After submission they come back as
+    ``{section_key: {field: value}, ...}``; we flatten them so the rest
+    of the integration keeps reading flat ``hub_entry.data`` keys
+    (``CONF_NOTIFY_SERVICES``, ``CONF_TTS_ENGINE``, ...).
 
     ``notify_services`` and ``tts_targets`` are multi-selects but their
     selectors (with ``custom_value=True``) may, in edge cases, deliver

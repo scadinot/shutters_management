@@ -6,6 +6,44 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le pr
 
 ## [Non publié]
 
+## [0.4.5] — 2026-05-01
+
+### Modifié
+
+- **Simplification du panneau hub** : le formulaire de configuration
+  passe de 3 sections à **2 sections autonomes** pour clarifier
+  l'écran. La section « Notifier uniquement en mode absence » qui
+  contenait les deux toggles `notify_when_away_only` et
+  `tts_when_away_only` est supprimée : chaque toggle migre dans la
+  section du canal qu'il contrôle.
+  - **Notifications push** : `notify_services` + « Envoyer le push
+    uniquement en absence ».
+  - **Annonce vocale** : `tts_engine`, `tts_targets` + « Annoncer
+    uniquement en absence ».
+- **Libellés raccourcis** pour améliorer la lisibilité — le label de
+  `sequential_covers` notamment passe d'une longue phrase à
+  « Actionner les volets successivement dans un ordre aléatoire ».
+- Renommage des libellés FR : « Moteur d'annonce vocale (TTS) » →
+  « Moteur TTS », « Enceintes connectées pour les annonces » →
+  « Enceintes connectées », etc.
+- L'**options flow** du hub adopte le même libellé clarifié et
+  s'intitule désormais « Paramètres du hub » (au lieu de
+  « Modifier les notifications »), puisqu'il édite aussi
+  `sequential_covers` qui n'est pas un paramètre de notification.
+- **Données stockées inchangées** : `_normalize_hub` aplatit toujours
+  les sections après soumission, `entry.data` garde sa structure
+  plate (clés `notify_services`, `notify_when_away_only`, etc.). Les
+  installs existantes continuent de marcher tel quel — pas de
+  migration de schéma.
+
+### Tests
+
+- Adaptation des deux tests `test_hub_user_flow_creates_singleton` et
+  `test_hub_options_flow_updates_notification_settings` à la nouvelle
+  forme du `user_input` (deux sections au lieu de trois, chaque
+  toggle d'absence dans sa section parente).
+- Suite complète : **88 tests verts**.
+
 ## [0.4.4] — 2026-05-01
 
 ### Modifié
