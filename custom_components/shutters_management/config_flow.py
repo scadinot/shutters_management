@@ -1,4 +1,13 @@
-"""Config flow for Shutters Management."""
+"""Config flow for Shutters Management.
+
+Architecture (v0.4.0):
+
+* The integration is a *hub*: a single ``ShuttersManagementConfigFlow``
+  entry whose ``data`` carries the **shared** notification settings.
+* Each shutter schedule (Bureau, RDC, ...) is a ``ConfigSubentry`` of
+  type ``instance`` attached to the hub. Subentries are created and
+  edited through ``ShuttersInstanceSubentryFlow``.
+"""
 from __future__ import annotations
 
 from typing import Any
@@ -9,12 +18,14 @@ from homeassistant import data_entry_flow
 from homeassistant.config_entries import (
     ConfigEntry,
     ConfigFlow,
+    ConfigSubentryFlow,
     OptionsFlow,
+    SubentryFlowResult,
 )
 from homeassistant.const import CONF_NAME
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.data_entry_flow import FlowResult
-from homeassistant.helpers import device_registry as dr, selector
+from homeassistant.helpers import selector
 from homeassistant.util import slugify
 
 from .const import (
@@ -23,6 +34,8 @@ from .const import (
     CONF_CLOSE_TIME,
     CONF_COVERS,
     CONF_DAYS,
+    CONF_NOTIFY_SERVICES,
+    CONF_NOTIFY_WHEN_AWAY_ONLY,
     CONF_ONLY_WHEN_AWAY,
     CONF_OPEN_MODE,
     CONF_OPEN_OFFSET,
@@ -30,11 +43,14 @@ from .const import (
     CONF_PRESENCE_ENTITY,
     CONF_RANDOMIZE,
     CONF_RANDOM_MAX_MINUTES,
+    CONF_TYPE,
     DAYS,
     DEFAULT_CLOSE_MODE,
     DEFAULT_CLOSE_OFFSET,
     DEFAULT_CLOSE_TIME,
     DEFAULT_DAYS,
+    DEFAULT_NOTIFY_SERVICES,
+    DEFAULT_NOTIFY_WHEN_AWAY_ONLY,
     DEFAULT_ONLY_WHEN_AWAY,
     DEFAULT_OPEN_MODE,
     DEFAULT_OPEN_OFFSET,
@@ -42,19 +58,60 @@ from .const import (
     DEFAULT_RANDOMIZE,
     DEFAULT_RANDOM_MAX_MINUTES,
     DOMAIN,
+    HUB_TITLE,
+    HUB_UNIQUE_ID,
     OFFSET_MAX_MINUTES,
     OFFSET_MIN_MINUTES,
+    SUBENTRY_TYPE_INSTANCE,
     TRIGGER_MODES,
+    TYPE_HUB,
 )
 
 SECTION_OPEN = "open"
 SECTION_CLOSE = "close"
 
 
-def _build_schema(
+def _available_notify_services(hass: HomeAssistant | None) -> list[str]:
+    """Return ``notify.<svc>`` strings discovered on this hass instance."""
+    if hass is None:
+        return []
+    notify_services = hass.services.async_services().get("notify", {})
+    return sorted(f"notify.{name}" for name in notify_services)
+
+
+def _build_hub_schema(
+    hass: HomeAssistant | None, defaults: dict[str, Any]
+) -> vol.Schema:
+    """Schema for the hub: shared notification settings only."""
+    return vol.Schema(
+        {
+            vol.Optional(
+                CONF_NOTIFY_SERVICES,
+                default=defaults.get(
+                    CONF_NOTIFY_SERVICES, DEFAULT_NOTIFY_SERVICES
+                ),
+            ): selector.SelectSelector(
+                selector.SelectSelectorConfig(
+                    options=_available_notify_services(hass),
+                    multiple=True,
+                    custom_value=True,
+                    mode=selector.SelectSelectorMode.DROPDOWN,
+                )
+            ),
+            vol.Required(
+                CONF_NOTIFY_WHEN_AWAY_ONLY,
+                default=defaults.get(
+                    CONF_NOTIFY_WHEN_AWAY_ONLY, DEFAULT_NOTIFY_WHEN_AWAY_ONLY
+                ),
+            ): selector.BooleanSelector(),
+        }
+    )
+
+
+def _build_instance_schema(
     defaults: dict[str, Any], *, include_name: bool = True
 ) -> vol.Schema:
-    """Build the single-panel schema with two trigger sections."""
+    """Schema for an instance subentry: scheduling + presence config."""
     mode_selector = selector.SelectSelector(
         selector.SelectSelectorConfig(
             options=TRIGGER_MODES,
@@ -175,22 +232,19 @@ def _build_schema(
 
 
 def _strip_name(data: dict[str, Any]) -> dict[str, Any]:
-    """Drop CONF_NAME from a payload destined for entry.options.
+    """Drop CONF_NAME from a payload destined to ``ConfigSubentry.data``.
 
-    The instance name lives in entry.data (and entry.title); keeping it
-    out of entry.options avoids a stale duplicate after a rename.
+    The instance name lives in the subentry title; storing it in
+    ``data`` as well would leave a stale duplicate after a rename.
     """
     return {k: v for k, v in data.items() if k != CONF_NAME}
 
 
-def _normalize(user_input: dict[str, Any]) -> dict[str, Any]:
-    """Normalize user input: flatten section sub-dicts, cast types, drop empties."""
+def _normalize_instance(user_input: dict[str, Any]) -> dict[str, Any]:
+    """Flatten section sub-dicts, cast types, drop empties."""
     flat: dict[str, Any] = {}
     for key, value in user_input.items():
         if key in (SECTION_OPEN, SECTION_CLOSE) and isinstance(value, dict):
-            # data_entry_flow.section returns its inner schema as a sub-dict;
-            # flatten only the known trigger sections so unrelated dict-valued
-            # fields keep their original structure.
             flat.update(value)
         else:
             flat[key] = value
@@ -198,6 +252,15 @@ def _normalize(user_input: dict[str, Any]) -> dict[str, Any]:
         flat[CONF_RANDOM_MAX_MINUTES] = int(flat[CONF_RANDOM_MAX_MINUTES])
     if not flat.get(CONF_PRESENCE_ENTITY):
         flat.pop(CONF_PRESENCE_ENTITY, None)
+    return flat
+
+
+def _normalize_hub(user_input: dict[str, Any]) -> dict[str, Any]:
+    """Normalize hub user input. notify_services is the only multi-value field."""
+    flat = dict(user_input)
+    services = flat.get(CONF_NOTIFY_SERVICES) or []
+    flat[CONF_NOTIFY_SERVICES] = list(services)
+    flat.setdefault(CONF_NOTIFY_WHEN_AWAY_ONLY, DEFAULT_NOTIFY_WHEN_AWAY_ONLY)
     return flat
 
 
@@ -211,82 +274,110 @@ def _needs_presence_warning(hass: HomeAssistant, data: dict[str, Any]) -> bool:
 
 
 class ShuttersManagementConfigFlow(ConfigFlow, domain=DOMAIN):
-    """Handle the initial UI configuration."""
+    """Config flow for the *hub* entry (singleton).
 
-    VERSION = 2
+    Each Shutters Management installation has exactly one hub entry that
+    holds the shared notification settings. Individual schedules
+    (Bureau, RDC, ...) are added as subentries via
+    :class:`ShuttersInstanceSubentryFlow`.
+    """
 
-    def __init__(self) -> None:
-        super().__init__()
-        self._pending_data: dict[str, Any] | None = None
+    VERSION = 3
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
-        """Single-step user form with sectioned trigger groups."""
-        errors: dict[str, str] = {}
+        """Create the hub. Only one hub may exist (singleton)."""
+        await self.async_set_unique_id(HUB_UNIQUE_ID)
+        self._abort_if_unique_id_configured()
 
         if user_input is not None:
-            data = _normalize(user_input)
-            name = (data.get(CONF_NAME) or "").strip()
-            if not name:
-                errors[CONF_NAME] = "name_required"
-            elif not data.get(CONF_COVERS):
-                errors[CONF_COVERS] = "no_covers"
-            elif not data.get(CONF_DAYS):
-                errors[CONF_DAYS] = "no_days"
-            else:
-                data[CONF_NAME] = name
-                await self.async_set_unique_id(slugify(name))
-                self._abort_if_unique_id_configured()
-                if _needs_presence_warning(self.hass, data):
-                    self._pending_data = data
-                    return await self.async_step_confirm_no_presence()
-                return self.async_create_entry(title=name, data=data)
+            normalized = _normalize_hub(user_input)
+            data = {CONF_TYPE: TYPE_HUB, **normalized}
+            return self.async_create_entry(title=HUB_TITLE, data=data)
 
         return self.async_show_form(
             step_id="user",
-            data_schema=_build_schema(_normalize(user_input or {})),
-            errors=errors,
+            data_schema=_build_hub_schema(self.hass, {}),
         )
 
-    async def async_step_confirm_no_presence(
-        self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
-        """Confirm save when only_when_away has no presence source."""
-        if user_input is not None:
-            assert self._pending_data is not None
-            data = self._pending_data
-            self._pending_data = None
-            return self.async_create_entry(title=data[CONF_NAME], data=data)
-
-        return self.async_show_form(
-            step_id="confirm_no_presence",
-            data_schema=vol.Schema({}),
-        )
+    @classmethod
+    @callback
+    def async_get_supported_subentry_types(
+        cls, config_entry: ConfigEntry
+    ) -> dict[str, type[ConfigSubentryFlow]]:
+        return {SUBENTRY_TYPE_INSTANCE: ShuttersInstanceSubentryFlow}
 
     @staticmethod
     @callback
     def async_get_options_flow(
         config_entry: ConfigEntry,
     ) -> OptionsFlow:
-        return ShuttersManagementOptionsFlow()
+        return ShuttersHubOptionsFlow()
 
 
-class ShuttersManagementOptionsFlow(OptionsFlow):
-    """Allow editing the integration after creation."""
-
-    def __init__(self) -> None:
-        super().__init__()
-        self._pending_data: dict[str, Any] | None = None
+class ShuttersHubOptionsFlow(OptionsFlow):
+    """Edit the hub: notification services + away-only toggle."""
 
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
-        """Single-step options form with sectioned trigger groups."""
+        if user_input is not None:
+            normalized = _normalize_hub(user_input)
+            new_data = {CONF_TYPE: TYPE_HUB, **normalized}
+            self.hass.config_entries.async_update_entry(
+                self.config_entry, data=new_data
+            )
+            return self.async_create_entry(title="", data={})
+
+        defaults = {
+            CONF_NOTIFY_SERVICES: self.config_entry.data.get(
+                CONF_NOTIFY_SERVICES, DEFAULT_NOTIFY_SERVICES
+            ),
+            CONF_NOTIFY_WHEN_AWAY_ONLY: self.config_entry.data.get(
+                CONF_NOTIFY_WHEN_AWAY_ONLY, DEFAULT_NOTIFY_WHEN_AWAY_ONLY
+            ),
+        }
+        return self.async_show_form(
+            step_id="init",
+            data_schema=_build_hub_schema(self.hass, defaults),
+        )
+
+
+class ShuttersInstanceSubentryFlow(ConfigSubentryFlow):
+    """Create or edit an *instance* subentry (one shutter schedule)."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self._pending_data: dict[str, Any] | None = None
+        self._pending_name: str | None = None
+        self._pending_edit_id: str | None = None
+
+    async def async_step_user(
+        self, user_input: dict[str, Any] | None = None
+    ) -> SubentryFlowResult:
+        """Create a new instance subentry."""
+        return await self._async_handle(user_input, edit_subentry_id=None)
+
+    async def async_step_reconfigure(
+        self, user_input: dict[str, Any] | None = None
+    ) -> SubentryFlowResult:
+        """Edit an existing instance subentry."""
+        return await self._async_handle(
+            user_input, edit_subentry_id=self._reconfigure_subentry_id
+        )
+
+    async def _async_handle(
+        self,
+        user_input: dict[str, Any] | None,
+        *,
+        edit_subentry_id: str | None,
+    ) -> SubentryFlowResult:
         errors: dict[str, str] = {}
+        entry = self._get_entry()
 
         if user_input is not None:
-            data = _normalize(user_input)
+            data = _normalize_instance(user_input)
             name = (data.get(CONF_NAME) or "").strip()
             if not name:
                 errors[CONF_NAME] = "name_required"
@@ -298,61 +389,77 @@ class ShuttersManagementOptionsFlow(OptionsFlow):
                 data[CONF_NAME] = name
                 if _needs_presence_warning(self.hass, data):
                     self._pending_data = data
+                    self._pending_name = name
+                    self._pending_edit_id = edit_subentry_id
                     return await self.async_step_confirm_no_presence()
-                self._sync_name(name)
-                return self.async_create_entry(title="", data=_strip_name(data))
+                return self._async_persist(
+                    name, data, entry, edit_subentry_id=edit_subentry_id
+                )
 
-        defaults = {
-            **self.config_entry.data,
-            **self.config_entry.options,
-            CONF_NAME: self.config_entry.title,
-        }
+        defaults: dict[str, Any]
+        if edit_subentry_id is not None:
+            subentry = entry.subentries[edit_subentry_id]
+            defaults = {**subentry.data, CONF_NAME: subentry.title}
+        else:
+            defaults = _normalize_instance(user_input or {})
+
+        step_id = "reconfigure" if edit_subentry_id is not None else "user"
         return self.async_show_form(
-            step_id="init",
-            data_schema=_build_schema(defaults),
+            step_id=step_id,
+            data_schema=_build_instance_schema(defaults),
             errors=errors,
         )
 
-    def _sync_name(self, name: str) -> None:
-        """Keep the instance name authoritative across data, title and device.
-
-        Stored in entry.data[CONF_NAME] (single source of truth), mirrored
-        on entry.title (what HA shows in the integrations list) and on the
-        device.name (what the device card displays). entry.options never
-        carries CONF_NAME; this avoids data/options/title drift after a
-        rename. The unique_id (built from the original name's slug at
-        creation) is left untouched intentionally — HA does not allow
-        unique_id changes after creation.
-        """
-        current_data_name = self.config_entry.data.get(CONF_NAME)
-        if (
-            name == self.config_entry.title
-            and current_data_name == name
-        ):
-            return
-        new_data = {**self.config_entry.data, CONF_NAME: name}
-        self.hass.config_entries.async_update_entry(
-            self.config_entry, title=name, data=new_data
-        )
-        device_registry = dr.async_get(self.hass)
-        device = device_registry.async_get_device(
-            identifiers={(DOMAIN, self.config_entry.entry_id)}
-        )
-        if device is not None:
-            device_registry.async_update_device(device.id, name=name)
-
     async def async_step_confirm_no_presence(
         self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
+    ) -> SubentryFlowResult:
         """Confirm save when only_when_away has no presence source."""
-        if user_input is not None:
-            assert self._pending_data is not None
-            data = self._pending_data
-            self._pending_data = None
-            self._sync_name(data[CONF_NAME])
-            return self.async_create_entry(title="", data=_strip_name(data))
+        if user_input is None:
+            return self.async_show_form(
+                step_id="confirm_no_presence",
+                data_schema=vol.Schema({}),
+            )
 
-        return self.async_show_form(
-            step_id="confirm_no_presence",
-            data_schema=vol.Schema({}),
+        assert self._pending_data is not None and self._pending_name is not None
+        data = self._pending_data
+        name = self._pending_name
+        edit_id = self._pending_edit_id
+        self._pending_data = None
+        self._pending_name = None
+        self._pending_edit_id = None
+
+        return self._async_persist(
+            name, data, self._get_entry(), edit_subentry_id=edit_id
+        )
+
+    @callback
+    def _async_persist(
+        self,
+        name: str,
+        data: dict[str, Any],
+        entry: ConfigEntry,
+        *,
+        edit_subentry_id: str | None,
+    ) -> SubentryFlowResult:
+        """Create or update the subentry, then finish the flow."""
+        payload = _strip_name(data)
+        unique_id = slugify(name)
+
+        if edit_subentry_id is not None:
+            subentry = entry.subentries[edit_subentry_id]
+            return self.async_update_and_abort(
+                entry,
+                subentry,
+                title=name,
+                data=payload,
+            )
+
+        for existing in entry.subentries.values():
+            if existing.unique_id == unique_id:
+                return self.async_abort(reason="already_configured")
+
+        return self.async_create_entry(
+            title=name,
+            data=payload,
+            unique_id=unique_id,
         )

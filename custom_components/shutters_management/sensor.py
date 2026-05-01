@@ -11,7 +11,7 @@ from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from . import ShuttersScheduler
-from .const import DOMAIN, signal_state_update
+from .const import DOMAIN, SUBENTRY_TYPE_INSTANCE, signal_state_update
 from .entities import _build_entity_id
 
 
@@ -20,14 +20,18 @@ async def async_setup_entry(
     entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    """Set up the next-trigger sensors for a config entry."""
-    scheduler: ShuttersScheduler = hass.data[DOMAIN][entry.entry_id]
-    async_add_entities(
-        [
-            ShuttersNextTriggerSensor(scheduler, "open"),
-            ShuttersNextTriggerSensor(scheduler, "close"),
-        ]
-    )
+    """Set up the next-trigger sensors for every instance subentry of the hub."""
+    for subentry in entry.subentries.values():
+        if subentry.subentry_type != SUBENTRY_TYPE_INSTANCE:
+            continue
+        scheduler: ShuttersScheduler = hass.data[DOMAIN][subentry.subentry_id]
+        async_add_entities(
+            [
+                ShuttersNextTriggerSensor(scheduler, "open"),
+                ShuttersNextTriggerSensor(scheduler, "close"),
+            ],
+            config_subentry_id=subentry.subentry_id,
+        )
 
 
 class ShuttersNextTriggerSensor(SensorEntity):
@@ -40,16 +44,17 @@ class ShuttersNextTriggerSensor(SensorEntity):
     def __init__(self, scheduler: ShuttersScheduler, kind: str) -> None:
         self._scheduler = scheduler
         self._kind = kind
-        self._attr_unique_id = f"{scheduler.entry.entry_id}_next_{kind}"
+        subentry = scheduler.subentry
+        self._attr_unique_id = f"{subentry.subentry_id}_next_{kind}"
         self._attr_translation_key = f"next_{kind}"
         suggested = _build_entity_id(
-            "sensor", scheduler.entry, self._attr_translation_key
+            "sensor", subentry, self._attr_translation_key
         )
         if suggested is not None:
             self.entity_id = suggested
         self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, scheduler.entry.entry_id)},
-            name=scheduler.entry.title,
+            identifiers={(DOMAIN, subentry.subentry_id)},
+            name=subentry.title,
             manufacturer="Shutters Management",
             entry_type=DeviceEntryType.SERVICE,
         )
@@ -65,7 +70,7 @@ class ShuttersNextTriggerSensor(SensorEntity):
         self.async_on_remove(
             async_dispatcher_connect(
                 self.hass,
-                signal_state_update(self._scheduler.entry.entry_id),
+                signal_state_update(self._scheduler.subentry_id),
                 self._handle_update,
             )
         )

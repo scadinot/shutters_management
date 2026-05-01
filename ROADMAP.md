@@ -15,7 +15,7 @@ utilisateurs.
 
 | Horizon | Objectif principal | Effort estimé |
 |---|---|---|
-| [Statut actuel](#statut-actuel) | Version courante v0.3.5 — voir CHANGELOG pour l'historique | livré |
+| [Statut actuel](#statut-actuel) | Version courante v0.4.0 — voir CHANGELOG pour l'historique | livré |
 | [Moyen terme](#moyen-terme--fonctionnalités-v030) | Profils horaires, déclencheurs solaires, multi-instance | quelques jours par lot |
 | [Long terme](#long-terme--stabilisation-v10) | Templates, notifications, statistiques, API publique stabilisée | plusieurs semaines |
 | [Pistes exploratoires](#pistes-exploratoires) | Météo, luminosité, jours fériés, ouverture partielle | à évaluer au cas par cas |
@@ -24,7 +24,7 @@ utilisateurs.
 
 ## Statut actuel
 
-La version courante est **v0.3.5**. Pour la liste des fonctionnalités
+La version courante est **v0.4.0**. Pour la liste des fonctionnalités
 déjà disponibles, voir la section [Fonctionnalités](README.md#fonctionnalités)
 du README. Pour l'historique détaillé des versions livrées, voir le
 [CHANGELOG.md](CHANGELOG.md).
@@ -116,20 +116,25 @@ l'évaluer via `Template(...).async_render()` à chaque calcul de
 `cv.template`. Garder la rétro-compatibilité : une valeur sans
 `{{` reste interprétée comme un littéral `HH:MM:SS`.
 
-### 7. Notifications optionnelles
+### 7. Notifications optionnelles — ✅ livré en v0.4.0
 
-**Motivation.** Un utilisateur peut vouloir être notifié quand
-l'intégration ouvre ou ferme ses volets, surtout en mode absence
-(« quelqu'un — l'intégration — vient d'agir sur la maison »).
-Aujourd'hui aucune notification native ; il faut composer avec une
-automatisation externe sur le `switch.*_simulation_active` ou les
-`sensor.*_next_*`.
+Multi-select des services `notify.*` au niveau du **hub** (donc
+partagé par toutes les instances) + toggle « seulement en absence ».
+Messages localisés FR/EN, envoyés après chaque action open/close
+(test buttons et service `run_now` inclus). Une notification cassée
+ne bloque jamais l'action sur les volets. Voir le
+[CHANGELOG](CHANGELOG.md#040--2026-05-01).
 
-**Piste technique.** Champ optionnel dans le `config_flow` : nom du
-service `notify.*` à appeler. Au moment du déclenchement, appeler le
-service avec un message paramétrable
-(`{{ action }}` / `{{ covers }}`). Option « avant », « après » ou
-« avant et après ».
+Le bump v0.4.0 a aussi introduit l'**architecture hub + subentries**
+(pattern `ConfigSubentryFlow` de HA 2025.3+) : une seule config entry
+hub regroupe toutes les instances Bureau / RDC / etc. sous forme de
+subentries, avec une migration automatique et conservatrice des
+entries v0.3.x existantes (les `entity_id` et `unique_id` sont
+préservés).
+
+Pas couvert par cette version (reportés) : personnalisation Jinja du
+message, notification avant l'action, notification sur pause/resume,
+ciblage des services notify par instance.
 
 ### 8. Statistiques d'exécution
 

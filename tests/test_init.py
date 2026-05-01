@@ -17,13 +17,16 @@ from custom_components.shutters_management.const import (
     SERVICE_RUN_NOW,
 )
 
+from .conftest import get_only_subentry_id
+
 
 async def test_setup_entry_stores_scheduler(
     hass: HomeAssistant, setup_integration, mock_config_entry: MockConfigEntry
 ) -> None:
-    """After setup, hass.data[DOMAIN][entry_id] must hold the scheduler."""
-    assert mock_config_entry.entry_id in hass.data[DOMAIN]
-    assert hass.data[DOMAIN][mock_config_entry.entry_id] is setup_integration
+    """After setup, hass.data[DOMAIN][subentry_id] must hold the scheduler."""
+    subentry_id = get_only_subentry_id(mock_config_entry)
+    assert subentry_id in hass.data[DOMAIN]
+    assert hass.data[DOMAIN][subentry_id] is setup_integration
 
 
 async def test_setup_entry_registers_entities(
@@ -40,6 +43,22 @@ async def test_setup_entry_registers_entities(
     assert domains == ["button", "button", "sensor", "sensor", "switch"]
 
 
+async def test_setup_entry_attaches_entities_to_subentry(
+    hass: HomeAssistant, setup_integration, mock_config_entry: MockConfigEntry
+) -> None:
+    """All registered entities must be attached to the instance subentry."""
+    registry = er.async_get(hass)
+    subentry_id = get_only_subentry_id(mock_config_entry)
+    entries = [
+        e
+        for e in registry.entities.values()
+        if e.config_entry_id == mock_config_entry.entry_id
+    ]
+    assert entries, "no entities registered for the hub entry"
+    for entity in entries:
+        assert entity.config_subentry_id == subentry_id
+
+
 async def test_setup_entry_registers_services(
     hass: HomeAssistant, setup_integration
 ) -> None:
@@ -53,9 +72,10 @@ async def test_unload_entry_clears_data(
     hass: HomeAssistant, setup_integration, mock_config_entry: MockConfigEntry
 ) -> None:
     """Unloading must remove the scheduler from hass.data and tear down services."""
+    subentry_id = get_only_subentry_id(mock_config_entry)
     assert await hass.config_entries.async_unload(mock_config_entry.entry_id)
     await hass.async_block_till_done()
-    assert mock_config_entry.entry_id not in hass.data.get(DOMAIN, {})
+    assert subentry_id not in hass.data.get(DOMAIN, {})
     assert not hass.services.has_service(DOMAIN, SERVICE_RUN_NOW)
 
 

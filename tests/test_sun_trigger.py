@@ -4,10 +4,8 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 from unittest.mock import patch
 
-from homeassistant.const import CONF_NAME, SUN_EVENT_SUNRISE, SUN_EVENT_SUNSET
+from homeassistant.const import SUN_EVENT_SUNRISE, SUN_EVENT_SUNSET
 from homeassistant.core import HomeAssistant
-from homeassistant.data_entry_flow import FlowResultType
-from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.shutters_management.const import (
     CONF_CLOSE_MODE,
@@ -22,12 +20,13 @@ from custom_components.shutters_management.const import (
     CONF_RANDOMIZE,
     CONF_RANDOM_MAX_MINUTES,
     DAYS,
-    DEFAULT_CLOSE_MODE,
     DOMAIN,
     MODE_FIXED,
     MODE_SUNRISE,
     MODE_SUNSET,
 )
+
+from .conftest import build_hub_with_instance, get_only_subentry_id
 
 
 def _build_entry(
@@ -37,10 +36,10 @@ def _build_entry(
     close_mode: str = MODE_FIXED,
     close_offset: int = 0,
     days: list[str] | None = None,
-) -> MockConfigEntry:
-    """Build a v2 entry with explicit mode/offset settings for sun tests."""
-    data = {
-        CONF_NAME: "Bureau",
+    instance_unique_id: str = "bureau",
+):
+    """Build a v3 hub with one instance subentry tuned for sun tests."""
+    instance_data = {
         CONF_COVERS: ["cover.living_room"],
         CONF_OPEN_MODE: open_mode,
         CONF_OPEN_TIME: "08:00:00",
@@ -53,14 +52,10 @@ def _build_entry(
         CONF_RANDOM_MAX_MINUTES: 30,
         CONF_ONLY_WHEN_AWAY: False,
     }
-    return MockConfigEntry(
-        domain=DOMAIN,
-        title="Bureau",
-        data=data,
-        options={},
+    return build_hub_with_instance(
+        instance_data=instance_data,
+        instance_unique_id=instance_unique_id,
         entry_id="test_entry_sun",
-        unique_id="bureau",
-        version=2,
     )
 
 
@@ -74,7 +69,8 @@ async def test_sunrise_mode_uses_get_astral_event_next(
     assert await hass.config_entries.async_setup(entry.entry_id)
     await hass.async_block_till_done()
 
-    scheduler = hass.data[DOMAIN][entry.entry_id]
+    subentry_id = get_only_subentry_id(entry)
+    scheduler = hass.data[DOMAIN][subentry_id]
     with patch(
         "custom_components.shutters_management.get_astral_event_next",
         return_value=fake_sunrise,
@@ -98,7 +94,8 @@ async def test_sunset_offset_negative(
     assert await hass.config_entries.async_setup(entry.entry_id)
     await hass.async_block_till_done()
 
-    scheduler = hass.data[DOMAIN][entry.entry_id]
+    subentry_id = get_only_subentry_id(entry)
+    scheduler = hass.data[DOMAIN][subentry_id]
     with patch(
         "custom_components.shutters_management.get_astral_event_next",
         return_value=fake_sunset,
@@ -128,7 +125,8 @@ async def test_sun_handler_filters_inactive_days(
     assert await hass.config_entries.async_setup(entry.entry_id)
     await hass.async_block_till_done()
 
-    scheduler = hass.data[DOMAIN][entry.entry_id]
+    subentry_id = get_only_subentry_id(entry)
+    scheduler = hass.data[DOMAIN][subentry_id]
 
     # Sequence of returned datetimes: Sat, Sun, Mon. Only Mon is active.
     sat = datetime(2026, 5, 2, 6, 0, 0, tzinfo=timezone.utc)
@@ -144,64 +142,12 @@ async def test_sun_handler_filters_inactive_days(
     assert mock_next.call_count == 3
 
 
-async def test_config_flow_sunrise_path_in_single_panel(
-    hass: HomeAssistant,
-) -> None:
-    """The single-panel form exposes mode + time + offset for both events.
-
-    With open_mode=sunrise, the user enters open_offset and the open_time
-    default is preserved; the scheduler will ignore open_time at runtime
-    because the mode dispatches to async_track_sunrise.
-    """
-    result = await hass.config_entries.flow.async_init(
-        DOMAIN, context={"source": "user"}
-    )
-    assert result["step_id"] == "user"
-
-    user_input = {
-        CONF_NAME: "Vacances",
-        CONF_COVERS: ["cover.living_room"],
-        "open": {
-            CONF_OPEN_MODE: MODE_SUNRISE,
-            CONF_OPEN_TIME: "08:00:00",
-            CONF_OPEN_OFFSET: 15,
-        },
-        "close": {
-            CONF_CLOSE_MODE: MODE_FIXED,
-            CONF_CLOSE_TIME: "20:00:00",
-            CONF_CLOSE_OFFSET: 0,
-        },
-        CONF_DAYS: list(DAYS),
-        CONF_RANDOMIZE: False,
-        CONF_RANDOM_MAX_MINUTES: 30,
-        CONF_ONLY_WHEN_AWAY: False,
-    }
-    result = await hass.config_entries.flow.async_configure(
-        result["flow_id"], user_input=user_input
-    )
-    assert result["type"] == FlowResultType.CREATE_ENTRY
-    assert result["data"][CONF_OPEN_MODE] == MODE_SUNRISE
-    assert result["data"][CONF_OPEN_OFFSET] == 15
-    assert result["data"][CONF_CLOSE_TIME] == "20:00:00"
-
-
 async def test_unknown_mode_falls_back_safely(
     hass: HomeAssistant, caplog,
 ) -> None:
     """An unrecognised mode value must not silently default to sunset."""
-    entry = _build_entry(open_mode=MODE_FIXED, close_mode=MODE_FIXED)
-    # Inject an invalid mode AFTER the fixture builds a valid one — simulates
-    # a manual edit of core.config_entries or a future mode rename.
-    bad_data = {**entry.data, CONF_OPEN_MODE: "moonrise"}
-    entry = MockConfigEntry(
-        domain=DOMAIN,
-        title="Bureau",
-        data=bad_data,
-        options={},
-        entry_id="bad_mode_entry",
-        unique_id="bad_mode",
-        version=2,
-    )
+    # Inject an invalid mode at subentry build time.
+    entry = _build_entry(open_mode="moonrise")  # type: ignore[arg-type]
     entry.add_to_hass(hass)
     assert await hass.config_entries.async_setup(entry.entry_id)
     await hass.async_block_till_done()
@@ -213,6 +159,7 @@ async def test_unknown_mode_falls_back_safely(
     )
 
     # next_open() also logs and falls back to fixed → returns a datetime.
-    scheduler = hass.data[DOMAIN][entry.entry_id]
+    subentry_id = get_only_subentry_id(entry)
+    scheduler = hass.data[DOMAIN][subentry_id]
     result = scheduler.next_open()
     assert result is not None

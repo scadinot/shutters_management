@@ -14,26 +14,29 @@ from custom_components.shutters_management.const import (
     DOMAIN,
 )
 
+from .conftest import get_only_subentry_id
+
 
 def _button_entity_id(
-    hass: HomeAssistant, entry: MockConfigEntry, action: str
+    hass: HomeAssistant, subentry_id: str, action: str
 ) -> str:
-    """Look up the button entity_id by its scoped unique_id."""
+    """Look up the button entity_id by its subentry-scoped unique_id."""
     registry = er.async_get(hass)
     entity_id = registry.async_get_entity_id(
-        "button", DOMAIN, f"{entry.entry_id}_test_{action}"
+        "button", DOMAIN, f"{subentry_id}_test_{action}"
     )
     assert entity_id is not None, f"Missing button entity for action: {action}"
     return entity_id
 
 
-async def test_button_unique_ids_are_entry_scoped(
+async def test_button_unique_ids_are_subentry_scoped(
     hass: HomeAssistant, setup_integration, mock_config_entry: MockConfigEntry
 ) -> None:
-    """Both button unique_ids must include the entry_id (multi-instance safe)."""
+    """Both button unique_ids must include the subentry_id (multi-instance safe)."""
     registry = er.async_get(hass)
+    subentry_id = get_only_subentry_id(mock_config_entry)
     for action in (ACTION_OPEN, ACTION_CLOSE):
-        expected = f"{mock_config_entry.entry_id}_test_{action}"
+        expected = f"{subentry_id}_test_{action}"
         assert (
             registry.async_get_entity_id("button", DOMAIN, expected) is not None
         )
@@ -44,11 +47,12 @@ async def test_button_entity_ids_are_stable_english(
 ) -> None:
     """Resolved entity_ids must use the English slug regardless of locale."""
     registry = er.async_get(hass)
+    subentry_id = get_only_subentry_id(mock_config_entry)
     open_id = registry.async_get_entity_id(
-        "button", DOMAIN, f"{mock_config_entry.entry_id}_test_{ACTION_OPEN}"
+        "button", DOMAIN, f"{subentry_id}_test_{ACTION_OPEN}"
     )
     close_id = registry.async_get_entity_id(
-        "button", DOMAIN, f"{mock_config_entry.entry_id}_test_{ACTION_CLOSE}"
+        "button", DOMAIN, f"{subentry_id}_test_{ACTION_CLOSE}"
     )
     assert open_id == "button.bureau_test_open"
     assert close_id == "button.bureau_test_close"
@@ -59,7 +63,8 @@ async def test_button_press_open_calls_run_now(
 ) -> None:
     """Pressing the open button must invoke scheduler.async_run_now('open')."""
     scheduler = setup_integration
-    entity_id = _button_entity_id(hass, mock_config_entry, ACTION_OPEN)
+    subentry_id = get_only_subentry_id(mock_config_entry)
+    entity_id = _button_entity_id(hass, subentry_id, ACTION_OPEN)
 
     with patch.object(
         scheduler, "async_run_now", AsyncMock()
@@ -75,7 +80,8 @@ async def test_button_press_close_calls_run_now(
 ) -> None:
     """Pressing the close button must invoke scheduler.async_run_now('close')."""
     scheduler = setup_integration
-    entity_id = _button_entity_id(hass, mock_config_entry, ACTION_CLOSE)
+    subentry_id = get_only_subentry_id(mock_config_entry)
+    entity_id = _button_entity_id(hass, subentry_id, ACTION_CLOSE)
 
     with patch.object(
         scheduler, "async_run_now", AsyncMock()

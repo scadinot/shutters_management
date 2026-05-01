@@ -6,6 +6,96 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le pr
 
 ## [Non publié]
 
+## [0.4.0] — 2026-05-01
+
+### Refactor majeur — passage au modèle hub + subentries
+
+- **Nouvelle architecture** : l'intégration n'expose plus une `ConfigEntry`
+  par planning de volets, mais **une seule entry « hub » singleton** qui
+  porte la configuration partagée (services de notification) et regroupe
+  chaque planning sous forme de **`ConfigSubentry`** de type `instance`.
+- Pattern `ConfigSubentryFlow` (HA ≥ 2025.3, stable depuis 2026.x) — voir
+  l'exemple `homeassistant/components/energyid/` qui sert de modèle.
+- `manifest.json` : `version` `0.3.5` → `0.4.0`, `integration_type`
+  `service` → `hub`.
+
+### Ajouté — notifications partagées
+
+- **Section « Notifications »** dans le config flow et l'options flow du
+  hub : multi-select des services `notify.*` à appeler après chaque
+  action open/close (suggestions auto-complétées via
+  `hass.services.async_services()`, saisie libre acceptée pour les
+  notifiers nommés dynamiquement).
+- Toggle **« seulement en absence »** (`notify_when_away_only`) : limite
+  l'envoi aux situations où la motivation initiale s'applique
+  (« quelqu'un — l'intégration — vient d'agir sur la maison »).
+- Messages **localisés FR/EN** (`Volets ouverts (N)` / `Shutters closed
+  (N)`), titre = nom de la subentry.
+- Une notification cassée (notifier mal configuré, intégration tierce
+  indisponible) **ne bloque jamais** l'action sur les volets : appel
+  cover effectué d'abord, notify avec `blocking=False` ensuite.
+
+### Migration v2 → v3 — automatique et conservatrice
+
+- Au boot (`async_setup`), toutes les entries v0.3.x sont **promues en
+  subentries d'un hub auto-créé** :
+  1. La 1ʳᵉ entry v2 rencontrée est convertie **en place** en hub
+     (`unique_id="_global"`, `data[CONF_TYPE]="hub"`, `version=3`) ;
+     ses paramètres d'instance sont déplacés dans une subentry homonyme.
+  2. Les entries v2 suivantes sont absorbées comme subentries du hub puis
+     supprimées de l'index `core.config_entries`.
+- **`unique_id` préservé sur chaque subentry** → les `entity_id`
+  (`sensor.bureau_next_open`, `button.rdc_test_close`, etc.) restent
+  identiques. Aucune automation utilisateur n'est cassée.
+
+### Modifié
+
+- `ShuttersScheduler.__init__(hass, hub_entry, subentry)` au lieu de
+  `(hass, entry)`. Les paramètres d'instance se lisent depuis
+  `subentry.data` ; les paramètres de notification depuis
+  `hub_entry.data` (relus à chaque appel pour suivre les changements de
+  l'options flow sans reload).
+- Les entities (`sensor`, `switch`, `button`) sont rattachées à la
+  bonne subentry via `async_add_entities(..., config_subentry_id=…)` —
+  l'UI HA affiche désormais 1 device par instance, sous le device hub.
+- `signal_state_update` est scopé par `subentry_id` (et plus par
+  `entry_id`) — les sensors/switches d'une instance ne réagissent qu'à
+  leurs propres events.
+- Services `run_now`, `pause`, `resume` : itèrent désormais
+  `hass.data[DOMAIN]` qui est indexé par `subentry_id`. Comportement
+  visible inchangé (broadcast à toutes les instances).
+
+### Tests
+
+- Refactor complet de la suite : nouvelle fixture commune
+  `setup_integration` qui produit un hub v3 avec une subentry « Bureau »,
+  helpers `get_only_subentry_id()` et `build_hub_with_instance()` dans
+  `conftest.py`.
+- `tests/test_config_flow.py` réécrit : couvre le flow hub (création +
+  abort singleton + options) et le flow subentry (création + erreurs +
+  duplicate + reconfigure).
+- **Nouveau** `tests/test_migration.py` (4 cas) : promotion d'une entry
+  isolée, fold de 2 entries en 1 hub, no-op sur hub natif, préservation
+  du `unique_id` pour la stabilité des entity_id.
+- **Nouveau** `tests/test_notifications.py` (10 cas) : liste vide,
+  open/close, multi-services, toggle away-only, localisation FR/EN,
+  robustesse face à un notifier cassé, cibles malformées.
+- Suite complète : **66 tests verts**.
+
+### Note de migration utilisateur
+
+- **Aucune action requise**. Au premier démarrage en v0.4.0, vos entries
+  v0.3.x sont converties automatiquement en subentries d'un hub
+  « Shutters Management » singleton. Les `entity_id`, les noms de
+  devices, les automations, les cards Lovelace continuent de
+  fonctionner sans modification.
+- Pour configurer les notifications, ouvrez **Paramètres → Appareils
+  et services → Shutters Management → Configurer** : multi-select des
+  services `notify.*` + toggle d'absence.
+- Pour ajouter un nouveau planning, allez sur la device card du hub
+  et cliquez sur **« + »** (« Add a shutter schedule » / « Ajouter un
+  planning de volets »).
+
 ## [0.3.5] — 2026-04-30
 
 ### Corrigé

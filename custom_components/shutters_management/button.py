@@ -8,7 +8,7 @@ from homeassistant.helpers.device_registry import DeviceEntryType, DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from . import ShuttersScheduler
-from .const import ACTION_CLOSE, ACTION_OPEN, DOMAIN
+from .const import ACTION_CLOSE, ACTION_OPEN, DOMAIN, SUBENTRY_TYPE_INSTANCE
 from .entities import _build_entity_id
 
 
@@ -17,14 +17,18 @@ async def async_setup_entry(
     entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    """Set up the test buttons for a config entry."""
-    scheduler: ShuttersScheduler = hass.data[DOMAIN][entry.entry_id]
-    async_add_entities(
-        [
-            ShuttersRunNowButton(scheduler, ACTION_OPEN),
-            ShuttersRunNowButton(scheduler, ACTION_CLOSE),
-        ]
-    )
+    """Set up the test buttons for every instance subentry of the hub."""
+    for subentry in entry.subentries.values():
+        if subentry.subentry_type != SUBENTRY_TYPE_INSTANCE:
+            continue
+        scheduler: ShuttersScheduler = hass.data[DOMAIN][subentry.subentry_id]
+        async_add_entities(
+            [
+                ShuttersRunNowButton(scheduler, ACTION_OPEN),
+                ShuttersRunNowButton(scheduler, ACTION_CLOSE),
+            ],
+            config_subentry_id=subentry.subentry_id,
+        )
 
 
 class ShuttersRunNowButton(ButtonEntity):
@@ -36,16 +40,17 @@ class ShuttersRunNowButton(ButtonEntity):
     def __init__(self, scheduler: ShuttersScheduler, action: str) -> None:
         self._scheduler = scheduler
         self._action = action
-        self._attr_unique_id = f"{scheduler.entry.entry_id}_test_{action}"
+        subentry = scheduler.subentry
+        self._attr_unique_id = f"{subentry.subentry_id}_test_{action}"
         self._attr_translation_key = f"test_{action}"
         suggested = _build_entity_id(
-            "button", scheduler.entry, self._attr_translation_key
+            "button", subentry, self._attr_translation_key
         )
         if suggested is not None:
             self.entity_id = suggested
         self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, scheduler.entry.entry_id)},
-            name=scheduler.entry.title,
+            identifiers={(DOMAIN, subentry.subentry_id)},
+            name=subentry.title,
             manufacturer="Shutters Management",
             entry_type=DeviceEntryType.SERVICE,
         )
