@@ -29,6 +29,7 @@ CONF_PRESENCE_ENTITY = "presence_entity"
 
 CONF_NOTIFY_SERVICES = "notify_services"
 CONF_NOTIFY_WHEN_AWAY_ONLY = "notify_when_away_only"
+CONF_SEQUENTIAL_COVERS = "sequential_covers"
 
 DEFAULT_OPEN_TIME = "08:00:00"
 DEFAULT_CLOSE_TIME = "21:00:00"
@@ -37,6 +38,12 @@ DEFAULT_RANDOM_MAX_MINUTES = 30
 DEFAULT_ONLY_WHEN_AWAY = False
 DEFAULT_NOTIFY_SERVICES: list[str] = []
 DEFAULT_NOTIFY_WHEN_AWAY_ONLY = False
+DEFAULT_SEQUENTIAL_COVERS = False
+
+# Hard cap for waiting on a cover to reach its target state in
+# sequential mode. Most motorised shutters take 20–40 s; 90 s covers
+# slow models and prevents a stuck cover from blocking the queue.
+COVER_ACTION_TIMEOUT_SECONDS = 90
 
 MODE_FIXED = "fixed"
 MODE_SUNRISE = "sunrise"

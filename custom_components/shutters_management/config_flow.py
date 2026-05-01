@@ -37,6 +37,7 @@ from .const import (
     CONF_NOTIFY_SERVICES,
     CONF_NOTIFY_WHEN_AWAY_ONLY,
     CONF_ONLY_WHEN_AWAY,
+    CONF_SEQUENTIAL_COVERS,
     CONF_OPEN_MODE,
     CONF_OPEN_OFFSET,
     CONF_OPEN_TIME,
@@ -52,6 +53,7 @@ from .const import (
     DEFAULT_NOTIFY_SERVICES,
     DEFAULT_NOTIFY_WHEN_AWAY_ONLY,
     DEFAULT_ONLY_WHEN_AWAY,
+    DEFAULT_SEQUENTIAL_COVERS,
     DEFAULT_OPEN_MODE,
     DEFAULT_OPEN_OFFSET,
     DEFAULT_OPEN_TIME,
@@ -102,6 +104,12 @@ def _build_hub_schema(
                 CONF_NOTIFY_WHEN_AWAY_ONLY,
                 default=defaults.get(
                     CONF_NOTIFY_WHEN_AWAY_ONLY, DEFAULT_NOTIFY_WHEN_AWAY_ONLY
+                ),
+            ): selector.BooleanSelector(),
+            vol.Required(
+                CONF_SEQUENTIAL_COVERS,
+                default=defaults.get(
+                    CONF_SEQUENTIAL_COVERS, DEFAULT_SEQUENTIAL_COVERS
                 ),
             ): selector.BooleanSelector(),
         }
@@ -273,6 +281,7 @@ def _normalize_hub(user_input: dict[str, Any]) -> dict[str, Any]:
     else:
         flat[CONF_NOTIFY_SERVICES] = list(services)
     flat.setdefault(CONF_NOTIFY_WHEN_AWAY_ONLY, DEFAULT_NOTIFY_WHEN_AWAY_ONLY)
+    flat.setdefault(CONF_SEQUENTIAL_COVERS, DEFAULT_SEQUENTIAL_COVERS)
     return flat
 
 
@@ -348,6 +357,9 @@ class ShuttersHubOptionsFlow(OptionsFlow):
             ),
             CONF_NOTIFY_WHEN_AWAY_ONLY: self.config_entry.data.get(
                 CONF_NOTIFY_WHEN_AWAY_ONLY, DEFAULT_NOTIFY_WHEN_AWAY_ONLY
+            ),
+            CONF_SEQUENTIAL_COVERS: self.config_entry.data.get(
+                CONF_SEQUENTIAL_COVERS, DEFAULT_SEQUENTIAL_COVERS
             ),
         }
         return self.async_show_form(

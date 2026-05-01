@@ -6,7 +6,8 @@
         "description": "Configure shared notification settings. Add shutter schedules afterwards by adding instances on the integration's hub.",
         "data": {
           "notify_services": "Notification services to call after each action (leave empty to disable)",
-          "notify_when_away_only": "Notify only when away"
+          "notify_when_away_only": "Notify only when away",
+          "sequential_covers": "Operate covers one at a time, in random order (waits for each cover to finish before starting the next)"
         }
       }
     },
@@ -21,7 +22,8 @@
         "description": "Update the shared notification settings.",
         "data": {
           "notify_services": "Notification services to call after each action (leave empty to disable)",
-          "notify_when_away_only": "Notify only when away"
+          "notify_when_away_only": "Notify only when away",
+          "sequential_covers": "Operate covers one at a time, in random order (waits for each cover to finish before starting the next)"
         }
       }
     }

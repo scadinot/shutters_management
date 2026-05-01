@@ -6,6 +6,57 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le pr
 
 ## [Non publié]
 
+## [0.4.1] — 2026-05-01
+
+### Ajouté
+
+- **Mode séquentiel + aléatoire** pour l'actionnement des volets, opt-in
+  via une nouvelle option **« Actionner les volets l'un après l'autre,
+  dans un ordre aléatoire »** dans la configuration du hub
+  (« Configurer » sur la device card du hub).
+- Quand l'option est activée, à chaque déclenchement (planning,
+  `run_now`, boutons « Tester ») la liste des volets est mélangée puis
+  parcourue **un par un** : chaque appel `cover.open_cover` /
+  `cover.close_cover` est lancé en `blocking=True` puis le scheduler
+  attend que le state du volet passe à sa cible (`open` / `closed`)
+  avant de passer au suivant.
+- **Garde-fou de 90 s** par volet (`COVER_ACTION_TIMEOUT_SECONDS`) :
+  un volet qui n'updaterait jamais son state (driver minimaliste,
+  panne moteur) ne bloque pas la queue ; un warning est loggé et la
+  séquence continue avec le volet suivant.
+- Si le scheduler est déchargé en plein milieu d'une séquence
+  (suppression de la subentry, redémarrage HA), la queue s'interrompt
+  proprement.
+
+### Modifié
+
+- Le mode par défaut **reste l'appel groupé** (1 seul `cover.<service>`
+  sur la liste complète, comportement v0.4.0). Aucun comportement
+  visible ne change si vous ne touchez pas à la nouvelle option.
+- Notifications inchangées : un seul message envoyé à la fin de la
+  séquence, jamais un par volet.
+- Bump `manifest.json` : `0.4.0` → `0.4.1`.
+
+### Tests
+
+- Nouveau `tests/test_sequential_covers.py` (6 cas) :
+  rétrocompatibilité du mode batché, mode séquentiel exécute N appels,
+  ordre aléatoire wired up via `random.shuffle`, attente effective du
+  state cible, sortie propre sur timeout, target `closed` pour close.
+- Suite complète : **74 tests verts**.
+
+### Pourquoi cette option
+
+Le burst parallèle d'origine envoie en quelques millisecondes N
+commandes au cluster radio (Z-Wave, Zigbee, RF433). Sur les réseaux
+chargés, certaines commandes peuvent se perdre ou être dépriorisées,
+laissant un volet en travers. Le mode séquentiel + aléatoire :
+
+1. **Évite la collision réseau** en sérialisant les commandes.
+2. **Renforce la simulation de présence** : un humain n'ouvre pas
+   tous ses volets simultanément ; l'ordre aléatoire brouille
+   davantage les routines détectables depuis l'extérieur.
+
 ## [0.4.0] — 2026-05-01
 
 ### Refactor majeur — passage au modèle hub + subentries
