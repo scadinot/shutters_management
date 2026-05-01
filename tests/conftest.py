@@ -15,8 +15,8 @@ from custom_components.shutters_management.const import (
     CONF_CLOSE_TIME,
     CONF_COVERS,
     CONF_DAYS,
+    CONF_NOTIFY_MODE,
     CONF_NOTIFY_SERVICES,
-    CONF_NOTIFY_WHEN_AWAY_ONLY,
     CONF_ONLY_WHEN_AWAY,
     CONF_OPEN_MODE,
     CONF_OPEN_OFFSET,
@@ -27,6 +27,7 @@ from custom_components.shutters_management.const import (
     DAYS,
     DEFAULT_CLOSE_MODE,
     DEFAULT_CLOSE_OFFSET,
+    DEFAULT_NOTIFY_MODE,
     DEFAULT_OPEN_MODE,
     DEFAULT_OPEN_OFFSET,
     DOMAIN,
@@ -68,7 +69,7 @@ def _hub_data(**overrides: Any) -> dict[str, Any]:
     data = {
         CONF_TYPE: TYPE_HUB,
         CONF_NOTIFY_SERVICES: [],
-        CONF_NOTIFY_WHEN_AWAY_ONLY: False,
+        CONF_NOTIFY_MODE: DEFAULT_NOTIFY_MODE,
     }
     data.update(overrides)
     return data
@@ -99,7 +100,7 @@ def mock_config_entry(base_config: dict[str, Any]) -> MockConfigEntry:
         options={},
         entry_id="test_entry_id",
         unique_id=HUB_UNIQUE_ID,
-        version=3,
+        version=4,
         subentries_data=[
             make_subentry_data(
                 title="Bureau",
@@ -135,7 +136,7 @@ def build_hub_with_instance(
         options={},
         entry_id=entry_id,
         unique_id=HUB_UNIQUE_ID,
-        version=3,
+        version=4,
         subentries_data=[
             make_subentry_data(
                 title=instance_title,

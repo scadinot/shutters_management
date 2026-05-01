@@ -6,6 +6,49 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le pr
 
 ## [Non publié]
 
+## [0.4.5] — 2026-05-01
+
+### Modifié
+
+- **Sélecteur radio « Quand envoyer »** (3 boutons) à la place des
+  cases à cocher `notify_when_away_only` / `tts_when_away_only` :
+  chaque section de canal expose désormais un seul sélecteur avec les
+  options **Sans / Toujours / Absence uniquement**, traduit en FR et EN.
+  - **Sans** : canal désactivé (même si des services/enceintes sont
+    renseignés).
+  - **Toujours** : envoi après chaque action d'ouverture ou fermeture.
+  - **Absence uniquement** : envoi seulement quand la présence est
+    détectée absente.
+- **Panneau hub en 2 sections autonomes** (suppression de la section
+  intermédiaire « Notifier uniquement en mode absence »). Chaque
+  canal est désormais auto-suffisant :
+  - **Notifications push** : `notify_services` + sélecteur de mode.
+  - **Annonce vocale** : `tts_engine`, `tts_targets` + sélecteur de
+    mode.
+- **Libellés raccourcis** et options flow renommé en
+  « Paramètres du hub ».
+
+### Schéma — migration v3 → v4
+
+- Les booléens `notify_when_away_only` et `tts_when_away_only` sont
+  remplacés par `notify_mode` et `tts_mode` (valeurs : `disabled` /
+  `always` / `away_only`).
+- `async_migrate_entry` fait la conversion automatiquement au
+  premier démarrage après la mise à jour : si les services push
+  étaient vides → `disabled` ; si `notify_when_away_only=True` →
+  `away_only` ; sinon → `always`.  Identique côté TTS.
+- `config_flow.py` passe à `VERSION = 4`.
+
+### Tests
+
+- Réécriture des helpers `_setup_hub` / `_setup_tts_hub` avec les
+  nouveaux paramètres `notify_mode` / `tts_mode`.
+- Nouveau test `test_no_notification_when_mode_disabled` et
+  `test_no_tts_when_mode_disabled`.
+- `test_migration_v3_to_v4_converts_boolean_flags` remplace le
+  précédent test « noop » de la v3.
+- Suite complète : **90 tests verts**.
+
 ## [0.4.4] — 2026-05-01
 
 ### Modifié

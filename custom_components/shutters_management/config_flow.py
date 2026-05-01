@@ -34,13 +34,13 @@ from .const import (
     CONF_CLOSE_TIME,
     CONF_COVERS,
     CONF_DAYS,
+    CONF_NOTIFY_MODE,
     CONF_NOTIFY_SERVICES,
-    CONF_NOTIFY_WHEN_AWAY_ONLY,
     CONF_ONLY_WHEN_AWAY,
     CONF_SEQUENTIAL_COVERS,
     CONF_TTS_ENGINE,
+    CONF_TTS_MODE,
     CONF_TTS_TARGETS,
-    CONF_TTS_WHEN_AWAY_ONLY,
     CONF_OPEN_MODE,
     CONF_OPEN_OFFSET,
     CONF_OPEN_TIME,
@@ -53,17 +53,20 @@ from .const import (
     DEFAULT_CLOSE_OFFSET,
     DEFAULT_CLOSE_TIME,
     DEFAULT_DAYS,
+    DEFAULT_NOTIFY_MODE,
     DEFAULT_NOTIFY_SERVICES,
-    DEFAULT_NOTIFY_WHEN_AWAY_ONLY,
     DEFAULT_ONLY_WHEN_AWAY,
     DEFAULT_SEQUENTIAL_COVERS,
+    DEFAULT_TTS_MODE,
     DEFAULT_TTS_TARGETS,
-    DEFAULT_TTS_WHEN_AWAY_ONLY,
     DEFAULT_OPEN_MODE,
     DEFAULT_OPEN_OFFSET,
     DEFAULT_OPEN_TIME,
     DEFAULT_RANDOMIZE,
     DEFAULT_RANDOM_MAX_MINUTES,
+    MODE_ALWAYS,
+    MODE_AWAY_ONLY,
+    MODE_DISABLED,
     DOMAIN,
     HUB_TITLE,
     HUB_UNIQUE_ID,
@@ -76,11 +79,10 @@ from .const import (
 
 SECTION_OPEN = "open"
 SECTION_CLOSE = "close"
-SECTION_AWAY_ONLY = "away_only"
 SECTION_NOTIFICATIONS = "notifications"
 SECTION_VOICE_ANNOUNCEMENT = "voice_announcement"
 
-_HUB_SECTIONS = (SECTION_AWAY_ONLY, SECTION_NOTIFICATIONS, SECTION_VOICE_ANNOUNCEMENT)
+_HUB_SECTIONS = (SECTION_NOTIFICATIONS, SECTION_VOICE_ANNOUNCEMENT)
 
 
 def _available_notify_services(hass: HomeAssistant | None) -> list[str]:
@@ -94,46 +96,26 @@ def _available_notify_services(hass: HomeAssistant | None) -> list[str]:
 def _build_hub_schema(
     hass: HomeAssistant | None, defaults: dict[str, Any]
 ) -> vol.Schema:
-    """Schema for the hub: scheduler option + 3 collapsible notification sections.
+    """Schema for the hub: scheduler option + 2 self-contained channel sections.
 
     Layout (top → bottom):
 
     1. ``sequential_covers`` (top-level toggle, scheduler behaviour).
-    2. Section ``away_only`` — two independent toggles, one per channel.
-    3. Section ``notifications`` — push notifications config.
-    4. Section ``voice_announcement`` — TTS engine + speakers.
+    2. Section ``notifications`` — push services + their own three-state
+       mode selector (disabled / always / away_only).
+    3. Section ``voice_announcement`` — TTS engine + speakers + their own
+       three-state mode selector.
+
+    Each channel section is **self-contained**: its mode selector sits
+    next to the fields it gates. There used to be a third ``away_only``
+    section grouping both toggles together, but it required users to
+    cross-reference the other sections — confusing in practice.
 
     The ``defaults`` dict can be **either** flat (e.g. fresh ``user_input``
     from a previous validation pass) **or** already nested under the
     section keys (e.g. when re-rendering after the user opened a section).
     ``_section_default`` handles both shapes transparently.
     """
-
-    away_only_section = data_entry_flow.section(
-        vol.Schema(
-            {
-                vol.Required(
-                    CONF_NOTIFY_WHEN_AWAY_ONLY,
-                    default=_section_default(
-                        defaults,
-                        SECTION_AWAY_ONLY,
-                        CONF_NOTIFY_WHEN_AWAY_ONLY,
-                        DEFAULT_NOTIFY_WHEN_AWAY_ONLY,
-                    ),
-                ): selector.BooleanSelector(),
-                vol.Required(
-                    CONF_TTS_WHEN_AWAY_ONLY,
-                    default=_section_default(
-                        defaults,
-                        SECTION_AWAY_ONLY,
-                        CONF_TTS_WHEN_AWAY_ONLY,
-                        DEFAULT_TTS_WHEN_AWAY_ONLY,
-                    ),
-                ): selector.BooleanSelector(),
-            }
-        ),
-        {"collapsed": False},
-    )
 
     notifications_section = data_entry_flow.section(
         vol.Schema(
@@ -152,6 +134,21 @@ def _build_hub_schema(
                         multiple=True,
                         custom_value=True,
                         mode=selector.SelectSelectorMode.DROPDOWN,
+                    )
+                ),
+                vol.Required(
+                    CONF_NOTIFY_MODE,
+                    default=_section_default(
+                        defaults,
+                        SECTION_NOTIFICATIONS,
+                        CONF_NOTIFY_MODE,
+                        DEFAULT_NOTIFY_MODE,
+                    ),
+                ): selector.SelectSelector(
+                    selector.SelectSelectorConfig(
+                        options=[MODE_DISABLED, MODE_ALWAYS, MODE_AWAY_ONLY],
+                        mode=selector.SelectSelectorMode.LIST,
+                        translation_key="notification_mode",
                     )
                 ),
             }
@@ -188,6 +185,21 @@ def _build_hub_schema(
                         domain="media_player", multiple=True
                     )
                 ),
+                vol.Required(
+                    CONF_TTS_MODE,
+                    default=_section_default(
+                        defaults,
+                        SECTION_VOICE_ANNOUNCEMENT,
+                        CONF_TTS_MODE,
+                        DEFAULT_TTS_MODE,
+                    ),
+                ): selector.SelectSelector(
+                    selector.SelectSelectorConfig(
+                        options=[MODE_DISABLED, MODE_ALWAYS, MODE_AWAY_ONLY],
+                        mode=selector.SelectSelectorMode.LIST,
+                        translation_key="notification_mode",
+                    )
+                ),
             }
         ),
         {"collapsed": False},
@@ -201,7 +213,6 @@ def _build_hub_schema(
                     CONF_SEQUENTIAL_COVERS, DEFAULT_SEQUENTIAL_COVERS
                 ),
             ): selector.BooleanSelector(),
-            vol.Required(SECTION_AWAY_ONLY): away_only_section,
             vol.Required(SECTION_NOTIFICATIONS): notifications_section,
             vol.Required(SECTION_VOICE_ANNOUNCEMENT): tts_section,
         }
@@ -377,11 +388,12 @@ def _normalize_instance(user_input: dict[str, Any]) -> dict[str, Any]:
 def _normalize_hub(user_input: dict[str, Any]) -> dict[str, Any]:
     """Flatten section sub-dicts and harden multi-value fields.
 
-    The hub form ships its three notification-related blocks inside HA
-    ``data_entry_flow.section`` containers. After submission they come
-    back as ``{section_key: {field: value}, ...}``; we flatten them so
-    the rest of the integration keeps reading flat ``hub_entry.data``
-    keys (``CONF_NOTIFY_SERVICES``, ``CONF_TTS_ENGINE``, ...).
+    The hub form ships its two channel blocks (``notifications`` and
+    ``voice_announcement``) inside HA ``data_entry_flow.section``
+    containers. After submission they come back as
+    ``{section_key: {field: value}, ...}``; we flatten them so the rest
+    of the integration keeps reading flat ``hub_entry.data`` keys
+    (``CONF_NOTIFY_SERVICES``, ``CONF_TTS_ENGINE``, ...).
 
     ``notify_services`` and ``tts_targets`` are multi-selects but their
     selectors (with ``custom_value=True``) may, in edge cases, deliver
@@ -403,7 +415,7 @@ def _normalize_hub(user_input: dict[str, Any]) -> dict[str, Any]:
         flat[CONF_NOTIFY_SERVICES] = [services]
     else:
         flat[CONF_NOTIFY_SERVICES] = list(services)
-    flat.setdefault(CONF_NOTIFY_WHEN_AWAY_ONLY, DEFAULT_NOTIFY_WHEN_AWAY_ONLY)
+    flat.setdefault(CONF_NOTIFY_MODE, DEFAULT_NOTIFY_MODE)
     flat.setdefault(CONF_SEQUENTIAL_COVERS, DEFAULT_SEQUENTIAL_COVERS)
 
     tts_engine = flat.get(CONF_TTS_ENGINE)
@@ -415,7 +427,7 @@ def _normalize_hub(user_input: dict[str, Any]) -> dict[str, Any]:
         flat[CONF_TTS_TARGETS] = [targets]
     else:
         flat[CONF_TTS_TARGETS] = list(targets)
-    flat.setdefault(CONF_TTS_WHEN_AWAY_ONLY, DEFAULT_TTS_WHEN_AWAY_ONLY)
+    flat.setdefault(CONF_TTS_MODE, DEFAULT_TTS_MODE)
     return flat
 
 
@@ -437,7 +449,7 @@ class ShuttersManagementConfigFlow(ConfigFlow, domain=DOMAIN):
     :class:`ShuttersInstanceSubentryFlow`.
     """
 
-    VERSION = 3
+    VERSION = 4
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
@@ -489,8 +501,8 @@ class ShuttersHubOptionsFlow(OptionsFlow):
             CONF_NOTIFY_SERVICES: self.config_entry.data.get(
                 CONF_NOTIFY_SERVICES, DEFAULT_NOTIFY_SERVICES
             ),
-            CONF_NOTIFY_WHEN_AWAY_ONLY: self.config_entry.data.get(
-                CONF_NOTIFY_WHEN_AWAY_ONLY, DEFAULT_NOTIFY_WHEN_AWAY_ONLY
+            CONF_NOTIFY_MODE: self.config_entry.data.get(
+                CONF_NOTIFY_MODE, DEFAULT_NOTIFY_MODE
             ),
             CONF_SEQUENTIAL_COVERS: self.config_entry.data.get(
                 CONF_SEQUENTIAL_COVERS, DEFAULT_SEQUENTIAL_COVERS
@@ -499,8 +511,8 @@ class ShuttersHubOptionsFlow(OptionsFlow):
             CONF_TTS_TARGETS: self.config_entry.data.get(
                 CONF_TTS_TARGETS, DEFAULT_TTS_TARGETS
             ),
-            CONF_TTS_WHEN_AWAY_ONLY: self.config_entry.data.get(
-                CONF_TTS_WHEN_AWAY_ONLY, DEFAULT_TTS_WHEN_AWAY_ONLY
+            CONF_TTS_MODE: self.config_entry.data.get(
+                CONF_TTS_MODE, DEFAULT_TTS_MODE
             ),
         }
         return self.async_show_form(

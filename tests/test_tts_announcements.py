@@ -15,13 +15,16 @@ from custom_components.shutters_management import ShuttersScheduler
 from custom_components.shutters_management.const import (
     ACTION_CLOSE,
     ACTION_OPEN,
+    CONF_NOTIFY_MODE,
     CONF_NOTIFY_SERVICES,
-    CONF_NOTIFY_WHEN_AWAY_ONLY,
     CONF_PRESENCE_ENTITY,
     CONF_TTS_ENGINE,
+    CONF_TTS_MODE,
     CONF_TTS_TARGETS,
-    CONF_TTS_WHEN_AWAY_ONLY,
     DOMAIN,
+    MODE_ALWAYS,
+    MODE_AWAY_ONLY,
+    MODE_DISABLED,
 )
 
 from .conftest import build_hub_with_instance, get_only_subentry_id
@@ -33,27 +36,23 @@ async def _setup_tts_hub(
     *,
     engine: str | None = "tts.test_engine",
     targets: list[str] | None = None,
-    tts_when_away_only: bool = False,
+    tts_mode: str = MODE_ALWAYS,
     notify_services: list[str] | None = None,
-    notify_when_away_only: bool = False,
+    notify_mode: str = MODE_ALWAYS,
     presence_entity: str | None = None,
 ) -> tuple[MockConfigEntry, ShuttersScheduler]:
     """Build, register and set up a hub with TTS settings of interest."""
     if presence_entity is not None:
         base_config[CONF_PRESENCE_ENTITY] = presence_entity
 
-    hub_overrides: dict = {}
+    hub_overrides: dict = {CONF_TTS_MODE: tts_mode}
     if engine is not None:
         hub_overrides[CONF_TTS_ENGINE] = engine
-    if targets is None:
-        targets = ["media_player.kitchen"]
-    hub_overrides[CONF_TTS_TARGETS] = targets
-    if tts_when_away_only:
-        hub_overrides[CONF_TTS_WHEN_AWAY_ONLY] = True
-    if notify_services is not None:
-        hub_overrides[CONF_NOTIFY_SERVICES] = notify_services
-    if notify_when_away_only:
-        hub_overrides[CONF_NOTIFY_WHEN_AWAY_ONLY] = True
+    hub_overrides[CONF_TTS_TARGETS] = targets if targets is not None else [
+        "media_player.kitchen"
+    ]
+    hub_overrides[CONF_NOTIFY_SERVICES] = notify_services if notify_services is not None else []
+    hub_overrides[CONF_NOTIFY_MODE] = notify_mode
 
     entry = build_hub_with_instance(
         instance_data=base_config, hub_data=hub_overrides
@@ -91,6 +90,22 @@ async def test_no_tts_when_targets_empty(
 
     _, scheduler = await _setup_tts_hub(
         hass, base_config, engine="tts.cloud", targets=[]
+    )
+    await scheduler.async_run_now(ACTION_OPEN)
+    await hass.async_block_till_done()
+
+    assert tts_calls == []
+
+
+async def test_no_tts_when_mode_disabled(
+    hass: HomeAssistant, base_config
+) -> None:
+    """mode=disabled must silence TTS even when engine and targets are set."""
+    async_mock_service(hass, "cover", SERVICE_OPEN_COVER)
+    tts_calls = async_mock_service(hass, "tts", "speak")
+
+    _, scheduler = await _setup_tts_hub(
+        hass, base_config, engine="tts.cloud", tts_mode=MODE_DISABLED
     )
     await scheduler.async_run_now(ACTION_OPEN)
     await hass.async_block_till_done()
@@ -184,7 +199,7 @@ async def test_tts_uses_comma_separator_not_newline(
 async def test_tts_when_away_only_skips_at_home(
     hass: HomeAssistant, base_config
 ) -> None:
-    """tts_when_away_only=True + presence detected at home → no announcement."""
+    """tts_mode=away_only + presence detected at home → no announcement."""
     hass.states.async_set("person.someone", "home")
     async_mock_service(hass, "cover", SERVICE_OPEN_COVER)
     tts_calls = async_mock_service(hass, "tts", "speak")
@@ -193,7 +208,7 @@ async def test_tts_when_away_only_skips_at_home(
         hass,
         base_config,
         engine="tts.cloud",
-        tts_when_away_only=True,
+        tts_mode=MODE_AWAY_ONLY,
         presence_entity="person.someone",
     )
     await scheduler.async_run_now(ACTION_OPEN)
@@ -205,7 +220,7 @@ async def test_tts_when_away_only_skips_at_home(
 async def test_tts_when_away_only_runs_when_away(
     hass: HomeAssistant, base_config
 ) -> None:
-    """tts_when_away_only=True + presence away → announcement fires."""
+    """tts_mode=away_only + presence away → announcement fires."""
     hass.states.async_set("person.someone", "not_home")
     async_mock_service(hass, "cover", SERVICE_OPEN_COVER)
     tts_calls = async_mock_service(hass, "tts", "speak")
@@ -214,7 +229,7 @@ async def test_tts_when_away_only_runs_when_away(
         hass,
         base_config,
         engine="tts.cloud",
-        tts_when_away_only=True,
+        tts_mode=MODE_AWAY_ONLY,
         presence_entity="person.someone",
     )
     await scheduler.async_run_now(ACTION_OPEN)
@@ -223,14 +238,14 @@ async def test_tts_when_away_only_runs_when_away(
     assert len(tts_calls) == 1
 
 
-async def test_tts_and_notify_have_independent_away_toggles(
+async def test_tts_and_notify_have_independent_modes(
     hass: HomeAssistant, base_config
 ) -> None:
-    """The two ``*_when_away_only`` toggles must be evaluated independently.
+    """The two channel modes must be evaluated independently.
 
-    Scenario: notify_when_away_only=True (silent at home) +
-    tts_when_away_only=False (always speak), at home → push must be
-    skipped, TTS must still fire.
+    Scenario: notify_mode=away_only (silent at home) +
+    tts_mode=always (always speak), at home → push must be skipped,
+    TTS must still fire.
     """
     hass.states.async_set("person.someone", "home")
     async_mock_service(hass, "cover", SERVICE_OPEN_COVER)
@@ -241,9 +256,9 @@ async def test_tts_and_notify_have_independent_away_toggles(
         hass,
         base_config,
         engine="tts.cloud",
-        tts_when_away_only=False,
+        tts_mode=MODE_ALWAYS,
         notify_services=["notify.iphone"],
-        notify_when_away_only=True,
+        notify_mode=MODE_AWAY_ONLY,
         presence_entity="person.someone",
     )
     await scheduler.async_run_now(ACTION_OPEN)
@@ -296,6 +311,7 @@ async def test_no_tts_if_scheduler_unloaded_mid_call(
         hub_data={
             CONF_TTS_ENGINE: "tts.cloud",
             CONF_TTS_TARGETS: ["media_player.kitchen"],
+            CONF_TTS_MODE: MODE_ALWAYS,
             CONF_SEQUENTIAL_COVERS: True,
         },
     )

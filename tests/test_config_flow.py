@@ -13,8 +13,8 @@ from custom_components.shutters_management.const import (
     CONF_CLOSE_TIME,
     CONF_COVERS,
     CONF_DAYS,
+    CONF_NOTIFY_MODE,
     CONF_NOTIFY_SERVICES,
-    CONF_NOTIFY_WHEN_AWAY_ONLY,
     CONF_ONLY_WHEN_AWAY,
     CONF_OPEN_MODE,
     CONF_OPEN_OFFSET,
@@ -22,14 +22,17 @@ from custom_components.shutters_management.const import (
     CONF_RANDOMIZE,
     CONF_RANDOM_MAX_MINUTES,
     CONF_SEQUENTIAL_COVERS,
+    CONF_TTS_MODE,
     CONF_TTS_TARGETS,
-    CONF_TTS_WHEN_AWAY_ONLY,
     CONF_TYPE,
     DAYS,
     DEFAULT_CLOSE_MODE,
     DEFAULT_OPEN_MODE,
     DOMAIN,
     HUB_TITLE,
+    MODE_ALWAYS,
+    MODE_AWAY_ONLY,
+    MODE_DISABLED,
     SUBENTRY_TYPE_INSTANCE,
     TYPE_HUB,
 )
@@ -73,9 +76,10 @@ def _valid_instance_input(**overrides):
 async def test_hub_user_flow_creates_singleton(hass: HomeAssistant) -> None:
     """The hub flow creates one entry with shared notification settings.
 
-    The form is laid out in 3 collapsible HA sections (``away_only``,
-    ``notifications``, ``voice_announcement``) plus the top-level
-    ``sequential_covers`` toggle, so user_input must mirror that shape.
+    The form is laid out in 2 collapsible HA sections (``notifications``
+    and ``voice_announcement``) plus the top-level ``sequential_covers``
+    toggle. Each section embeds its own three-state mode selector
+    (disabled / always / away_only), so user_input must mirror that shape.
     """
     result = await hass.config_entries.flow.async_init(
         DOMAIN, context={"source": SOURCE_USER}
@@ -87,12 +91,14 @@ async def test_hub_user_flow_creates_singleton(hass: HomeAssistant) -> None:
         result["flow_id"],
         user_input={
             CONF_SEQUENTIAL_COVERS: False,
-            "away_only": {
-                CONF_NOTIFY_WHEN_AWAY_ONLY: False,
-                CONF_TTS_WHEN_AWAY_ONLY: False,
+            "notifications": {
+                CONF_NOTIFY_SERVICES: [],
+                CONF_NOTIFY_MODE: MODE_ALWAYS,
             },
-            "notifications": {CONF_NOTIFY_SERVICES: []},
-            "voice_announcement": {CONF_TTS_TARGETS: []},
+            "voice_announcement": {
+                CONF_TTS_TARGETS: [],
+                CONF_TTS_MODE: MODE_DISABLED,
+            },
         },
     )
     assert result["type"] == FlowResultType.CREATE_ENTRY
@@ -100,7 +106,7 @@ async def test_hub_user_flow_creates_singleton(hass: HomeAssistant) -> None:
     assert result["data"][CONF_TYPE] == TYPE_HUB
     # _normalize_hub flattens the sections back into a flat dict.
     assert result["data"][CONF_NOTIFY_SERVICES] == []
-    assert result["data"][CONF_NOTIFY_WHEN_AWAY_ONLY] is False
+    assert result["data"][CONF_NOTIFY_MODE] == MODE_ALWAYS
 
 
 async def test_hub_user_flow_aborts_when_already_configured(
@@ -128,21 +134,21 @@ async def test_hub_options_flow_updates_notification_settings(
         result["flow_id"],
         user_input={
             CONF_SEQUENTIAL_COVERS: False,
-            "away_only": {
-                CONF_NOTIFY_WHEN_AWAY_ONLY: True,
-                CONF_TTS_WHEN_AWAY_ONLY: False,
-            },
             "notifications": {
                 CONF_NOTIFY_SERVICES: ["notify.persistent_notification"],
+                CONF_NOTIFY_MODE: MODE_AWAY_ONLY,
             },
-            "voice_announcement": {CONF_TTS_TARGETS: []},
+            "voice_announcement": {
+                CONF_TTS_TARGETS: [],
+                CONF_TTS_MODE: MODE_DISABLED,
+            },
         },
     )
     assert result["type"] == FlowResultType.CREATE_ENTRY
     assert mock_config_entry.data[CONF_NOTIFY_SERVICES] == [
         "notify.persistent_notification"
     ]
-    assert mock_config_entry.data[CONF_NOTIFY_WHEN_AWAY_ONLY] is True
+    assert mock_config_entry.data[CONF_NOTIFY_MODE] == MODE_AWAY_ONLY
 
 
 # ---- Instance subentry flow --------------------------------------------------
