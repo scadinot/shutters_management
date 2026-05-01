@@ -153,6 +153,36 @@ async def test_migration_is_noop_for_native_v3_hub(
     ]
 
 
+async def test_migration_reuses_legacy_entry_id_as_subentry_id(
+    hass: HomeAssistant,
+) -> None:
+    """The new subentry must reuse the legacy ``entry_id`` as its ``subentry_id``.
+
+    Entities are now identified by ``subentry.subentry_id`` (their
+    ``unique_id`` is ``f"{subentry_id}_next_open"`` etc.). If migration
+    generated a brand-new subentry_id, the existing registry entries —
+    keyed on the legacy ``entry_id`` — would no longer match and HA
+    would create duplicate entities. Reusing the legacy id is the
+    cheapest way to preserve registry state.
+    """
+    bureau = _legacy_entry(
+        name="Bureau", entry_id="legacy_bureau", unique_id="bureau"
+    )
+    rdc = _legacy_entry(
+        name="RDC", entry_id="legacy_rdc", unique_id="rdc"
+    )
+    bureau.add_to_hass(hass)
+    rdc.add_to_hass(hass)
+
+    assert await hass.config_entries.async_setup(bureau.entry_id)
+    await hass.async_block_till_done()
+
+    hub = hass.config_entries.async_entries(DOMAIN)[0]
+    subentry_ids = set(hub.subentries.keys())
+    # Both legacy entry_ids survive as the subentry_ids.
+    assert subentry_ids == {"legacy_bureau", "legacy_rdc"}
+
+
 async def test_migration_preserves_unique_id_for_entity_id_stability(
     hass: HomeAssistant,
 ) -> None:

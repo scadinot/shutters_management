@@ -166,13 +166,20 @@ async def _async_migrate_legacy_entries(hass: HomeAssistant) -> None:
 
     if hub is None:
         # Promote the first legacy entry into the hub itself, keeping its
-        # original instance configuration as the first subentry.
+        # original instance configuration as the first subentry. The new
+        # subentry reuses the legacy ``entry.entry_id`` as its
+        # ``subentry_id`` so existing entity unique_ids
+        # (``f"{entry.entry_id}_next_open"``, etc.) keep matching after
+        # the move — HA finds the registry entry by unique_id and
+        # updates ``config_subentry_id`` in place rather than creating
+        # a duplicate.
         seed = legacy.pop(0)
         original_data = dict(seed.data)
         original_options = dict(seed.options)
         instance_data = _strip_name({**original_data, **original_options})
         instance_title = seed.title or original_data.get(CONF_NAME) or HUB_TITLE
         instance_unique_id = seed.unique_id
+        legacy_id = seed.entry_id
 
         hass.config_entries.async_update_entry(
             seed,
@@ -189,6 +196,7 @@ async def _async_migrate_legacy_entries(hass: HomeAssistant) -> None:
         hass.config_entries.async_add_subentry(
             seed,
             ConfigSubentry(
+                subentry_id=legacy_id,
                 subentry_type=SUBENTRY_TYPE_INSTANCE,
                 title=instance_title,
                 unique_id=instance_unique_id,
@@ -203,11 +211,15 @@ async def _async_migrate_legacy_entries(hass: HomeAssistant) -> None:
         )
 
     for entry in legacy:
+        # Same trick: reuse the legacy entry_id as subentry_id so the
+        # entity registry can re-bind by unique_id once the legacy
+        # entry is gone.
         instance_data = _strip_name({**entry.data, **entry.options})
         instance_title = entry.title or entry.data.get(CONF_NAME) or "Instance"
         hass.config_entries.async_add_subentry(
             hub,
             ConfigSubentry(
+                subentry_id=entry.entry_id,
                 subentry_type=SUBENTRY_TYPE_INSTANCE,
                 title=instance_title,
                 unique_id=entry.unique_id,
@@ -236,13 +248,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         )
         return False
 
-    schedulers: dict[str, ShuttersScheduler] = {}
     for subentry in entry.subentries.values():
         if subentry.subentry_type != SUBENTRY_TYPE_INSTANCE:
             continue
         scheduler = ShuttersScheduler(hass, entry, subentry)
         scheduler.async_schedule()
-        schedulers[subentry.subentry_id] = scheduler
         hass.data[DOMAIN][subentry.subentry_id] = scheduler
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
@@ -273,7 +283,30 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
 
 async def _async_update_listener(hass: HomeAssistant, entry: ConfigEntry) -> None:
-    """Reload integration on hub data update or subentry add/remove."""
+    """Reload only when the set of instance subentries actually changed.
+
+    The hub options flow rewrites ``entry.data`` to update the shared
+    notification settings, which would otherwise trigger a reload here.
+    But notifications already re-read ``hub_entry.data`` on every send,
+    so a reload is just churn (entities flicker, schedulers respawn).
+
+    The listener still fires on subentry add / remove / reconfigure
+    because those changes mutate ``entry.subentries``; in that case we
+    do reload so the per-subentry schedulers and entity lists are
+    rebuilt.
+    """
+    current = {
+        sub.subentry_id: dict(sub.data)
+        for sub in entry.subentries.values()
+        if sub.subentry_type == SUBENTRY_TYPE_INSTANCE
+    }
+    loaded = {
+        sid: dict(scheduler.subentry.data)
+        for sid, scheduler in hass.data.get(DOMAIN, {}).items()
+        if scheduler.hub_entry is entry
+    }
+    if current == loaded:
+        return
     await hass.config_entries.async_reload(entry.entry_id)
 
 

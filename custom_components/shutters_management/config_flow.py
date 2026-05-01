@@ -256,10 +256,22 @@ def _normalize_instance(user_input: dict[str, Any]) -> dict[str, Any]:
 
 
 def _normalize_hub(user_input: dict[str, Any]) -> dict[str, Any]:
-    """Normalize hub user input. notify_services is the only multi-value field."""
+    """Normalize hub user input.
+
+    ``notify_services`` is a multi-select but the selector with
+    ``custom_value=True`` may, in edge cases, deliver a single string
+    rather than a list. Wrap that case explicitly to avoid the silent
+    bug where ``list("notify.iphone")`` would expand to a list of
+    characters.
+    """
     flat = dict(user_input)
-    services = flat.get(CONF_NOTIFY_SERVICES) or []
-    flat[CONF_NOTIFY_SERVICES] = list(services)
+    services = flat.get(CONF_NOTIFY_SERVICES)
+    if not services:
+        flat[CONF_NOTIFY_SERVICES] = []
+    elif isinstance(services, str):
+        flat[CONF_NOTIFY_SERVICES] = [services]
+    else:
+        flat[CONF_NOTIFY_SERVICES] = list(services)
     flat.setdefault(CONF_NOTIFY_WHEN_AWAY_ONLY, DEFAULT_NOTIFY_WHEN_AWAY_ONLY)
     return flat
 
@@ -441,9 +453,26 @@ class ShuttersInstanceSubentryFlow(ConfigSubentryFlow):
         *,
         edit_subentry_id: str | None,
     ) -> SubentryFlowResult:
-        """Create or update the subentry, then finish the flow."""
+        """Create or update the subentry, then finish the flow.
+
+        Both unique_id and the visible title are checked for collisions.
+        unique_id is the primary key (set at creation, immutable on
+        rename) but a user could rename ``Bureau`` to ``Étage`` and
+        then create a brand-new ``Étage`` whose slugified unique_id
+        wouldn't collide; the title check catches that case so the
+        device list stays unambiguous.
+        """
         payload = _strip_name(data)
         unique_id = slugify(name)
+        normalized_title = name.casefold()
+
+        for sub_id, existing in entry.subentries.items():
+            if sub_id == edit_subentry_id:
+                continue
+            if existing.unique_id == unique_id:
+                return self.async_abort(reason="already_configured")
+            if existing.title.casefold() == normalized_title:
+                return self.async_abort(reason="already_configured")
 
         if edit_subentry_id is not None:
             subentry = entry.subentries[edit_subentry_id]
@@ -453,10 +482,6 @@ class ShuttersInstanceSubentryFlow(ConfigSubentryFlow):
                 title=name,
                 data=payload,
             )
-
-        for existing in entry.subentries.values():
-            if existing.unique_id == unique_id:
-                return self.async_abort(reason="already_configured")
 
         return self.async_create_entry(
             title=name,

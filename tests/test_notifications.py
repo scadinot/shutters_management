@@ -6,7 +6,7 @@ import logging
 from homeassistant.const import SERVICE_OPEN_COVER
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
-from pytest_homeassistant_custom_component.common import (  # noqa: F401
+from pytest_homeassistant_custom_component.common import (
     MockConfigEntry,
     async_mock_service,
 )
@@ -21,7 +21,7 @@ from custom_components.shutters_management.const import (
     DOMAIN,
 )
 
-from .conftest import _hub_data, build_hub_with_instance, get_only_subentry_id
+from .conftest import build_hub_with_instance, get_only_subentry_id
 
 
 async def _setup_hub(

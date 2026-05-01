@@ -209,6 +209,40 @@ async def test_subentry_user_flow_aborts_on_duplicate_name(
     assert result["reason"] == "already_configured"
 
 
+async def test_subentry_user_flow_aborts_on_title_collision_after_rename(
+    hass: HomeAssistant, setup_integration, mock_config_entry: MockConfigEntry
+) -> None:
+    """A rename can leave a stale unique_id; a new subentry with the renamed
+    title must still be rejected on title collision.
+
+    Scenario: the fixture's "Bureau" gets reconfigured to title "Étage"
+    (its unique_id stays "bureau" because subentry unique_id is immutable
+    on rename). Creating a fresh "Étage" would slugify to "etage", which
+    is a different unique_id — but the visible title would clash. The
+    flow must abort.
+    """
+    subentry_id = next(iter(mock_config_entry.subentries))
+    result = await mock_config_entry.start_subentry_reconfigure_flow(
+        hass, subentry_id
+    )
+    await hass.config_entries.subentries.async_configure(
+        result["flow_id"],
+        user_input=_valid_instance_input(**{CONF_NAME: "Étage"}),
+    )
+    assert mock_config_entry.subentries[subentry_id].title == "Étage"
+
+    result = await hass.config_entries.subentries.async_init(
+        (mock_config_entry.entry_id, SUBENTRY_TYPE_INSTANCE),
+        context={"source": SOURCE_USER},
+    )
+    result = await hass.config_entries.subentries.async_configure(
+        result["flow_id"],
+        user_input=_valid_instance_input(**{CONF_NAME: "Étage"}),
+    )
+    assert result["type"] == FlowResultType.ABORT
+    assert result["reason"] == "already_configured"
+
+
 async def test_subentry_user_flow_confirms_when_no_presence_source(
     hass: HomeAssistant, setup_integration, mock_config_entry: MockConfigEntry
 ) -> None:
