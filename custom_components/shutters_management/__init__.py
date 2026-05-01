@@ -4,7 +4,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import random
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from datetime import datetime, time, timedelta
 from types import MappingProxyType
 from typing import Any
@@ -55,6 +55,9 @@ from .const import (
     CONF_RANDOMIZE,
     CONF_RANDOM_MAX_MINUTES,
     CONF_SEQUENTIAL_COVERS,
+    CONF_TTS_ENGINE,
+    CONF_TTS_TARGETS,
+    CONF_TTS_WHEN_AWAY_ONLY,
     CONF_TYPE,
     COVER_ACTION_TIMEOUT_SECONDS,
     DAYS,
@@ -66,6 +69,8 @@ from .const import (
     DEFAULT_OPEN_OFFSET,
     DEFAULT_RANDOM_MAX_MINUTES,
     DEFAULT_SEQUENTIAL_COVERS,
+    DEFAULT_TTS_TARGETS,
+    DEFAULT_TTS_WHEN_AWAY_ONLY,
     DOMAIN,
     HUB_TITLE,
     HUB_UNIQUE_ID,
@@ -103,6 +108,27 @@ _NOTIFY_HEADERS: dict[str, dict[str, str]] = {
 }
 
 
+_TTS_HEADERS: dict[str, dict[str, str]] = {
+    "fr": {
+        # French typography: space before the colon.
+        ACTION_OPEN: "Volets ouverts : ",
+        ACTION_CLOSE: "Volets fermés : ",
+    },
+    "en": {
+        ACTION_OPEN: "Shutters opened: ",
+        ACTION_CLOSE: "Shutters closed: ",
+    },
+}
+
+
+def _cover_display_name(hass: HomeAssistant, entity_id: str) -> str:
+    """Friendly_name for ``entity_id`` when known, raw entity_id otherwise."""
+    state = hass.states.get(entity_id)
+    if state is None:
+        return entity_id
+    return state.attributes.get("friendly_name") or entity_id
+
+
 def _notify_message(
     hass: HomeAssistant, language: str, action: str, processed_covers: list[str]
 ) -> str:
@@ -118,13 +144,26 @@ def _notify_message(
     header = bucket.get(action, _NOTIFY_HEADERS["en"][action])
     lines = [header]
     for entity_id in processed_covers:
-        state = hass.states.get(entity_id)
-        if state is not None:
-            friendly = state.attributes.get("friendly_name")
-            lines.append(friendly or entity_id)
-        else:
-            lines.append(entity_id)
+        lines.append(_cover_display_name(hass, entity_id))
     return "\n".join(lines)
+
+
+def _tts_message(
+    hass: HomeAssistant, language: str, action: str, processed_covers: list[str]
+) -> str:
+    """Build the spoken-announcement body for ``tts.speak``.
+
+    Same content as ``_notify_message`` but joined with commas instead
+    of newlines, so a smart speaker reads a natural sentence rather
+    than a string of awkward pauses on each line break:
+    ``"Shutters opened: Living Room, Kitchen, Bedroom."``. The header
+    already carries its own ``: `` (or `` : `` in French) so the join
+    is unconditional.
+    """
+    bucket = _TTS_HEADERS.get(language, _TTS_HEADERS["en"])
+    header = bucket.get(action, _TTS_HEADERS["en"][action])
+    names = [_cover_display_name(hass, entity_id) for entity_id in processed_covers]
+    return f"{header}{', '.join(names)}."
 
 
 def _parse_time(value: str | time) -> time:
@@ -717,35 +756,55 @@ class ShuttersScheduler:
     async def _async_send_notifications(
         self, cover_service: str, processed_covers: list[str]
     ) -> None:
-        """Notify each configured ``notify.*`` service about the action.
+        """Dispatch the action to push notifiers and to TTS speakers.
 
         ``processed_covers`` is the list of covers in the order the
         scheduler actually fired them — that's the order the user sees
-        in the notification body, line by line.
+        in the notification body and hears spoken on the smart speaker.
+
+        Push and TTS are two independent branches:
+
+        * Each is gated by its own ``*_when_away_only`` toggle.
+        * Each is wrapped in its own try/except so a failure in one
+          channel never silences the other (and never propagates back
+          up to break the cover action that already succeeded).
 
         Settings are read from the hub entry on every call (not cached)
-        so that the hub options flow takes effect without a reload.
-        Per-notifier failures are logged but never propagated, so a
-        broken notify integration cannot block the cover action that
-        already succeeded above.
+        so the hub options flow takes effect without a reload.
         """
         hub_data = self.hub_entry.data
+        is_away = self._is_away(self._settings)
+        action = ACTION_OPEN if cover_service == SERVICE_OPEN_COVER else ACTION_CLOSE
+        language = self.hass.config.language
+
+        await self._async_send_push_notifications(
+            hub_data, action, language, is_away, processed_covers
+        )
+        await self._async_send_tts_announcements(
+            hub_data, action, language, is_away, processed_covers
+        )
+
+    async def _async_send_push_notifications(
+        self,
+        hub_data: Mapping[str, Any],
+        action: str,
+        language: str,
+        is_away: bool,
+        processed_covers: list[str],
+    ) -> None:
+        """Send a push notification through every configured ``notify.*`` service."""
         targets: list[str] = list(
             hub_data.get(CONF_NOTIFY_SERVICES, DEFAULT_NOTIFY_SERVICES)
         )
         if not targets:
             return
-
         if hub_data.get(
             CONF_NOTIFY_WHEN_AWAY_ONLY, DEFAULT_NOTIFY_WHEN_AWAY_ONLY
-        ) and not self._is_away(self._settings):
+        ) and not is_away:
             return
 
-        action = ACTION_OPEN if cover_service == SERVICE_OPEN_COVER else ACTION_CLOSE
         title = self.subentry.title
-        message = _notify_message(
-            self.hass, self.hass.config.language, action, processed_covers
-        )
+        message = _notify_message(self.hass, language, action, processed_covers)
 
         for target in targets:
             if "." not in target:
@@ -768,6 +827,43 @@ class ShuttersScheduler:
                 _LOGGER.exception(
                     "Failed to send notification via %s", target
                 )
+
+    async def _async_send_tts_announcements(
+        self,
+        hub_data: Mapping[str, Any],
+        action: str,
+        language: str,
+        is_away: bool,
+        processed_covers: list[str],
+    ) -> None:
+        """Speak the action on every configured ``media_player.*`` via ``tts.speak``."""
+        engine = hub_data.get(CONF_TTS_ENGINE)
+        targets: list[str] = list(
+            hub_data.get(CONF_TTS_TARGETS, DEFAULT_TTS_TARGETS)
+        )
+        if not engine or not targets:
+            return
+        if hub_data.get(
+            CONF_TTS_WHEN_AWAY_ONLY, DEFAULT_TTS_WHEN_AWAY_ONLY
+        ) and not is_away:
+            return
+
+        message = _tts_message(self.hass, language, action, processed_covers)
+        try:
+            await self.hass.services.async_call(
+                "tts",
+                "speak",
+                {
+                    "entity_id": engine,
+                    "media_player_entity_id": targets,
+                    "message": message,
+                },
+                blocking=False,
+            )
+        except Exception:  # noqa: BLE001 — never break the cover action
+            _LOGGER.exception(
+                "Failed to broadcast TTS announcement via %s", engine
+            )
 
     def _is_away(self, settings: dict[str, Any]) -> bool:
         """Return True when the configured presence entity reports away."""

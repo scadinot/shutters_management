@@ -7,7 +7,10 @@
         "data": {
           "notify_services": "Services de notification à appeler après chaque action (laisser vide pour désactiver)",
           "notify_when_away_only": "Notifier uniquement en mode absence",
-          "sequential_covers": "Actionner les volets l'un après l'autre, dans un ordre aléatoire (attend la fin de chaque volet avant de démarrer le suivant)"
+          "sequential_covers": "Actionner les volets l'un après l'autre, dans un ordre aléatoire (attend la fin de chaque volet avant de démarrer le suivant)",
+          "tts_engine": "Moteur d'annonce vocale (TTS)",
+          "tts_targets": "Enceintes connectées pour les annonces (laisser vide pour désactiver)",
+          "tts_when_away_only": "Annoncer uniquement en mode absence"
         }
       }
     },
@@ -23,7 +26,10 @@
         "data": {
           "notify_services": "Services de notification à appeler après chaque action (laisser vide pour désactiver)",
           "notify_when_away_only": "Notifier uniquement en mode absence",
-          "sequential_covers": "Actionner les volets l'un après l'autre, dans un ordre aléatoire (attend la fin de chaque volet avant de démarrer le suivant)"
+          "sequential_covers": "Actionner les volets l'un après l'autre, dans un ordre aléatoire (attend la fin de chaque volet avant de démarrer le suivant)",
+          "tts_engine": "Moteur d'annonce vocale (TTS)",
+          "tts_targets": "Enceintes connectées pour les annonces (laisser vide pour désactiver)",
+          "tts_when_away_only": "Annoncer uniquement en mode absence"
         }
       }
     }

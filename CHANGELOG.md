@@ -6,6 +6,58 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le pr
 
 ## [Non publié]
 
+## [0.4.3] — 2026-05-01
+
+### Ajouté
+
+- **Annonces vocales sur enceintes connectées** (Google Home, Nest,
+  Sonos, …) en complément des notifications push. Trois nouveaux
+  champs au niveau du hub :
+  - **« Moteur d'annonce vocale (TTS) »** : sélection d'une entité
+    `tts.*` (le provider TTS, ex. `tts.cloud`, `tts.google_translate_en_com`).
+  - **« Enceintes connectées pour les annonces »** : multi-select
+    d'entités `media_player.*`.
+  - **« Annoncer uniquement en absence »** : toggle dédié, **indépendant**
+    du toggle équivalent côté push notifications.
+- Quand le moteur TTS et au moins une enceinte sont configurés, chaque
+  action open/close déclenche en plus un appel `tts.speak` qui fait
+  parler les enceintes en parallèle. Le message est compact, dédié à
+  l'oral :
+  - FR : `« Volets ouverts : Salon, Cuisine, Chambre. »`
+  - EN : `« Shutters opened: Living Room, Kitchen, Bedroom. »`
+- Push et TTS sont **strictement indépendants** : un échec d'un canal
+  (provider TTS injoignable, enceinte éteinte, notifier cassé)
+  n'empêche jamais l'autre canal de partir, ni l'action sur les volets.
+- Les deux toggles « away-only » étant séparés, on peut router
+  finement — par exemple, push toujours, mais TTS uniquement en
+  absence.
+
+### Modifié
+
+- Bump `manifest.json` : `0.4.2` → `0.4.3`.
+- `_async_send_notifications` est découpée en deux helpers internes
+  (`_async_send_push_notifications` et `_async_send_tts_announcements`)
+  pour rendre l'isolation des canaux explicite et évoluable.
+
+### Tests
+
+- Nouveau `tests/test_tts_announcements.py` (11 cas) :
+  pas d'appel sans engine, pas d'appel sans targets, message en FR,
+  message en EN, action open / close, format compact à virgules
+  (jamais de `\n`), toggle away-only TTS qui skip à la maison et
+  qui parle en absence, indépendance des deux toggles away-only,
+  TTS cassé qui ne bloque pas le cover, scheduler unloaded qui
+  silence aussi le TTS.
+- Suite complète : **88 tests verts** (77 + 11).
+
+### Pourquoi ce canal séparé
+
+Une notification push est silencieuse et nominative ; une annonce
+vocale est ambiante et **immédiate** — on entend depuis n'importe
+quelle pièce que les volets bougent. Les deux sont
+complémentaires plutôt qu'alternatifs, d'où le découplage complet
+(toggles d'absence indépendants, robustesse cross-canal).
+
 ## [0.4.2] — 2026-05-01
 
 ### Modifié

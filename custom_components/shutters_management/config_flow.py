@@ -38,6 +38,9 @@ from .const import (
     CONF_NOTIFY_WHEN_AWAY_ONLY,
     CONF_ONLY_WHEN_AWAY,
     CONF_SEQUENTIAL_COVERS,
+    CONF_TTS_ENGINE,
+    CONF_TTS_TARGETS,
+    CONF_TTS_WHEN_AWAY_ONLY,
     CONF_OPEN_MODE,
     CONF_OPEN_OFFSET,
     CONF_OPEN_TIME,
@@ -54,6 +57,8 @@ from .const import (
     DEFAULT_NOTIFY_WHEN_AWAY_ONLY,
     DEFAULT_ONLY_WHEN_AWAY,
     DEFAULT_SEQUENTIAL_COVERS,
+    DEFAULT_TTS_TARGETS,
+    DEFAULT_TTS_WHEN_AWAY_ONLY,
     DEFAULT_OPEN_MODE,
     DEFAULT_OPEN_OFFSET,
     DEFAULT_OPEN_TIME,
@@ -110,6 +115,28 @@ def _build_hub_schema(
                 CONF_SEQUENTIAL_COVERS,
                 default=defaults.get(
                     CONF_SEQUENTIAL_COVERS, DEFAULT_SEQUENTIAL_COVERS
+                ),
+            ): selector.BooleanSelector(),
+            vol.Optional(
+                CONF_TTS_ENGINE,
+                description={
+                    "suggested_value": defaults.get(CONF_TTS_ENGINE, "")
+                },
+            ): selector.EntitySelector(
+                selector.EntitySelectorConfig(domain="tts")
+            ),
+            vol.Optional(
+                CONF_TTS_TARGETS,
+                default=defaults.get(CONF_TTS_TARGETS, DEFAULT_TTS_TARGETS),
+            ): selector.EntitySelector(
+                selector.EntitySelectorConfig(
+                    domain="media_player", multiple=True
+                )
+            ),
+            vol.Required(
+                CONF_TTS_WHEN_AWAY_ONLY,
+                default=defaults.get(
+                    CONF_TTS_WHEN_AWAY_ONLY, DEFAULT_TTS_WHEN_AWAY_ONLY
                 ),
             ): selector.BooleanSelector(),
         }
@@ -282,6 +309,17 @@ def _normalize_hub(user_input: dict[str, Any]) -> dict[str, Any]:
         flat[CONF_NOTIFY_SERVICES] = list(services)
     flat.setdefault(CONF_NOTIFY_WHEN_AWAY_ONLY, DEFAULT_NOTIFY_WHEN_AWAY_ONLY)
     flat.setdefault(CONF_SEQUENTIAL_COVERS, DEFAULT_SEQUENTIAL_COVERS)
+
+    tts_engine = flat.get(CONF_TTS_ENGINE)
+    flat[CONF_TTS_ENGINE] = tts_engine or None
+    targets = flat.get(CONF_TTS_TARGETS)
+    if not targets:
+        flat[CONF_TTS_TARGETS] = []
+    elif isinstance(targets, str):
+        flat[CONF_TTS_TARGETS] = [targets]
+    else:
+        flat[CONF_TTS_TARGETS] = list(targets)
+    flat.setdefault(CONF_TTS_WHEN_AWAY_ONLY, DEFAULT_TTS_WHEN_AWAY_ONLY)
     return flat
 
 
@@ -360,6 +398,13 @@ class ShuttersHubOptionsFlow(OptionsFlow):
             ),
             CONF_SEQUENTIAL_COVERS: self.config_entry.data.get(
                 CONF_SEQUENTIAL_COVERS, DEFAULT_SEQUENTIAL_COVERS
+            ),
+            CONF_TTS_ENGINE: self.config_entry.data.get(CONF_TTS_ENGINE) or "",
+            CONF_TTS_TARGETS: self.config_entry.data.get(
+                CONF_TTS_TARGETS, DEFAULT_TTS_TARGETS
+            ),
+            CONF_TTS_WHEN_AWAY_ONLY: self.config_entry.data.get(
+                CONF_TTS_WHEN_AWAY_ONLY, DEFAULT_TTS_WHEN_AWAY_ONLY
             ),
         }
         return self.async_show_form(
