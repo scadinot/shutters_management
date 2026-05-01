@@ -15,7 +15,7 @@ utilisateurs.
 
 | Horizon | Objectif principal | Effort estimé |
 |---|---|---|
-| [Statut actuel](#statut-actuel) | Version courante v0.4.1 — voir CHANGELOG pour l'historique | livré |
+| [Statut actuel](#statut-actuel) | Version courante v0.4.2 — voir CHANGELOG pour l'historique | livré |
 | [Moyen terme](#moyen-terme--fonctionnalités-v030) | Profils horaires, déclencheurs solaires, multi-instance | quelques jours par lot |
 | [Long terme](#long-terme--stabilisation-v10) | Templates, notifications, statistiques, API publique stabilisée | plusieurs semaines |
 | [Pistes exploratoires](#pistes-exploratoires) | Météo, luminosité, jours fériés, ouverture partielle | à évaluer au cas par cas |
@@ -24,7 +24,7 @@ utilisateurs.
 
 ## Statut actuel
 
-La version courante est **v0.4.1**. Pour la liste des fonctionnalités
+La version courante est **v0.4.2**. Pour la liste des fonctionnalités
 déjà disponibles, voir la section [Fonctionnalités](README.md#fonctionnalités)
 du README. Pour l'historique détaillé des versions livrées, voir le
 [CHANGELOG.md](CHANGELOG.md).

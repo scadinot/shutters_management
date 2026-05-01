@@ -91,23 +91,40 @@ RUN_NOW_SCHEMA = vol.Schema(
 )
 
 
-_NOTIFY_MESSAGES: dict[str, dict[str, str]] = {
+_NOTIFY_HEADERS: dict[str, dict[str, str]] = {
     "fr": {
-        ACTION_OPEN: "Volets ouverts ({count})",
-        ACTION_CLOSE: "Volets fermés ({count})",
+        ACTION_OPEN: "Volets ouverts :",
+        ACTION_CLOSE: "Volets fermés :",
     },
     "en": {
-        ACTION_OPEN: "Shutters opened ({count})",
-        ACTION_CLOSE: "Shutters closed ({count})",
+        ACTION_OPEN: "Shutters opened:",
+        ACTION_CLOSE: "Shutters closed:",
     },
 }
 
 
-def _notify_message(language: str, action: str, count: int) -> str:
-    """Localized notification message; ``en`` fallback for other locales."""
-    bucket = _NOTIFY_MESSAGES.get(language, _NOTIFY_MESSAGES["en"])
-    template = bucket.get(action, _NOTIFY_MESSAGES["en"][action])
-    return template.format(count=count)
+def _notify_message(
+    hass: HomeAssistant, language: str, action: str, processed_covers: list[str]
+) -> str:
+    """Build the localized notification body.
+
+    The body lists each cover in **processing order** — i.e. the order
+    in which the scheduler actually fired ``cover.<service>`` (the
+    shuffled order in sequential mode, the configuration order in
+    batched mode). Each cover is rendered using its ``friendly_name``
+    when available, with the ``entity_id`` as a fallback.
+    """
+    bucket = _NOTIFY_HEADERS.get(language, _NOTIFY_HEADERS["en"])
+    header = bucket.get(action, _NOTIFY_HEADERS["en"][action])
+    lines = [header]
+    for entity_id in processed_covers:
+        state = hass.states.get(entity_id)
+        if state is not None:
+            friendly = state.attributes.get("friendly_name")
+            lines.append(friendly or entity_id)
+        else:
+            lines.append(entity_id)
+    return "\n".join(lines)
 
 
 def _parse_time(value: str | time) -> time:
@@ -596,32 +613,44 @@ class ShuttersScheduler:
         )
 
         if sequential:
-            await self._async_call_sequential(service, covers)
+            processed = list(covers)
+            random.shuffle(processed)
+            _LOGGER.debug(
+                "Sequential cover.%s on %s (random order)", service, processed
+            )
+            await self._async_call_sequential(service, processed)
         else:
+            processed = list(covers)
             await self.hass.services.async_call(
                 "cover",
                 service,
-                {ATTR_ENTITY_ID: covers},
+                {ATTR_ENTITY_ID: processed},
                 blocking=False,
             )
-            _LOGGER.info("Called cover.%s on %s", service, covers)
+            _LOGGER.info("Called cover.%s on %s", service, processed)
 
-        await self._async_send_notifications(service, covers)
+        # If we got unloaded mid-call (sequential mode aborts on
+        # subentry remove / HA shutdown), don't notify or signal: the
+        # subentry is being torn down and the notification would list
+        # covers that may not all have been actioned anyway.
+        if self.hass.data.get(DOMAIN, {}).get(self.subentry_id) is not self:
+            return
+
+        await self._async_send_notifications(service, processed)
         async_dispatcher_send(self.hass, signal_state_update(self.subentry_id))
 
     async def _async_call_sequential(
-        self, service: str, covers: list[str]
+        self, service: str, ordered: list[str]
     ) -> None:
-        """Run ``cover.<service>`` on each cover in random order, in turn."""
+        """Run ``cover.<service>`` on each cover in the given order, in turn.
+
+        ``ordered`` is the already-shuffled list; the caller owns the
+        shuffling so it can pass the same list down to the notification
+        hook (so the body lists covers in processing order).
+        """
         target_state = (
             STATE_OPEN if service == SERVICE_OPEN_COVER else STATE_CLOSED
         )
-        ordered = list(covers)
-        random.shuffle(ordered)
-        _LOGGER.debug(
-            "Sequential cover.%s on %s (random order)", service, ordered
-        )
-
         for entity_id in ordered:
             # If the scheduler was unloaded mid-sequence (entry remove,
             # HA shutdown, ...), bail out cleanly.
@@ -686,9 +715,13 @@ class ShuttersScheduler:
             unsub()
 
     async def _async_send_notifications(
-        self, cover_service: str, covers: list[str]
+        self, cover_service: str, processed_covers: list[str]
     ) -> None:
         """Notify each configured ``notify.*`` service about the action.
+
+        ``processed_covers`` is the list of covers in the order the
+        scheduler actually fired them — that's the order the user sees
+        in the notification body, line by line.
 
         Settings are read from the hub entry on every call (not cached)
         so that the hub options flow takes effect without a reload.
@@ -711,7 +744,7 @@ class ShuttersScheduler:
         action = ACTION_OPEN if cover_service == SERVICE_OPEN_COVER else ACTION_CLOSE
         title = self.subentry.title
         message = _notify_message(
-            self.hass.config.language, action, len(covers)
+            self.hass, self.hass.config.language, action, processed_covers
         )
 
         for target in targets:

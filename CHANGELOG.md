@@ -6,6 +6,49 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le pr
 
 ## [Non publié]
 
+## [0.4.2] — 2026-05-01
+
+### Modifié
+
+- **Format des notifications** : le corps du message liste désormais
+  **chaque volet sur sa propre ligne**, dans **l'ordre où le scheduler
+  les a réellement actionnés** (= ordre du `random.shuffle` en mode
+  séquentiel, ordre de la configuration en mode parallèle). Le
+  comptage `(N)` est remplacé par cette énumération nominative.
+  - Avant (v0.4.1) : `Volets ouverts (3)`
+  - Après (v0.4.2) :
+    ```
+    Volets ouverts :
+    Bureau gauche
+    Bureau droit
+    Bureau fond
+    ```
+- Chaque volet est rendu via son `friendly_name` (celui que l'on voit
+  dans Lovelace), avec fallback sur l'`entity_id` si le state n'est
+  pas disponible ou n'expose pas de `friendly_name`. Localisation
+  FR/EN inchangée.
+- Bump `manifest.json` : `0.4.1` → `0.4.2`.
+
+### Tests
+
+- `tests/test_notifications.py` enrichi : assertion ligne par ligne
+  sur le nouveau format, nouveau test
+  `test_notification_lists_covers_in_processing_order` qui verrouille
+  l'ordre du shuffle dans le body, nouveau test
+  `test_notification_falls_back_to_entity_id_without_friendly_name`
+  pour le fallback.
+- Suite complète : **76 tests verts** (74 + 2).
+
+### Pourquoi ce changement
+
+Une notification « Volets ouverts (3) » indique qu'il s'est passé
+quelque chose mais ne dit pas **lesquels** ; sur une instance qui
+contrôle 5–6 volets, l'utilisateur préfère savoir que c'est bien
+« Salon + Cuisine + Chambre 1 » plutôt qu'un compteur opaque.
+L'ordre traité est aussi exposé pour permettre de déboguer un
+réseau radio capricieux : si le 3ᵉ volet a un comportement bizarre,
+on voit dans la notif qu'il est bien passé en 3ᵉ position.
+
 ## [0.4.1] — 2026-05-01
 
 ### Ajouté
