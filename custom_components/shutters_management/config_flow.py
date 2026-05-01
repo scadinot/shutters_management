@@ -106,7 +106,7 @@ def _build_hub_schema(
     The ``defaults`` dict can be **either** flat (e.g. fresh ``user_input``
     from a previous validation pass) **or** already nested under the
     section keys (e.g. when re-rendering after the user opened a section).
-    ``_section_defaults`` handles both shapes transparently.
+    ``_section_default`` handles both shapes transparently.
     """
 
     away_only_section = data_entry_flow.section(

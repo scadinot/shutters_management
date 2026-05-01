@@ -21,6 +21,9 @@ from custom_components.shutters_management.const import (
     CONF_OPEN_TIME,
     CONF_RANDOMIZE,
     CONF_RANDOM_MAX_MINUTES,
+    CONF_SEQUENTIAL_COVERS,
+    CONF_TTS_TARGETS,
+    CONF_TTS_WHEN_AWAY_ONLY,
     CONF_TYPE,
     DAYS,
     DEFAULT_CLOSE_MODE,
@@ -83,13 +86,13 @@ async def test_hub_user_flow_creates_singleton(hass: HomeAssistant) -> None:
     result = await hass.config_entries.flow.async_configure(
         result["flow_id"],
         user_input={
-            "sequential_covers": False,
+            CONF_SEQUENTIAL_COVERS: False,
             "away_only": {
                 CONF_NOTIFY_WHEN_AWAY_ONLY: False,
-                "tts_when_away_only": False,
+                CONF_TTS_WHEN_AWAY_ONLY: False,
             },
             "notifications": {CONF_NOTIFY_SERVICES: []},
-            "voice_announcement": {"tts_targets": []},
+            "voice_announcement": {CONF_TTS_TARGETS: []},
         },
     )
     assert result["type"] == FlowResultType.CREATE_ENTRY
@@ -124,15 +127,15 @@ async def test_hub_options_flow_updates_notification_settings(
     result = await hass.config_entries.options.async_configure(
         result["flow_id"],
         user_input={
-            "sequential_covers": False,
+            CONF_SEQUENTIAL_COVERS: False,
             "away_only": {
                 CONF_NOTIFY_WHEN_AWAY_ONLY: True,
-                "tts_when_away_only": False,
+                CONF_TTS_WHEN_AWAY_ONLY: False,
             },
             "notifications": {
                 CONF_NOTIFY_SERVICES: ["notify.persistent_notification"],
             },
-            "voice_announcement": {"tts_targets": []},
+            "voice_announcement": {CONF_TTS_TARGETS: []},
         },
     )
     assert result["type"] == FlowResultType.CREATE_ENTRY
