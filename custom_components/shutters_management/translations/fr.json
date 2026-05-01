@@ -6,7 +6,8 @@
         "description": "Configurer les paramètres de notification partagés. Vous ajouterez ensuite des plannings de volets en créant des instances sur le hub de l'intégration.",
         "data": {
           "notify_services": "Services de notification à appeler après chaque action (laisser vide pour désactiver)",
-          "notify_when_away_only": "Notifier uniquement en mode absence"
+          "notify_when_away_only": "Notifier uniquement en mode absence",
+          "sequential_covers": "Actionner les volets l'un après l'autre, dans un ordre aléatoire (attend la fin de chaque volet avant de démarrer le suivant)"
         }
       }
     },
@@ -21,7 +22,8 @@
         "description": "Mettre à jour les paramètres de notification partagés.",
         "data": {
           "notify_services": "Services de notification à appeler après chaque action (laisser vide pour désactiver)",
-          "notify_when_away_only": "Notifier uniquement en mode absence"
+          "notify_when_away_only": "Notifier uniquement en mode absence",
+          "sequential_covers": "Actionner les volets l'un après l'autre, dans un ordre aléatoire (attend la fin de chaque volet avant de démarrer le suivant)"
         }
       }
     }

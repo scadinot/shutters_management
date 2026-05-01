@@ -1,6 +1,7 @@
 """Shutters Management integration."""
 from __future__ import annotations
 
+import asyncio
 import logging
 import random
 from collections.abc import Callable
@@ -16,6 +17,8 @@ from homeassistant.const import (
     CONF_NAME,
     SERVICE_CLOSE_COVER,
     SERVICE_OPEN_COVER,
+    STATE_CLOSED,
+    STATE_OPEN,
     SUN_EVENT_SUNRISE,
     SUN_EVENT_SUNSET,
 )
@@ -24,6 +27,7 @@ from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.helpers.event import (
     async_call_later,
+    async_track_state_change_event,
     async_track_sunrise,
     async_track_sunset,
     async_track_time_change,
@@ -50,7 +54,9 @@ from .const import (
     CONF_PRESENCE_ENTITY,
     CONF_RANDOMIZE,
     CONF_RANDOM_MAX_MINUTES,
+    CONF_SEQUENTIAL_COVERS,
     CONF_TYPE,
+    COVER_ACTION_TIMEOUT_SECONDS,
     DAYS,
     DEFAULT_CLOSE_MODE,
     DEFAULT_CLOSE_OFFSET,
@@ -59,6 +65,7 @@ from .const import (
     DEFAULT_OPEN_MODE,
     DEFAULT_OPEN_OFFSET,
     DEFAULT_RANDOM_MAX_MINUTES,
+    DEFAULT_SEQUENTIAL_COVERS,
     DOMAIN,
     HUB_TITLE,
     HUB_UNIQUE_ID,
@@ -564,20 +571,119 @@ class ShuttersScheduler:
         await self._async_call(service)
 
     async def _async_call(self, service: str) -> None:
-        """Invoke the cover service for all configured entities."""
+        """Invoke the cover service on all configured entities.
+
+        Two modes, gated by the hub-level ``sequential_covers`` toggle:
+
+        * **Parallel** (default): one batched ``cover.<service>`` call on
+          the whole list; HA dispatches immediately, no waiting.
+        * **Sequential**: shuffle the list, then for each cover issue
+          its own ``blocking=True`` call and wait for the cover state
+          to reach the action's target (``open`` / ``closed``) before
+          moving on. A per-cover timeout
+          (``COVER_ACTION_TIMEOUT_SECONDS``) prevents a stuck or
+          stateless cover from blocking the queue indefinitely.
+
+        In both modes, notifications fire **once** at the end (one
+        message for the whole batch, not one per cover).
+        """
         covers = self._settings.get(CONF_COVERS, [])
         if not covers:
             return
 
-        await self.hass.services.async_call(
-            "cover",
-            service,
-            {ATTR_ENTITY_ID: covers},
-            blocking=False,
+        sequential = self.hub_entry.data.get(
+            CONF_SEQUENTIAL_COVERS, DEFAULT_SEQUENTIAL_COVERS
         )
-        _LOGGER.info("Called cover.%s on %s", service, covers)
+
+        if sequential:
+            await self._async_call_sequential(service, covers)
+        else:
+            await self.hass.services.async_call(
+                "cover",
+                service,
+                {ATTR_ENTITY_ID: covers},
+                blocking=False,
+            )
+            _LOGGER.info("Called cover.%s on %s", service, covers)
+
         await self._async_send_notifications(service, covers)
         async_dispatcher_send(self.hass, signal_state_update(self.subentry_id))
+
+    async def _async_call_sequential(
+        self, service: str, covers: list[str]
+    ) -> None:
+        """Run ``cover.<service>`` on each cover in random order, in turn."""
+        target_state = (
+            STATE_OPEN if service == SERVICE_OPEN_COVER else STATE_CLOSED
+        )
+        ordered = list(covers)
+        random.shuffle(ordered)
+        _LOGGER.debug(
+            "Sequential cover.%s on %s (random order)", service, ordered
+        )
+
+        for entity_id in ordered:
+            # If the scheduler was unloaded mid-sequence (entry remove,
+            # HA shutdown, ...), bail out cleanly.
+            if self.hass.data.get(DOMAIN, {}).get(self.subentry_id) is not self:
+                _LOGGER.debug(
+                    "Aborting sequential cover sequence: scheduler unloaded"
+                )
+                return
+            await self.hass.services.async_call(
+                "cover",
+                service,
+                {ATTR_ENTITY_ID: entity_id},
+                blocking=True,
+            )
+            _LOGGER.info("Called cover.%s on %s", service, entity_id)
+            await self._async_wait_for_cover_state(entity_id, target_state)
+
+    async def _async_wait_for_cover_state(
+        self, entity_id: str, target_state: str
+    ) -> None:
+        """Wait until ``entity_id`` reaches ``target_state`` or times out.
+
+        Subscribes to state-change events first, *then* re-reads the
+        current state. This ordering closes the (theoretical, on
+        cooperative scheduling) race window where the cover could flip
+        to its target between the read and the subscribe — anything
+        that happens before subscribe still triggers a fresh state
+        snapshot here, anything after fires the listener.
+
+        Times out after ``COVER_ACTION_TIMEOUT_SECONDS`` if the cover
+        never publishes a final state (some minimalist drivers don't);
+        the timeout is logged at warning level and the queue moves on
+        to the next cover.
+        """
+        finished = asyncio.Event()
+
+        @callback
+        def _on_state_change(event) -> None:
+            new_state = event.data.get("new_state")
+            if new_state is not None and new_state.state == target_state:
+                finished.set()
+
+        unsub = async_track_state_change_event(
+            self.hass, [entity_id], _on_state_change
+        )
+        try:
+            current = self.hass.states.get(entity_id)
+            if current is not None and current.state == target_state:
+                return
+            await asyncio.wait_for(
+                finished.wait(), timeout=COVER_ACTION_TIMEOUT_SECONDS
+            )
+        except TimeoutError:
+            _LOGGER.warning(
+                "Cover %s did not reach state %s within %s seconds; "
+                "continuing with the next cover",
+                entity_id,
+                target_state,
+                COVER_ACTION_TIMEOUT_SECONDS,
+            )
+        finally:
+            unsub()
 
     async def _async_send_notifications(
         self, cover_service: str, covers: list[str]
