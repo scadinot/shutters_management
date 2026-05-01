@@ -644,17 +644,18 @@ class ShuttersScheduler:
     ) -> None:
         """Wait until ``entity_id`` reaches ``target_state`` or times out.
 
-        Returns immediately if the cover is already in the target state
-        (basic on/off covers may flip synchronously). Otherwise listens
-        on the entity's state change events and waits up to
-        ``COVER_ACTION_TIMEOUT_SECONDS``. A timeout is logged at warning
-        level but does not raise — the next cover in the queue still
-        runs.
-        """
-        current = self.hass.states.get(entity_id)
-        if current is not None and current.state == target_state:
-            return
+        Subscribes to state-change events first, *then* re-reads the
+        current state. This ordering closes the (theoretical, on
+        cooperative scheduling) race window where the cover could flip
+        to its target between the read and the subscribe — anything
+        that happens before subscribe still triggers a fresh state
+        snapshot here, anything after fires the listener.
 
+        Times out after ``COVER_ACTION_TIMEOUT_SECONDS`` if the cover
+        never publishes a final state (some minimalist drivers don't);
+        the timeout is logged at warning level and the queue moves on
+        to the next cover.
+        """
         finished = asyncio.Event()
 
         @callback
@@ -667,6 +668,9 @@ class ShuttersScheduler:
             self.hass, [entity_id], _on_state_change
         )
         try:
+            current = self.hass.states.get(entity_id)
+            if current is not None and current.state == target_state:
+                return
             await asyncio.wait_for(
                 finished.wait(), timeout=COVER_ACTION_TIMEOUT_SECONDS
             )

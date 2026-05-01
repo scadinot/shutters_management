@@ -3,7 +3,6 @@ from __future__ import annotations
 
 from unittest.mock import patch
 
-import pytest
 from homeassistant.const import SERVICE_CLOSE_COVER, SERVICE_OPEN_COVER
 from homeassistant.core import HomeAssistant
 from pytest_homeassistant_custom_component.common import async_mock_service
