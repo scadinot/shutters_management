@@ -76,6 +76,11 @@ from .const import (
 
 SECTION_OPEN = "open"
 SECTION_CLOSE = "close"
+SECTION_AWAY_ONLY = "away_only"
+SECTION_NOTIFICATIONS = "notifications"
+SECTION_VOICE_ANNOUNCEMENT = "voice_announcement"
+
+_HUB_SECTIONS = (SECTION_AWAY_ONLY, SECTION_NOTIFICATIONS, SECTION_VOICE_ANNOUNCEMENT)
 
 
 def _available_notify_services(hass: HomeAssistant | None) -> list[str]:
@@ -89,58 +94,137 @@ def _available_notify_services(hass: HomeAssistant | None) -> list[str]:
 def _build_hub_schema(
     hass: HomeAssistant | None, defaults: dict[str, Any]
 ) -> vol.Schema:
-    """Schema for the hub: shared notification settings only."""
+    """Schema for the hub: scheduler option + 3 collapsible notification sections.
+
+    Layout (top → bottom):
+
+    1. ``sequential_covers`` (top-level toggle, scheduler behaviour).
+    2. Section ``away_only`` — two independent toggles, one per channel.
+    3. Section ``notifications`` — push notifications config.
+    4. Section ``voice_announcement`` — TTS engine + speakers.
+
+    The ``defaults`` dict can be **either** flat (e.g. fresh ``user_input``
+    from a previous validation pass) **or** already nested under the
+    section keys (e.g. when re-rendering after the user opened a section).
+    ``_section_defaults`` handles both shapes transparently.
+    """
+
+    away_only_section = data_entry_flow.section(
+        vol.Schema(
+            {
+                vol.Required(
+                    CONF_NOTIFY_WHEN_AWAY_ONLY,
+                    default=_section_default(
+                        defaults,
+                        SECTION_AWAY_ONLY,
+                        CONF_NOTIFY_WHEN_AWAY_ONLY,
+                        DEFAULT_NOTIFY_WHEN_AWAY_ONLY,
+                    ),
+                ): selector.BooleanSelector(),
+                vol.Required(
+                    CONF_TTS_WHEN_AWAY_ONLY,
+                    default=_section_default(
+                        defaults,
+                        SECTION_AWAY_ONLY,
+                        CONF_TTS_WHEN_AWAY_ONLY,
+                        DEFAULT_TTS_WHEN_AWAY_ONLY,
+                    ),
+                ): selector.BooleanSelector(),
+            }
+        ),
+        {"collapsed": False},
+    )
+
+    notifications_section = data_entry_flow.section(
+        vol.Schema(
+            {
+                vol.Optional(
+                    CONF_NOTIFY_SERVICES,
+                    default=_section_default(
+                        defaults,
+                        SECTION_NOTIFICATIONS,
+                        CONF_NOTIFY_SERVICES,
+                        DEFAULT_NOTIFY_SERVICES,
+                    ),
+                ): selector.SelectSelector(
+                    selector.SelectSelectorConfig(
+                        options=_available_notify_services(hass),
+                        multiple=True,
+                        custom_value=True,
+                        mode=selector.SelectSelectorMode.DROPDOWN,
+                    )
+                ),
+            }
+        ),
+        {"collapsed": False},
+    )
+
+    tts_section = data_entry_flow.section(
+        vol.Schema(
+            {
+                vol.Optional(
+                    CONF_TTS_ENGINE,
+                    description={
+                        "suggested_value": _section_default(
+                            defaults,
+                            SECTION_VOICE_ANNOUNCEMENT,
+                            CONF_TTS_ENGINE,
+                            "",
+                        )
+                    },
+                ): selector.EntitySelector(
+                    selector.EntitySelectorConfig(domain="tts")
+                ),
+                vol.Optional(
+                    CONF_TTS_TARGETS,
+                    default=_section_default(
+                        defaults,
+                        SECTION_VOICE_ANNOUNCEMENT,
+                        CONF_TTS_TARGETS,
+                        DEFAULT_TTS_TARGETS,
+                    ),
+                ): selector.EntitySelector(
+                    selector.EntitySelectorConfig(
+                        domain="media_player", multiple=True
+                    )
+                ),
+            }
+        ),
+        {"collapsed": False},
+    )
+
     return vol.Schema(
         {
-            vol.Optional(
-                CONF_NOTIFY_SERVICES,
-                default=defaults.get(
-                    CONF_NOTIFY_SERVICES, DEFAULT_NOTIFY_SERVICES
-                ),
-            ): selector.SelectSelector(
-                selector.SelectSelectorConfig(
-                    options=_available_notify_services(hass),
-                    multiple=True,
-                    custom_value=True,
-                    mode=selector.SelectSelectorMode.DROPDOWN,
-                )
-            ),
-            vol.Required(
-                CONF_NOTIFY_WHEN_AWAY_ONLY,
-                default=defaults.get(
-                    CONF_NOTIFY_WHEN_AWAY_ONLY, DEFAULT_NOTIFY_WHEN_AWAY_ONLY
-                ),
-            ): selector.BooleanSelector(),
             vol.Required(
                 CONF_SEQUENTIAL_COVERS,
                 default=defaults.get(
                     CONF_SEQUENTIAL_COVERS, DEFAULT_SEQUENTIAL_COVERS
                 ),
             ): selector.BooleanSelector(),
-            vol.Optional(
-                CONF_TTS_ENGINE,
-                description={
-                    "suggested_value": defaults.get(CONF_TTS_ENGINE, "")
-                },
-            ): selector.EntitySelector(
-                selector.EntitySelectorConfig(domain="tts")
-            ),
-            vol.Optional(
-                CONF_TTS_TARGETS,
-                default=defaults.get(CONF_TTS_TARGETS, DEFAULT_TTS_TARGETS),
-            ): selector.EntitySelector(
-                selector.EntitySelectorConfig(
-                    domain="media_player", multiple=True
-                )
-            ),
-            vol.Required(
-                CONF_TTS_WHEN_AWAY_ONLY,
-                default=defaults.get(
-                    CONF_TTS_WHEN_AWAY_ONLY, DEFAULT_TTS_WHEN_AWAY_ONLY
-                ),
-            ): selector.BooleanSelector(),
+            vol.Required(SECTION_AWAY_ONLY): away_only_section,
+            vol.Required(SECTION_NOTIFICATIONS): notifications_section,
+            vol.Required(SECTION_VOICE_ANNOUNCEMENT): tts_section,
         }
     )
+
+
+def _section_default(
+    defaults: dict[str, Any], section: str, key: str, fallback: Any
+) -> Any:
+    """Read a nested section value with a flat-fallback.
+
+    Accepts both shapes so we can render the schema from either:
+
+    * Newly-built defaults (already nested by section).
+    * Legacy flat data (e.g. a hub entry created in v0.4.3 or earlier
+      where every field sat at the top level of ``entry.data``).
+    """
+    section_block = defaults.get(section)
+    if isinstance(section_block, dict) and key in section_block:
+        return section_block[key]
+    if key in defaults:
+        return defaults[key]
+    return fallback
 
 
 def _build_instance_schema(
@@ -291,15 +375,27 @@ def _normalize_instance(user_input: dict[str, Any]) -> dict[str, Any]:
 
 
 def _normalize_hub(user_input: dict[str, Any]) -> dict[str, Any]:
-    """Normalize hub user input.
+    """Flatten section sub-dicts and harden multi-value fields.
 
-    ``notify_services`` is a multi-select but the selector with
-    ``custom_value=True`` may, in edge cases, deliver a single string
-    rather than a list. Wrap that case explicitly to avoid the silent
-    bug where ``list("notify.iphone")`` would expand to a list of
-    characters.
+    The hub form ships its three notification-related blocks inside HA
+    ``data_entry_flow.section`` containers. After submission they come
+    back as ``{section_key: {field: value}, ...}``; we flatten them so
+    the rest of the integration keeps reading flat ``hub_entry.data``
+    keys (``CONF_NOTIFY_SERVICES``, ``CONF_TTS_ENGINE``, ...).
+
+    ``notify_services`` and ``tts_targets`` are multi-selects but their
+    selectors (with ``custom_value=True``) may, in edge cases, deliver
+    a single string rather than a list. Wrap that case explicitly to
+    avoid the silent bug where ``list("notify.iphone")`` would expand
+    into a list of characters.
     """
-    flat = dict(user_input)
+    flat: dict[str, Any] = {}
+    for key, value in user_input.items():
+        if key in _HUB_SECTIONS and isinstance(value, dict):
+            flat.update(value)
+        else:
+            flat[key] = value
+
     services = flat.get(CONF_NOTIFY_SERVICES)
     if not services:
         flat[CONF_NOTIFY_SERVICES] = []

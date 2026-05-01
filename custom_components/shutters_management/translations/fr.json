@@ -5,12 +5,29 @@
         "title": "Shutters Management",
         "description": "Configurer les paramètres de notification partagés. Vous ajouterez ensuite des plannings de volets en créant des instances sur le hub de l'intégration.",
         "data": {
-          "notify_services": "Services de notification à appeler après chaque action (laisser vide pour désactiver)",
-          "notify_when_away_only": "Notifier uniquement en mode absence",
-          "sequential_covers": "Actionner les volets l'un après l'autre, dans un ordre aléatoire (attend la fin de chaque volet avant de démarrer le suivant)",
-          "tts_engine": "Moteur d'annonce vocale (TTS)",
-          "tts_targets": "Enceintes connectées pour les annonces (laisser vide pour désactiver)",
-          "tts_when_away_only": "Annoncer uniquement en mode absence"
+          "sequential_covers": "Actionner les volets l'un après l'autre, dans un ordre aléatoire (attend la fin de chaque volet avant de démarrer le suivant)"
+        },
+        "sections": {
+          "away_only": {
+            "name": "Notifier uniquement en mode absence",
+            "data": {
+              "notify_when_away_only": "Appliquer aux services de notification",
+              "tts_when_away_only": "Appliquer aux annonces vocales"
+            }
+          },
+          "notifications": {
+            "name": "Services de notification",
+            "data": {
+              "notify_services": "Services de notification à appeler après chaque action (laisser vide pour désactiver)"
+            }
+          },
+          "voice_announcement": {
+            "name": "Annonce vocale",
+            "data": {
+              "tts_engine": "Moteur d'annonce vocale (TTS)",
+              "tts_targets": "Enceintes connectées pour les annonces (laisser vide pour désactiver)"
+            }
+          }
         }
       }
     },
@@ -24,12 +41,29 @@
         "title": "Modifier les notifications",
         "description": "Mettre à jour les paramètres de notification partagés.",
         "data": {
-          "notify_services": "Services de notification à appeler après chaque action (laisser vide pour désactiver)",
-          "notify_when_away_only": "Notifier uniquement en mode absence",
-          "sequential_covers": "Actionner les volets l'un après l'autre, dans un ordre aléatoire (attend la fin de chaque volet avant de démarrer le suivant)",
-          "tts_engine": "Moteur d'annonce vocale (TTS)",
-          "tts_targets": "Enceintes connectées pour les annonces (laisser vide pour désactiver)",
-          "tts_when_away_only": "Annoncer uniquement en mode absence"
+          "sequential_covers": "Actionner les volets l'un après l'autre, dans un ordre aléatoire (attend la fin de chaque volet avant de démarrer le suivant)"
+        },
+        "sections": {
+          "away_only": {
+            "name": "Notifier uniquement en mode absence",
+            "data": {
+              "notify_when_away_only": "Appliquer aux services de notification",
+              "tts_when_away_only": "Appliquer aux annonces vocales"
+            }
+          },
+          "notifications": {
+            "name": "Services de notification",
+            "data": {
+              "notify_services": "Services de notification à appeler après chaque action (laisser vide pour désactiver)"
+            }
+          },
+          "voice_announcement": {
+            "name": "Annonce vocale",
+            "data": {
+              "tts_engine": "Moteur d'annonce vocale (TTS)",
+              "tts_targets": "Enceintes connectées pour les annonces (laisser vide pour désactiver)"
+            }
+          }
         }
       }
     }
@@ -46,7 +80,8 @@
         "no_days": "Sélectionnez au moins un jour."
       },
       "abort": {
-        "already_configured": "Une instance portant ce nom est déjà configurée."
+        "already_configured": "Une instance portant ce nom est déjà configurée.",
+        "reconfigure_successful": "Configuration mise à jour."
       },
       "step": {
         "user": {

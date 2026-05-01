@@ -68,7 +68,12 @@ def _valid_instance_input(**overrides):
 
 
 async def test_hub_user_flow_creates_singleton(hass: HomeAssistant) -> None:
-    """The hub flow creates one entry with shared notification settings."""
+    """The hub flow creates one entry with shared notification settings.
+
+    The form is laid out in 3 collapsible HA sections (``away_only``,
+    ``notifications``, ``voice_announcement``) plus the top-level
+    ``sequential_covers`` toggle, so user_input must mirror that shape.
+    """
     result = await hass.config_entries.flow.async_init(
         DOMAIN, context={"source": SOURCE_USER}
     )
@@ -78,13 +83,19 @@ async def test_hub_user_flow_creates_singleton(hass: HomeAssistant) -> None:
     result = await hass.config_entries.flow.async_configure(
         result["flow_id"],
         user_input={
-            CONF_NOTIFY_SERVICES: [],
-            CONF_NOTIFY_WHEN_AWAY_ONLY: False,
+            "sequential_covers": False,
+            "away_only": {
+                CONF_NOTIFY_WHEN_AWAY_ONLY: False,
+                "tts_when_away_only": False,
+            },
+            "notifications": {CONF_NOTIFY_SERVICES: []},
+            "voice_announcement": {"tts_targets": []},
         },
     )
     assert result["type"] == FlowResultType.CREATE_ENTRY
     assert result["title"] == HUB_TITLE
     assert result["data"][CONF_TYPE] == TYPE_HUB
+    # _normalize_hub flattens the sections back into a flat dict.
     assert result["data"][CONF_NOTIFY_SERVICES] == []
     assert result["data"][CONF_NOTIFY_WHEN_AWAY_ONLY] is False
 
@@ -113,8 +124,15 @@ async def test_hub_options_flow_updates_notification_settings(
     result = await hass.config_entries.options.async_configure(
         result["flow_id"],
         user_input={
-            CONF_NOTIFY_SERVICES: ["notify.persistent_notification"],
-            CONF_NOTIFY_WHEN_AWAY_ONLY: True,
+            "sequential_covers": False,
+            "away_only": {
+                CONF_NOTIFY_WHEN_AWAY_ONLY: True,
+                "tts_when_away_only": False,
+            },
+            "notifications": {
+                CONF_NOTIFY_SERVICES: ["notify.persistent_notification"],
+            },
+            "voice_announcement": {"tts_targets": []},
         },
     )
     assert result["type"] == FlowResultType.CREATE_ENTRY
