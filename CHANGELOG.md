@@ -6,6 +6,46 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le pr
 
 ## [Non publié]
 
+## [0.4.4] — 2026-05-01
+
+### Modifié
+
+- **Réorganisation du panneau hub** en 3 sections HA repliables, dans
+  l'ordre demandé par les utilisateurs :
+  1. **Notifier uniquement en mode absence** : les deux toggles
+     existants (`notify_when_away_only` et `tts_when_away_only`)
+     groupés visuellement, libellés cette fois comme « Appliquer aux
+     services de notification » et « Appliquer aux annonces vocales ».
+  2. **Services de notification** : champ `notify_services`.
+  3. **Annonce vocale** : champs `tts_engine` et `tts_targets`.
+- Le toggle `sequential_covers` reste au top-level (au-dessus des
+  sections), car il configure le scheduler et non le canal de notif.
+- L'options flow du hub présente la même structure pour rester
+  cohérent.
+- **Données stockées inchangées** : `_normalize_hub` aplatit les
+  sections après soumission, `entry.data` garde sa structure plate
+  v0.4.3 (clés `notify_services`, `notify_when_away_only`, etc.). Les
+  installs existantes continuent donc de marcher tel quel — pas de
+  migration de schéma.
+
+### Ajouté
+
+- **Traduction de `reconfigure_successful`** : après l'édition d'une
+  instance via le bouton « Modifier », HA affiche désormais
+  « Configuration mise à jour. » (FR) ou « Configuration updated. »
+  (EN) au lieu de la clé technique brute. Couvert par
+  `config_subentries.instance.abort.reconfigure_successful` dans
+  `strings.json` + `translations/{en,fr}.json`.
+
+### Tests
+
+- Adaptation des deux tests `test_hub_user_flow_creates_singleton` et
+  `test_hub_options_flow_updates_notification_settings` pour soumettre
+  un `user_input` imbriqué par section (le flatten fait par
+  `_normalize_hub` est testé indirectement via les assertions sur
+  `entry.data`, qui reste plate).
+- Suite complète : **88 tests verts**.
+
 ## [0.4.3] — 2026-05-01
 
 ### Ajouté

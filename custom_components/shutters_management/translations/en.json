@@ -5,12 +5,29 @@
         "title": "Shutters Management",
         "description": "Configure shared notification settings. Add shutter schedules afterwards by adding instances on the integration's hub.",
         "data": {
-          "notify_services": "Notification services to call after each action (leave empty to disable)",
-          "notify_when_away_only": "Notify only when away",
-          "sequential_covers": "Operate covers one at a time, in random order (waits for each cover to finish before starting the next)",
-          "tts_engine": "Voice announcement engine (TTS)",
-          "tts_targets": "Smart speakers to announce on (leave empty to disable)",
-          "tts_when_away_only": "Announce only when away"
+          "sequential_covers": "Operate covers one at a time, in random order (waits for each cover to finish before starting the next)"
+        },
+        "sections": {
+          "away_only": {
+            "name": "Notify only when away",
+            "data": {
+              "notify_when_away_only": "Apply to notification services",
+              "tts_when_away_only": "Apply to voice announcements"
+            }
+          },
+          "notifications": {
+            "name": "Notification services",
+            "data": {
+              "notify_services": "Notification services to call after each action (leave empty to disable)"
+            }
+          },
+          "voice_announcement": {
+            "name": "Voice announcement",
+            "data": {
+              "tts_engine": "Voice announcement engine (TTS)",
+              "tts_targets": "Smart speakers to announce on (leave empty to disable)"
+            }
+          }
         }
       }
     },
@@ -24,12 +41,29 @@
         "title": "Edit notifications",
         "description": "Update the shared notification settings.",
         "data": {
-          "notify_services": "Notification services to call after each action (leave empty to disable)",
-          "notify_when_away_only": "Notify only when away",
-          "sequential_covers": "Operate covers one at a time, in random order (waits for each cover to finish before starting the next)",
-          "tts_engine": "Voice announcement engine (TTS)",
-          "tts_targets": "Smart speakers to announce on (leave empty to disable)",
-          "tts_when_away_only": "Announce only when away"
+          "sequential_covers": "Operate covers one at a time, in random order (waits for each cover to finish before starting the next)"
+        },
+        "sections": {
+          "away_only": {
+            "name": "Notify only when away",
+            "data": {
+              "notify_when_away_only": "Apply to notification services",
+              "tts_when_away_only": "Apply to voice announcements"
+            }
+          },
+          "notifications": {
+            "name": "Notification services",
+            "data": {
+              "notify_services": "Notification services to call after each action (leave empty to disable)"
+            }
+          },
+          "voice_announcement": {
+            "name": "Voice announcement",
+            "data": {
+              "tts_engine": "Voice announcement engine (TTS)",
+              "tts_targets": "Smart speakers to announce on (leave empty to disable)"
+            }
+          }
         }
       }
     }
@@ -46,7 +80,8 @@
         "no_days": "Select at least one day."
       },
       "abort": {
-        "already_configured": "An instance with this name is already configured."
+        "already_configured": "An instance with this name is already configured.",
+        "reconfigure_successful": "Configuration updated."
       },
       "step": {
         "user": {
