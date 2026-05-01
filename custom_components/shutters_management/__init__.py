@@ -629,6 +629,13 @@ class ShuttersScheduler:
             )
             _LOGGER.info("Called cover.%s on %s", service, processed)
 
+        # If we got unloaded mid-call (sequential mode aborts on
+        # subentry remove / HA shutdown), don't notify or signal: the
+        # subentry is being torn down and the notification would list
+        # covers that may not all have been actioned anyway.
+        if self.hass.data.get(DOMAIN, {}).get(self.subentry_id) is not self:
+            return
+
         await self._async_send_notifications(service, processed)
         async_dispatcher_send(self.hass, signal_state_update(self.subentry_id))
 

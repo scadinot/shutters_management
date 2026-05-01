@@ -113,8 +113,6 @@ async def test_notification_lists_covers_in_processing_order(
     hass.states.async_set("cover.middle", "open", {"friendly_name": "Middle"})
     hass.states.async_set("cover.right", "open", {"friendly_name": "Right"})
 
-    from .conftest import build_hub_with_instance
-
     entry = build_hub_with_instance(
         instance_data=base_config,
         hub_data={
@@ -141,6 +139,56 @@ async def test_notification_lists_covers_in_processing_order(
     # Header + 3 covers in reversed order.
     assert body_lines[0].endswith(":")
     assert body_lines[1:] == ["Right", "Middle", "Left"]
+
+
+async def test_no_notification_if_scheduler_unloaded_mid_call(
+    hass: HomeAssistant, base_config
+) -> None:
+    """If the scheduler is torn down mid-sequence, no notification fires.
+
+    This guards the case where the user removes a subentry while one
+    of its sequential cover loops is still walking through the queue:
+    we don't want a stale notification listing covers that won't all
+    have been actioned.
+    """
+    from unittest.mock import patch
+
+    from custom_components.shutters_management.const import (
+        CONF_COVERS,
+        CONF_SEQUENTIAL_COVERS,
+    )
+
+    async_mock_service(hass, "cover", SERVICE_OPEN_COVER)
+    notify_calls = async_mock_service(hass, "notify", "iphone")
+
+    base_config[CONF_COVERS] = ["cover.a"]
+    entry = build_hub_with_instance(
+        instance_data=base_config,
+        hub_data={
+            CONF_NOTIFY_SERVICES: ["notify.iphone"],
+            CONF_SEQUENTIAL_COVERS: True,
+        },
+    )
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    subentry_id = get_only_subentry_id(entry)
+    scheduler = hass.data[DOMAIN][subentry_id]
+
+    # Stand-in for "scheduler unloaded mid-sequence": we replace the
+    # sequential helper with a stub that drops the scheduler from
+    # hass.data without doing any cover work. The post-call presence
+    # check in _async_call must then drop the notification.
+    async def _evict(*_args, **_kwargs):
+        hass.data[DOMAIN].pop(subentry_id, None)
+
+    with patch.object(
+        scheduler, "_async_call_sequential", side_effect=_evict
+    ):
+        await scheduler.async_run_now(ACTION_OPEN)
+        await hass.async_block_till_done()
+
+    assert notify_calls == []
 
 
 async def test_notification_falls_back_to_entity_id_without_friendly_name(

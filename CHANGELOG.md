@@ -45,7 +45,7 @@ Une notification « Volets ouverts (3) » indique qu'il s'est passé
 quelque chose mais ne dit pas **lesquels** ; sur une instance qui
 contrôle 5–6 volets, l'utilisateur préfère savoir que c'est bien
 « Salon + Cuisine + Chambre 1 » plutôt qu'un compteur opaque.
-L'ordre traité est aussi exposé pour permettre de débugger un
+L'ordre traité est aussi exposé pour permettre de déboguer un
 réseau radio capricieux : si le 3ᵉ volet a un comportement bizarre,
 on voit dans la notif qu'il est bien passé en 3ᵉ position.
 
