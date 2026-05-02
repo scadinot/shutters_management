@@ -86,7 +86,19 @@ from .const import (
     SERVICE_PAUSE,
     SERVICE_RESUME,
     SERVICE_RUN_NOW,
+    CONF_ARC,
+    CONF_MIN_ELEVATION,
+    CONF_MIN_UV,
+    CONF_ORIENTATION,
+    CONF_TARGET_POSITION,
+    CONF_UV_ENTITY,
+    DEFAULT_ARC,
+    DEFAULT_MIN_ELEVATION,
+    DEFAULT_MIN_UV,
+    DEFAULT_TARGET_POSITION,
     SUBENTRY_TYPE_INSTANCE,
+    SUBENTRY_TYPE_SUN_PROTECTION,
+    SUN_ENTITY,
     TRIGGER_MODES,
     TYPE_HUB,
     signal_state_update,
@@ -317,11 +329,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         return False
 
     for subentry in entry.subentries.values():
-        if subentry.subentry_type != SUBENTRY_TYPE_INSTANCE:
-            continue
-        scheduler = ShuttersScheduler(hass, entry, subentry)
-        scheduler.async_schedule()
-        hass.data[DOMAIN][subentry.subentry_id] = scheduler
+        if subentry.subentry_type == SUBENTRY_TYPE_INSTANCE:
+            scheduler = ShuttersScheduler(hass, entry, subentry)
+            scheduler.async_schedule()
+            hass.data[DOMAIN][subentry.subentry_id] = scheduler
+        elif subentry.subentry_type == SUBENTRY_TYPE_SUN_PROTECTION:
+            manager = ShuttersSunProtectionManager(hass, entry, subentry)
+            await manager.async_setup()
+            hass.data[DOMAIN][subentry.subentry_id] = manager
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     _async_register_services(hass)
@@ -338,11 +353,13 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         return False
 
     for subentry in entry.subentries.values():
-        scheduler: ShuttersScheduler | None = hass.data.get(DOMAIN, {}).pop(
-            subentry.subentry_id, None
-        )
-        if scheduler is not None:
-            scheduler.async_unschedule()
+        manager = hass.data.get(DOMAIN, {}).pop(subentry.subentry_id, None)
+        if manager is None:
+            continue
+        if isinstance(manager, ShuttersScheduler):
+            manager.async_unschedule()
+        elif isinstance(manager, ShuttersSunProtectionManager):
+            await manager.async_unload()
 
     if not hass.data.get(DOMAIN):
         _async_unregister_services(hass)
@@ -366,12 +383,12 @@ async def _async_update_listener(hass: HomeAssistant, entry: ConfigEntry) -> Non
     current = {
         sub.subentry_id: dict(sub.data)
         for sub in entry.subentries.values()
-        if sub.subentry_type == SUBENTRY_TYPE_INSTANCE
+        if sub.subentry_type in (SUBENTRY_TYPE_INSTANCE, SUBENTRY_TYPE_SUN_PROTECTION)
     }
     loaded = {
-        sid: dict(scheduler.subentry.data)
-        for sid, scheduler in hass.data.get(DOMAIN, {}).items()
-        if scheduler.hub_entry is entry
+        sid: dict(mgr.subentry.data)
+        for sid, mgr in hass.data.get(DOMAIN, {}).items()
+        if mgr.hub_entry is entry
     }
     if current == loaded:
         return
@@ -464,6 +481,228 @@ def _async_unregister_services(hass: HomeAssistant) -> None:
     for service in (SERVICE_RUN_NOW, SERVICE_PAUSE, SERVICE_RESUME):
         if hass.services.has_service(DOMAIN, service):
             hass.services.async_remove(DOMAIN, service)
+
+
+class ShuttersSunProtectionManager:
+    """Manage sun-position-based shutter lowering for one orientation group."""
+
+    def __init__(
+        self,
+        hass: HomeAssistant,
+        hub_entry: ConfigEntry,
+        subentry: ConfigSubentry,
+    ) -> None:
+        self.hass = hass
+        self.hub_entry = hub_entry
+        self.subentry = subentry
+        self._enabled = True
+        self._in_sun_mode = False
+        self._snapshots: dict[str, int] = {}
+        self._applied_positions: dict[str, int] = {}
+        self._unsubs: list[Callable[[], None]] = []
+
+    @property
+    def subentry_id(self) -> str:
+        return self.subentry.subentry_id
+
+    @property
+    def is_enabled(self) -> bool:
+        return self._enabled
+
+    @property
+    def is_active(self) -> bool:
+        return self._in_sun_mode and self._enabled
+
+    @property
+    def status(self) -> str:
+        if not self._enabled:
+            return "disabled"
+        sun_state = self.hass.states.get(SUN_ENTITY)
+        if sun_state is None:
+            return "below_horizon"
+        elevation = sun_state.attributes.get("elevation", 0)
+        azimuth = sun_state.attributes.get("azimuth", 0)
+        data = self.subentry.data
+        if elevation < data.get(CONF_MIN_ELEVATION, DEFAULT_MIN_ELEVATION):
+            return "below_horizon"
+        orientation = data.get(CONF_ORIENTATION, 180)
+        arc = data.get(CONF_ARC, DEFAULT_ARC)
+        diff = abs((azimuth - orientation + 180) % 360 - 180)
+        if diff > arc:
+            return "out_of_arc"
+        uv_entity = self.hub_entry.data.get(CONF_UV_ENTITY, "")
+        if uv_entity:
+            uv_state = self.hass.states.get(uv_entity)
+            try:
+                uv_value = float(uv_state.state) if uv_state else 0.0
+            except (ValueError, TypeError):
+                uv_value = 0.0
+            if uv_value < data.get(CONF_MIN_UV, DEFAULT_MIN_UV):
+                return "uv_too_low"
+        return "active"
+
+    async def async_setup(self) -> None:
+        """Subscribe to sun and UV state changes and run an initial evaluation."""
+        self._unsubs.append(
+            async_track_state_change_event(
+                self.hass, [SUN_ENTITY], self._async_on_state_change
+            )
+        )
+        uv_entity = self.hub_entry.data.get(CONF_UV_ENTITY, "")
+        if uv_entity:
+            self._unsubs.append(
+                async_track_state_change_event(
+                    self.hass, [uv_entity], self._async_on_state_change
+                )
+            )
+        covers = list(self.subentry.data.get(CONF_COVERS, []))
+        if covers:
+            self._unsubs.append(
+                async_track_state_change_event(
+                    self.hass, covers, self._async_on_cover_state_change
+                )
+            )
+        self._unsubs.append(
+            async_call_later(self.hass, 0, self._async_evaluate_cb)
+        )
+
+    async def async_unload(self) -> None:
+        """Cancel subscriptions and restore positions if in sun mode."""
+        for unsub in self._unsubs:
+            unsub()
+        self._unsubs.clear()
+        if self._in_sun_mode:
+            await self._async_exit_sun_mode()
+
+    async def _async_on_state_change(self, event: Any) -> None:
+        await self.async_evaluate()
+
+    async def _async_evaluate_cb(self, _now: Any) -> None:
+        await self.async_evaluate()
+
+    async def async_evaluate(self) -> None:
+        """Recompute whether sun protection should be active and act accordingly."""
+        if not self._enabled:
+            if self._in_sun_mode:
+                await self._async_exit_sun_mode()
+            return
+
+        sun_state = self.hass.states.get(SUN_ENTITY)
+        if sun_state is None:
+            return
+
+        elevation = sun_state.attributes.get("elevation", 0)
+        azimuth = sun_state.attributes.get("azimuth", 0)
+        data = self.subentry.data
+        min_elevation = data.get(CONF_MIN_ELEVATION, DEFAULT_MIN_ELEVATION)
+        orientation = data.get(CONF_ORIENTATION, 180)
+        arc = data.get(CONF_ARC, DEFAULT_ARC)
+        min_uv = data.get(CONF_MIN_UV, DEFAULT_MIN_UV)
+
+        uv_ok = True
+        uv_entity = self.hub_entry.data.get(CONF_UV_ENTITY, "")
+        if uv_entity:
+            uv_state = self.hass.states.get(uv_entity)
+            try:
+                uv_value = float(uv_state.state) if uv_state else 0.0
+            except (ValueError, TypeError):
+                uv_value = 0.0
+            uv_ok = uv_value >= min_uv
+
+        diff = abs((azimuth - orientation + 180) % 360 - 180)
+        should_activate = elevation >= min_elevation and diff <= arc and uv_ok
+
+        if should_activate and not self._in_sun_mode:
+            await self._async_enter_sun_mode()
+        elif not should_activate and self._in_sun_mode:
+            await self._async_exit_sun_mode()
+
+        async_dispatcher_send(self.hass, signal_state_update(self.subentry_id))
+
+    async def _async_enter_sun_mode(self) -> None:
+        """Snapshot current positions and lower covers to target."""
+        covers = list(self.subentry.data.get(CONF_COVERS, []))
+        target = self.subentry.data.get(CONF_TARGET_POSITION, DEFAULT_TARGET_POSITION)
+
+        for cover_id in covers:
+            state = self.hass.states.get(cover_id)
+            if state is not None:
+                pos = state.attributes.get("current_position")
+                if pos is not None:
+                    self._snapshots[cover_id] = int(pos)
+            await self.hass.services.async_call(
+                "cover",
+                "set_cover_position",
+                {"entity_id": cover_id, "position": target},
+            )
+            self._applied_positions[cover_id] = target
+
+        self._in_sun_mode = True
+        _LOGGER.debug(
+            "Sun protection %s: entered sun mode (target=%s%%)",
+            self.subentry_id,
+            target,
+        )
+
+    async def _async_exit_sun_mode(self) -> None:
+        """Restore cover positions, skipping any that were manually moved."""
+        covers = list(self.subentry.data.get(CONF_COVERS, []))
+
+        for cover_id in covers:
+            applied = self._applied_positions.get(cover_id)
+            snapshot = self._snapshots.get(cover_id)
+            if snapshot is None:
+                continue
+            state = self.hass.states.get(cover_id)
+            current_pos = None
+            if state is not None:
+                raw = state.attributes.get("current_position")
+                if raw is not None:
+                    current_pos = int(raw)
+            # Only restore if the cover hasn't been moved manually.
+            if current_pos is None or current_pos == applied:
+                await self.hass.services.async_call(
+                    "cover",
+                    "set_cover_position",
+                    {"entity_id": cover_id, "position": snapshot},
+                )
+
+        self._in_sun_mode = False
+        self._snapshots.clear()
+        self._applied_positions.clear()
+        _LOGGER.debug("Sun protection %s: exited sun mode", self.subentry_id)
+
+    async def _async_on_cover_state_change(self, event: Any) -> None:
+        """Update snapshot when a cover we control is moved externally."""
+        if not self._in_sun_mode:
+            return
+        cover_id = event.data.get("entity_id")
+        if cover_id not in self._applied_positions:
+            return
+        new_state = event.data.get("new_state")
+        if new_state is None:
+            return
+        new_pos = new_state.attributes.get("current_position")
+        if new_pos is None:
+            return
+        new_pos_int = int(new_pos)
+        applied = self._applied_positions.get(cover_id)
+        snapshot = self._snapshots.get(cover_id)
+        # Ignore intermediate positions while the cover is moving toward our target.
+        # Only consider it an external move when it lands outside the transit range.
+        if (
+            applied is not None
+            and snapshot is not None
+            and min(snapshot, applied) <= new_pos_int <= max(snapshot, applied)
+        ):
+            return
+        self._snapshots[cover_id] = new_pos_int
+        self._applied_positions[cover_id] = new_pos_int
+
+    def set_enabled(self, enabled: bool) -> None:
+        """Toggle the group on/off (called by the switch entity)."""
+        self._enabled = enabled
+        self.hass.async_create_task(self.async_evaluate())
 
 
 class ShuttersScheduler:
