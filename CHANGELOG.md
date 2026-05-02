@@ -6,6 +6,22 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le pr
 
 ## [Non publié]
 
+## [0.4.11] — 2026-05-02
+
+### Corrigé
+
+- **Sous-titre du device** : nettoyage du champ `model` résiduel (« Presence
+  schedule » / « Sun protection ») persisté dans le device registry HA depuis
+  les v0.4.8/v0.4.9. La v0.4.10 avait supprimé ce champ du code mais HA ne
+  nettoyait pas la valeur en cache lors d'un simple reload.
+- Migration ajoutée dans `async_setup_entry` : à chaque chargement, les
+  devices liés au hub voient leur `model` mis à `None` via
+  `device_registry.async_update_device(device.id, model=None)`. La migration
+  est idempotente (skip si déjà à `None`).
+
+> Pour les installs sur v0.4.10 : la mise à jour vers v0.4.11 nettoie
+> automatiquement le sous-titre au prochain redémarrage / reload.
+
 ## [0.4.10] — 2026-05-02
 
 ### Modifié
@@ -715,7 +731,8 @@ Aucun changement de code dans l'intégration. Seules les méta-données (`manife
 - Annulation propre des déclencheurs et des callbacks différés au déchargement / rechargement.
 - Traductions français et anglais.
 
-[Non publié]: https://github.com/scadinot/shutters_management/compare/0.4.10...HEAD
+[Non publié]: https://github.com/scadinot/shutters_management/compare/0.4.11...HEAD
+[0.4.11]: https://github.com/scadinot/shutters_management/compare/0.4.10...0.4.11
 [0.4.10]: https://github.com/scadinot/shutters_management/compare/0.4.9...0.4.10
 [0.4.9]: https://github.com/scadinot/shutters_management/compare/0.4.8...0.4.9
 [0.4.8]: https://github.com/scadinot/shutters_management/compare/0.4.7...0.4.8

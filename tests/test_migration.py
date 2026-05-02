@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from homeassistant.const import CONF_NAME
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers import device_registry as dr
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.shutters_management.const import (
@@ -221,3 +222,52 @@ async def test_migration_preserves_unique_id_for_entity_id_stability(
     hub = hass.config_entries.async_entries(DOMAIN)[0]
     subentry = next(iter(hub.subentries.values()))
     assert subentry.unique_id == "bureau"
+
+
+# ---- v0.4.11 residual `model` cleanup ---------------------------------------
+
+
+async def test_residual_model_is_cleared_on_setup(
+    hass: HomeAssistant, setup_integration, mock_config_entry: MockConfigEntry
+) -> None:
+    """Devices with the v0.4.8/v0.4.9 stale `model` are cleaned on next load."""
+    device_registry = dr.async_get(hass)
+    subentry_id = next(iter(mock_config_entry.subentries))
+
+    # Seed the residual `model` from v0.4.8/v0.4.9.
+    device = device_registry.async_get_or_create(
+        config_entry_id=mock_config_entry.entry_id,
+        identifiers={(DOMAIN, subentry_id)},
+        model="Presence schedule",
+    )
+    assert device.model == "Presence schedule"
+
+    # Reload the hub: the migration should clear it.
+    await hass.config_entries.async_reload(mock_config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    refreshed = device_registry.async_get(device.id)
+    assert refreshed is not None
+    assert refreshed.model is None
+
+
+async def test_user_model_is_preserved_on_setup(
+    hass: HomeAssistant, setup_integration, mock_config_entry: MockConfigEntry
+) -> None:
+    """Models that aren't the known stale values must not be wiped."""
+    device_registry = dr.async_get(hass)
+    subentry_id = next(iter(mock_config_entry.subentries))
+
+    device = device_registry.async_get_or_create(
+        config_entry_id=mock_config_entry.entry_id,
+        identifiers={(DOMAIN, subentry_id)},
+        model="Custom user value",
+    )
+    assert device.model == "Custom user value"
+
+    await hass.config_entries.async_reload(mock_config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    refreshed = device_registry.async_get(device.id)
+    assert refreshed is not None
+    assert refreshed.model == "Custom user value"
