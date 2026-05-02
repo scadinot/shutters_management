@@ -24,6 +24,7 @@ from homeassistant.const import (
 )
 from homeassistant.core import HomeAssistant, ServiceCall, callback
 from homeassistant.helpers import config_validation as cv
+from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.helpers.event import (
     async_call_later,
@@ -327,6 +328,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             entry.data.get(CONF_TYPE),
         )
         return False
+
+    # Clear residual `model` field cached in the device registry from
+    # v0.4.8/v0.4.9 (removed in v0.4.10, but persisted on existing devices).
+    device_registry = dr.async_get(hass)
+    for device in dr.async_entries_for_config_entry(device_registry, entry.entry_id):
+        if device.model is not None:
+            device_registry.async_update_device(device.id, model=None)
 
     for subentry in entry.subentries.values():
         if subentry.subentry_type == SUBENTRY_TYPE_INSTANCE:
