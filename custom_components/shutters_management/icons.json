@@ -1,4 +1,8 @@
 {
+  "device": {
+    "instance": { "default": "mdi:calendar-clock" },
+    "sun_protection": { "default": "mdi:weather-sunny" }
+  },
   "entity": {
     "switch": {
       "simulation_active": { "default": "mdi:calendar-clock" },

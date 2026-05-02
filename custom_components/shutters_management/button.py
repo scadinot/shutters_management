@@ -53,6 +53,7 @@ class ShuttersRunNowButton(ButtonEntity):
             name=subentry.title,
             manufacturer="Shutters Management",
             entry_type=DeviceEntryType.SERVICE,
+            translation_key="instance",
         )
 
     async def async_press(self) -> None:
