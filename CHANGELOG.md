@@ -6,6 +6,33 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le pr
 
 ## [Non publié]
 
+## [0.4.10] — 2026-05-02
+
+### Modifié
+
+- **Nom du device traduit par type** (FR/EN), via `translation_key` sur
+  `DeviceInfo` et nouvelle section `device` dans `strings.json` /
+  `translations/{en,fr}.json` :
+  - Sous-entrée `instance` → « Planning de présence » (FR) / « Presence
+    schedule » (EN)
+  - Sous-entrée `sun_protection` → « Protection solaire » (FR) / « Sun
+    protection » (EN)
+- **Suppression du champ `model`** (`Presence schedule` / `Sun protection`),
+  devenu redondant avec le nom traduit. Le champ n'était de toute façon pas
+  traduit par HA.
+- **Suppression de `name=subentry.title`** dans les `DeviceInfo` (écrasé par
+  `translation_key` côté HA — code mort). Le nom de la pièce reste affiché
+  par la carte parente (subentry).
+
+### Supprimé
+
+- Constantes `DEVICE_MODEL_INSTANCE` et `DEVICE_MODEL_SUN_PROTECTION` dans
+  `const.py`.
+
+> **Note** : pour les installations existantes, recharger l'intégration
+> (`Settings > Devices > Shutters Management > … > Reload`) pour que HA
+> recalcule le nom du device avec la nouvelle traduction.
+
 ## [0.4.9] — 2026-05-02
 
 ### Corrigé
@@ -688,7 +715,8 @@ Aucun changement de code dans l'intégration. Seules les méta-données (`manife
 - Annulation propre des déclencheurs et des callbacks différés au déchargement / rechargement.
 - Traductions français et anglais.
 
-[Non publié]: https://github.com/scadinot/shutters_management/compare/0.4.9...HEAD
+[Non publié]: https://github.com/scadinot/shutters_management/compare/0.4.10...HEAD
+[0.4.10]: https://github.com/scadinot/shutters_management/compare/0.4.9...0.4.10
 [0.4.9]: https://github.com/scadinot/shutters_management/compare/0.4.8...0.4.9
 [0.4.8]: https://github.com/scadinot/shutters_management/compare/0.4.7...0.4.8
 [0.4.7]: https://github.com/scadinot/shutters_management/compare/0.4.6...0.4.7

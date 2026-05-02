@@ -15,10 +15,6 @@ HUB_UNIQUE_ID = "_global"
 HUB_TITLE = "Shutters Management"
 CONF_TYPE = "type"
 
-# DeviceInfo.model is not translated by HA — use stable English labels.
-DEVICE_MODEL_INSTANCE = "Presence schedule"
-DEVICE_MODEL_SUN_PROTECTION = "Sun protection"
-
 CONF_COVERS = "covers"
 CONF_OPEN_TIME = "open_time"
 CONF_CLOSE_TIME = "close_time"
