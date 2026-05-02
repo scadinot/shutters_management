@@ -8,7 +8,13 @@ from homeassistant.helpers.device_registry import DeviceEntryType, DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from . import ShuttersScheduler
-from .const import ACTION_CLOSE, ACTION_OPEN, DOMAIN, SUBENTRY_TYPE_INSTANCE
+from .const import (
+    ACTION_CLOSE,
+    ACTION_OPEN,
+    DEVICE_MODEL_INSTANCE,
+    DOMAIN,
+    SUBENTRY_TYPE_INSTANCE,
+)
 from .entities import _build_entity_id
 
 
@@ -52,6 +58,7 @@ class ShuttersRunNowButton(ButtonEntity):
             identifiers={(DOMAIN, subentry.subentry_id)},
             name=subentry.title,
             manufacturer="Shutters Management",
+            model=DEVICE_MODEL_INSTANCE,
             entry_type=DeviceEntryType.SERVICE,
             translation_key="instance",
         )

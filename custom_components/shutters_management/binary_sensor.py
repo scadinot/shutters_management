@@ -9,7 +9,12 @@ from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from . import ShuttersSunProtectionManager
-from .const import DOMAIN, SUBENTRY_TYPE_SUN_PROTECTION, signal_state_update
+from .const import (
+    DEVICE_MODEL_SUN_PROTECTION,
+    DOMAIN,
+    SUBENTRY_TYPE_SUN_PROTECTION,
+    signal_state_update,
+)
 from .entities import _build_entity_id
 
 
@@ -51,6 +56,7 @@ class SunProtectionActiveSensor(BinarySensorEntity):
             identifiers={(DOMAIN, subentry.subentry_id)},
             name=subentry.title,
             manufacturer="Shutters Management",
+            model=DEVICE_MODEL_SUN_PROTECTION,
             entry_type=DeviceEntryType.SERVICE,
             translation_key="sun_protection",
         )
