@@ -107,6 +107,12 @@ from .const import (
 
 _LOGGER = logging.getLogger(__name__)
 
+# Stale `DeviceInfo.model` values defined in v0.4.8/v0.4.9 and removed in v0.4.10.
+# Persisted in the device registry until explicitly cleared (HA does not clean
+# up fields removed from DeviceInfo). Used by the one-time migration in
+# `async_setup_entry`.
+_RESIDUAL_DEVICE_MODELS = frozenset({"Presence schedule", "Sun protection"})
+
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
 RUN_NOW_SCHEMA = vol.Schema(
@@ -329,11 +335,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         )
         return False
 
-    # Clear residual `model` field cached in the device registry from
-    # v0.4.8/v0.4.9 (removed in v0.4.10, but persisted on existing devices).
+    # One-time cleanup: clear the residual `model` field cached in the device
+    # registry from v0.4.8/v0.4.9 (removed in v0.4.10, but persisted on
+    # existing devices). Constrained to the two known stale values so that
+    # any future legitimate `model` set by this integration is preserved.
     device_registry = dr.async_get(hass)
     for device in dr.async_entries_for_config_entry(device_registry, entry.entry_id):
-        if device.model is not None:
+        if device.model in _RESIDUAL_DEVICE_MODELS:
             device_registry.async_update_device(device.id, model=None)
 
     for subentry in entry.subentries.values():
