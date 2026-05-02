@@ -5,6 +5,7 @@ from unittest.mock import AsyncMock, patch
 
 from homeassistant.components.button import SERVICE_PRESS
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
@@ -12,9 +13,10 @@ from custom_components.shutters_management.const import (
     ACTION_CLOSE,
     ACTION_OPEN,
     DOMAIN,
+    SUBENTRY_TYPE_PRESENCE_SIM,
 )
 
-from .conftest import get_only_subentry_id
+from .conftest import build_hub_with_instance, get_only_subentry_id
 
 
 def _button_entity_id(
@@ -90,3 +92,47 @@ async def test_button_press_close_calls_run_now(
             "button", SERVICE_PRESS, {"entity_id": entity_id}, blocking=True
         )
         mock_run_now.assert_awaited_once_with(ACTION_CLOSE)
+
+
+async def test_presence_simulation_buttons_use_dedicated_device(
+    hass: HomeAssistant, base_config
+) -> None:
+    """A presence_simulation subentry must produce test buttons on its own device.
+
+    Covers the ``SUBENTRY_TYPE_PRESENCE_SIM`` branch in ``button.py`` setup
+    and confirms the platform picks the ``presence_simulation``
+    device-translation_key (not the default ``instance``).
+    """
+    entry = build_hub_with_instance(
+        instance_data=base_config,
+        instance_title="Présence",
+        instance_unique_id="presence",
+        subentry_type=SUBENTRY_TYPE_PRESENCE_SIM,
+        entry_id="presence_button_entry",
+    )
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    subentry_id = get_only_subentry_id(entry)
+    entity_registry = er.async_get(hass)
+    open_id = entity_registry.async_get_entity_id(
+        "button", DOMAIN, f"{subentry_id}_test_{ACTION_OPEN}"
+    )
+    close_id = entity_registry.async_get_entity_id(
+        "button", DOMAIN, f"{subentry_id}_test_{ACTION_CLOSE}"
+    )
+    assert open_id is not None and close_id is not None
+
+    device_registry = dr.async_get(hass)
+    open_entry = entity_registry.async_get(open_id)
+    device = device_registry.async_get(open_entry.device_id)
+    assert device is not None
+    assert (DOMAIN, subentry_id) in device.identifiers
+
+    component = hass.data["entity_components"]["button"]
+    open_entity = component.get_entity(open_id)
+    close_entity = component.get_entity(close_id)
+    assert open_entity is not None and close_entity is not None
+    assert open_entity.device_info["translation_key"] == "presence_simulation"
+    assert close_entity.device_info["translation_key"] == "presence_simulation"

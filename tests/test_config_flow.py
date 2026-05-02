@@ -397,6 +397,61 @@ async def test_presence_simulation_subentry_user_flow_success(
     assert new_subentry.data[CONF_ONLY_WHEN_AWAY] is False
 
 
+async def test_presence_simulation_subentry_reconfigure_updates_existing(
+    hass: HomeAssistant, mock_config_entry: MockConfigEntry, base_config
+) -> None:
+    """Reconfigure flow rewrites an existing presence-simulation subentry.
+
+    Distinct from the schedule reconfigure test because the simulation
+    handler has its own schema (the four extra fields), abort messages
+    and persistence path.
+    """
+    from custom_components.shutters_management.const import SUBENTRY_TYPE_PRESENCE_SIM as _SIM
+    from .conftest import build_hub_with_instance
+
+    sim_data = dict(base_config)
+    sim_data[CONF_RANDOMIZE] = False
+    sim_data[CONF_RANDOM_MAX_MINUTES] = 30
+    sim_data[CONF_ONLY_WHEN_AWAY] = False
+    entry = build_hub_with_instance(
+        instance_data=sim_data,
+        instance_title="Présence",
+        instance_unique_id="presence",
+        subentry_type=_SIM,
+        entry_id="presence_sim_reconf_entry",
+    )
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    subentry_id = next(iter(entry.subentries))
+    result = await entry.start_subentry_reconfigure_flow(hass, subentry_id)
+    assert result["type"] == FlowResultType.FORM
+    assert result["step_id"] == "reconfigure"
+
+    result = await hass.config_entries.subentries.async_configure(
+        result["flow_id"],
+        user_input=_valid_presence_sim_input(
+            **{
+                CONF_NAME: "Présence renommée",
+                CONF_OPEN_TIME: "07:30:00",
+                CONF_RANDOMIZE: True,
+                CONF_RANDOM_MAX_MINUTES: 60,
+            }
+        ),
+    )
+    assert result["type"] == FlowResultType.ABORT
+    assert result["reason"] == "reconfigure_successful"
+
+    updated = entry.subentries[subentry_id]
+    assert updated.title == "Présence renommée"
+    assert updated.subentry_type == _SIM
+    assert updated.data[CONF_OPEN_TIME] == "07:30:00"
+    assert updated.data[CONF_RANDOMIZE] is True
+    assert updated.data[CONF_RANDOM_MAX_MINUTES] == 60
+    assert CONF_NAME not in updated.data
+
+
 async def test_instance_subentry_does_not_accept_simulation_fields(
     hass: HomeAssistant, setup_integration, mock_config_entry: MockConfigEntry
 ) -> None:

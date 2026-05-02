@@ -15,6 +15,7 @@ from custom_components.shutters_management.const import (
     CONF_NOTIFY_WHEN_AWAY_ONLY,
     CONF_ONLY_WHEN_AWAY,
     CONF_OPEN_TIME,
+    CONF_PRESENCE_ENTITY,
     CONF_RANDOMIZE,
     CONF_RANDOM_MAX_MINUTES,
     CONF_TTS_MODE,
@@ -209,6 +210,7 @@ async def test_migration_v4_to_v5_strips_simulation_fields_from_instance(
                     CONF_RANDOMIZE: True,
                     CONF_RANDOM_MAX_MINUTES: 45,
                     CONF_ONLY_WHEN_AWAY: True,
+                    CONF_PRESENCE_ENTITY: "person.someone",
                 },
             )
         ],
@@ -228,6 +230,7 @@ async def test_migration_v4_to_v5_strips_simulation_fields_from_instance(
     assert CONF_RANDOMIZE not in subentry.data
     assert CONF_RANDOM_MAX_MINUTES not in subentry.data
     assert CONF_ONLY_WHEN_AWAY not in subentry.data
+    assert CONF_PRESENCE_ENTITY not in subentry.data
 
 
 async def test_migration_reuses_legacy_entry_id_as_subentry_id(

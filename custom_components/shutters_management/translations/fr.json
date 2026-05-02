@@ -71,7 +71,7 @@
         "no_covers": "Sélectionnez au moins un volet."
       },
       "abort": {
-        "already_configured": "Un groupe portant ce nom est déjà configuré.",
+        "already_configured": "Une autre sous-entrée portant ce nom existe déjà.",
         "reconfigure_successful": "Configuration mise à jour."
       },
       "step": {
@@ -114,13 +114,13 @@
         "no_days": "Sélectionnez au moins un jour."
       },
       "abort": {
-        "already_configured": "Une planification portant ce nom est déjà configurée.",
+        "already_configured": "Une autre sous-entrée portant ce nom existe déjà.",
         "reconfigure_successful": "Configuration mise à jour."
       },
       "step": {
         "user": {
           "title": "Ajouter une planification",
-          "description": "Configurer des heures fixes d'ouverture / fermeture pour un groupe de volets.",
+          "description": "Configurer des déclencheurs déterministes d'ouverture / fermeture (heure fixe, lever ou coucher du soleil) pour un groupe de volets.",
           "data": {
             "name": "Nom de la planification",
             "covers": "Volets à piloter",
@@ -185,7 +185,7 @@
         "no_days": "Sélectionnez au moins un jour."
       },
       "abort": {
-        "already_configured": "Une simulation portant ce nom est déjà configurée.",
+        "already_configured": "Une autre sous-entrée portant ce nom existe déjà.",
         "reconfigure_successful": "Configuration mise à jour."
       },
       "step": {

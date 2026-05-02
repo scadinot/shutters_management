@@ -71,7 +71,7 @@
         "no_covers": "Select at least one cover."
       },
       "abort": {
-        "already_configured": "A group with this name is already configured.",
+        "already_configured": "Another subentry with this name already exists.",
         "reconfigure_successful": "Configuration updated."
       },
       "step": {
@@ -114,13 +114,13 @@
         "no_days": "Select at least one day."
       },
       "abort": {
-        "already_configured": "A schedule with this name is already configured.",
+        "already_configured": "Another subentry with this name already exists.",
         "reconfigure_successful": "Configuration updated."
       },
       "step": {
         "user": {
           "title": "Add a schedule",
-          "description": "Configure deterministic open/close times for a group of covers.",
+          "description": "Configure deterministic open / close triggers (fixed time, sunrise or sunset) for a group of covers.",
           "data": {
             "name": "Schedule name",
             "covers": "Shutters to control",
@@ -185,7 +185,7 @@
         "no_days": "Select at least one day."
       },
       "abort": {
-        "already_configured": "A simulation with this name is already configured.",
+        "already_configured": "Another subentry with this name already exists.",
         "reconfigure_successful": "Configuration updated."
       },
       "step": {
