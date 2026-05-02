@@ -6,6 +6,24 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le pr
 
 ## [Non publié]
 
+## [0.4.8] — 2026-05-02
+
+### Ajouté
+
+- **Champ `model` sur les devices** pour différencier visuellement les deux
+  familles de sous-entrées dans la fiche détail HA :
+  - Sous-entrée `instance` → `model = "Planning de présence"`
+  - Sous-entrée `sun_protection` → `model = "Protection solaire"`
+- C'est le pattern utilisé par toutes les intégrations natives (Shelly,
+  TP-Link, ZHA, Z-Wave JS, MQTT) pour distinguer plusieurs types de devices
+  d'une même intégration.
+
+> **Limitation HA documentée** : l'icône du device card dans la liste de
+> l'intégration ne peut pas être personnalisée par device pour un
+> `DeviceEntryType.SERVICE`. Aucune section `device` dans `icons.json`,
+> aucun champ `icon` sur `DeviceInfo` — vérifié sur HA 2026.x et 100+
+> intégrations natives. Le champ `model` est le seul levier officiel.
+
 ## [0.4.7] — 2026-05-02
 
 ### Ajouté

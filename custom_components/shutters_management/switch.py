@@ -63,6 +63,7 @@ class ShuttersSimulationSwitch(SwitchEntity):
             identifiers={(DOMAIN, subentry.subentry_id)},
             name=subentry.title,
             manufacturer="Shutters Management",
+            model="Planning de présence",
             entry_type=DeviceEntryType.SERVICE,
             translation_key="instance",
         )
@@ -110,6 +111,7 @@ class SunProtectionSwitch(SwitchEntity):
             identifiers={(DOMAIN, subentry.subentry_id)},
             name=subentry.title,
             manufacturer="Shutters Management",
+            model="Protection solaire",
             entry_type=DeviceEntryType.SERVICE,
             translation_key="sun_protection",
         )

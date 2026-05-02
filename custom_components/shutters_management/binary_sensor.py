@@ -51,6 +51,7 @@ class SunProtectionActiveSensor(BinarySensorEntity):
             identifiers={(DOMAIN, subentry.subentry_id)},
             name=subentry.title,
             manufacturer="Shutters Management",
+            model="Protection solaire",
             entry_type=DeviceEntryType.SERVICE,
             translation_key="sun_protection",
         )

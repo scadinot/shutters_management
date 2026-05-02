@@ -52,6 +52,7 @@ class ShuttersRunNowButton(ButtonEntity):
             identifiers={(DOMAIN, subentry.subentry_id)},
             name=subentry.title,
             manufacturer="Shutters Management",
+            model="Planning de présence",
             entry_type=DeviceEntryType.SERVICE,
             translation_key="instance",
         )
