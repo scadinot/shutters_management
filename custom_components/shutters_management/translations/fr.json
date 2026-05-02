@@ -226,6 +226,14 @@
       }
     }
   },
+  "device": {
+    "instance": {
+      "name": "Planning de présence"
+    },
+    "sun_protection": {
+      "name": "Protection solaire"
+    }
+  },
   "entity": {
     "binary_sensor": {
       "sun_protection_active": {

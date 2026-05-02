@@ -226,6 +226,14 @@
       }
     }
   },
+  "device": {
+    "instance": {
+      "name": "Presence schedule"
+    },
+    "sun_protection": {
+      "name": "Sun protection"
+    }
+  },
   "entity": {
     "binary_sensor": {
       "sun_protection_active": {

@@ -11,12 +11,7 @@ from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from . import ShuttersScheduler
-from .const import (
-    DEVICE_MODEL_INSTANCE,
-    DOMAIN,
-    SUBENTRY_TYPE_INSTANCE,
-    signal_state_update,
-)
+from .const import DOMAIN, SUBENTRY_TYPE_INSTANCE, signal_state_update
 from .entities import _build_entity_id
 
 
@@ -59,10 +54,9 @@ class ShuttersNextTriggerSensor(SensorEntity):
             self.entity_id = suggested
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, subentry.subentry_id)},
-            name=subentry.title,
             manufacturer="Shutters Management",
-            model=DEVICE_MODEL_INSTANCE,
             entry_type=DeviceEntryType.SERVICE,
+            translation_key="instance",
         )
 
     @property

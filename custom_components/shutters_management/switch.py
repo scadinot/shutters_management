@@ -12,8 +12,6 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from . import ShuttersScheduler, ShuttersSunProtectionManager
 from .const import (
-    DEVICE_MODEL_INSTANCE,
-    DEVICE_MODEL_SUN_PROTECTION,
     DOMAIN,
     SUBENTRY_TYPE_INSTANCE,
     SUBENTRY_TYPE_SUN_PROTECTION,
@@ -63,10 +61,9 @@ class ShuttersSimulationSwitch(SwitchEntity):
             self.entity_id = suggested
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, subentry.subentry_id)},
-            name=subentry.title,
             manufacturer="Shutters Management",
-            model=DEVICE_MODEL_INSTANCE,
             entry_type=DeviceEntryType.SERVICE,
+            translation_key="instance",
         )
 
     @property
@@ -110,10 +107,9 @@ class SunProtectionSwitch(SwitchEntity):
             self.entity_id = suggested
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, subentry.subentry_id)},
-            name=subentry.title,
             manufacturer="Shutters Management",
-            model=DEVICE_MODEL_SUN_PROTECTION,
             entry_type=DeviceEntryType.SERVICE,
+            translation_key="sun_protection",
         )
 
     @property
