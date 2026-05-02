@@ -15,10 +15,5 @@
       "test_open": { "default": "mdi:arrow-up-circle-outline" },
       "test_close": { "default": "mdi:arrow-down-circle-outline" }
     }
-  },
-  "services": {
-    "run_now": { "default": "mdi:play" },
-    "pause": { "default": "mdi:pause" },
-    "resume": { "default": "mdi:play-pause" }
   }
 }
