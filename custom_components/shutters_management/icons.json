@@ -1,0 +1,24 @@
+{
+  "entity": {
+    "switch": {
+      "simulation_active": { "default": "mdi:calendar-clock" },
+      "sun_protection": { "default": "mdi:weather-sunny" }
+    },
+    "binary_sensor": {
+      "sun_protection_active": { "default": "mdi:sun-angle" }
+    },
+    "sensor": {
+      "next_open": { "default": "mdi:blinds-open" },
+      "next_close": { "default": "mdi:blinds" }
+    },
+    "button": {
+      "test_open": { "default": "mdi:arrow-up-circle-outline" },
+      "test_close": { "default": "mdi:arrow-down-circle-outline" }
+    }
+  },
+  "services": {
+    "run_now": { "default": "mdi:play" },
+    "pause": { "default": "mdi:pause" },
+    "resume": { "default": "mdi:play-pause" }
+  }
+}
