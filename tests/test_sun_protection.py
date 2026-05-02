@@ -72,7 +72,7 @@ def _build_hub_with_sun_protection(
         options={},
         entry_id=entry_id,
         unique_id=HUB_UNIQUE_ID,
-        version=4,
+        version=5,
         subentries_data=[
             ConfigSubentryData(
                 subentry_type=SUBENTRY_TYPE_SUN_PROTECTION,

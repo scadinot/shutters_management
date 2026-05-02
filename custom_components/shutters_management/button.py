@@ -8,7 +8,13 @@ from homeassistant.helpers.device_registry import DeviceEntryType, DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from . import ShuttersScheduler
-from .const import ACTION_CLOSE, ACTION_OPEN, DOMAIN, SUBENTRY_TYPE_INSTANCE
+from .const import (
+    ACTION_CLOSE,
+    ACTION_OPEN,
+    DOMAIN,
+    SUBENTRY_TYPE_INSTANCE,
+    SUBENTRY_TYPE_PRESENCE_SIM,
+)
 from .entities import _build_entity_id
 
 
@@ -19,7 +25,10 @@ async def async_setup_entry(
 ) -> None:
     """Set up the test buttons for every instance subentry of the hub."""
     for subentry in entry.subentries.values():
-        if subentry.subentry_type != SUBENTRY_TYPE_INSTANCE:
+        if subentry.subentry_type not in (
+            SUBENTRY_TYPE_INSTANCE,
+            SUBENTRY_TYPE_PRESENCE_SIM,
+        ):
             continue
         scheduler: ShuttersScheduler = hass.data[DOMAIN][subentry.subentry_id]
         async_add_entities(
@@ -48,11 +57,16 @@ class ShuttersRunNowButton(ButtonEntity):
         )
         if suggested is not None:
             self.entity_id = suggested
+        device_translation_key = (
+            "presence_simulation"
+            if subentry.subentry_type == SUBENTRY_TYPE_PRESENCE_SIM
+            else "instance"
+        )
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, subentry.subentry_id)},
             manufacturer="Shutters Management",
             entry_type=DeviceEntryType.SERVICE,
-            translation_key="instance",
+            translation_key=device_translation_key,
         )
 
     async def async_press(self) -> None:

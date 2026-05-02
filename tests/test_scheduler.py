@@ -22,6 +22,7 @@ from custom_components.shutters_management.const import (
     CONF_OPEN_TIME,
     CONF_PRESENCE_ENTITY,
     DOMAIN,
+    SUBENTRY_TYPE_PRESENCE_SIM,
 )
 
 from .conftest import build_hub_with_instance, get_only_subentry_id
@@ -95,13 +96,21 @@ async def _setup_with_open_at_noon(
     only_when_away: bool,
     presence_entity: str | None,
 ):
-    """Configure and set up the integration so that the open trigger fires at 12:00 UTC."""
+    """Configure and set up a presence-simulation subentry that fires at 12:00 UTC.
+
+    The deterministic ``instance`` schedule ignores ``only_when_away`` and
+    ``presence_entity``; those fields only have an effect on the
+    ``presence_simulation`` type, so the test uses that subentry type.
+    """
     await hass.config.async_set_time_zone("UTC")
     base_config[CONF_OPEN_TIME] = "12:00:00"
     base_config[CONF_ONLY_WHEN_AWAY] = only_when_away
     if presence_entity is not None:
         base_config[CONF_PRESENCE_ENTITY] = presence_entity
-    entry = build_hub_with_instance(instance_data=base_config)
+    entry = build_hub_with_instance(
+        instance_data=base_config,
+        subentry_type=SUBENTRY_TYPE_PRESENCE_SIM,
+    )
     entry.add_to_hass(hass)
     assert await hass.config_entries.async_setup(entry.entry_id)
     await hass.async_block_till_done()
@@ -149,6 +158,34 @@ async def test_only_when_away_runs_when_away(
 
     assert len(calls) == 1
     assert calls[0].data["entity_id"] == ["cover.living_room"]
+
+
+async def test_instance_ignores_only_when_away_even_when_set(
+    hass: HomeAssistant, base_config
+) -> None:
+    """Plain Planification (instance) must trigger regardless of presence.
+
+    The four presence-simulation fields are stripped at runtime for
+    ``subentry_type='instance'``; even if leftover ``only_when_away=True``
+    persists in storage, the deterministic schedule still fires.
+    """
+    hass.states.async_set("person.someone", "home")
+    calls = async_mock_service(hass, "cover", SERVICE_OPEN_COVER)
+    await hass.config.async_set_time_zone("UTC")
+    base_config[CONF_OPEN_TIME] = "12:00:00"
+    base_config[CONF_ONLY_WHEN_AWAY] = True
+    base_config[CONF_PRESENCE_ENTITY] = "person.someone"
+
+    fake_now = datetime(2026, 4, 27, 11, 59, 0, tzinfo=timezone.utc)
+    with freeze_time(fake_now):
+        entry = build_hub_with_instance(instance_data=base_config)
+        entry.add_to_hass(hass)
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+        async_fire_time_changed(hass, fake_now + timedelta(seconds=61))
+        await hass.async_block_till_done()
+
+    assert len(calls) == 1
 
 
 async def test_no_covers_skips_call(

@@ -14,6 +14,7 @@ from . import ShuttersScheduler, ShuttersSunProtectionManager
 from .const import (
     DOMAIN,
     SUBENTRY_TYPE_INSTANCE,
+    SUBENTRY_TYPE_PRESENCE_SIM,
     SUBENTRY_TYPE_SUN_PROTECTION,
     signal_state_update,
 )
@@ -27,7 +28,7 @@ async def async_setup_entry(
 ) -> None:
     """Set up switch entities for every subentry of the hub."""
     for subentry in entry.subentries.values():
-        if subentry.subentry_type == SUBENTRY_TYPE_INSTANCE:
+        if subentry.subentry_type in (SUBENTRY_TYPE_INSTANCE, SUBENTRY_TYPE_PRESENCE_SIM):
             scheduler: ShuttersScheduler = hass.data[DOMAIN][subentry.subentry_id]
             async_add_entities(
                 [ShuttersSimulationSwitch(scheduler)],
@@ -59,11 +60,16 @@ class ShuttersSimulationSwitch(SwitchEntity):
         )
         if suggested is not None:
             self.entity_id = suggested
+        device_translation_key = (
+            "presence_simulation"
+            if subentry.subentry_type == SUBENTRY_TYPE_PRESENCE_SIM
+            else "instance"
+        )
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, subentry.subentry_id)},
             manufacturer="Shutters Management",
             entry_type=DeviceEntryType.SERVICE,
-            translation_key="instance",
+            translation_key=device_translation_key,
         )
 
     @property

@@ -86,6 +86,7 @@ from .const import (
     OFFSET_MIN_MINUTES,
     ORIENTATION_CARDINALS,
     SUBENTRY_TYPE_INSTANCE,
+    SUBENTRY_TYPE_PRESENCE_SIM,
     SUBENTRY_TYPE_SUN_PROTECTION,
     TRIGGER_MODES,
     TYPE_HUB,
@@ -261,9 +262,19 @@ def _section_default(
 
 
 def _build_instance_schema(
-    defaults: dict[str, Any], *, include_name: bool = True
+    defaults: dict[str, Any],
+    *,
+    include_name: bool = True,
+    include_simulation: bool = False,
 ) -> vol.Schema:
-    """Schema for an instance subentry: scheduling + presence config."""
+    """Schema for a schedule subentry.
+
+    When ``include_simulation`` is True, the four presence-simulation
+    fields (``randomize``, ``random_max_minutes``, ``only_when_away``,
+    ``presence_entity``) are appended. They are reserved for the
+    ``presence_simulation`` subentry type; the plain ``instance``
+    (Planification) flow keeps the deterministic fields only.
+    """
     mode_selector = selector.SelectSelector(
         selector.SelectSelectorConfig(
             options=TRIGGER_MODES,
@@ -348,38 +359,47 @@ def _build_instance_schema(
                     translation_key="days",
                 )
             ),
-            vol.Required(
-                CONF_RANDOMIZE,
-                default=defaults.get(CONF_RANDOMIZE, DEFAULT_RANDOMIZE),
-            ): selector.BooleanSelector(),
-            vol.Required(
-                CONF_RANDOM_MAX_MINUTES,
-                default=defaults.get(
-                    CONF_RANDOM_MAX_MINUTES, DEFAULT_RANDOM_MAX_MINUTES
-                ),
-            ): selector.NumberSelector(
-                selector.NumberSelectorConfig(
-                    min=0,
-                    max=240,
-                    step=1,
-                    unit_of_measurement="min",
-                    mode=selector.NumberSelectorMode.BOX,
-                )
-            ),
-            vol.Required(
-                CONF_ONLY_WHEN_AWAY,
-                default=defaults.get(CONF_ONLY_WHEN_AWAY, DEFAULT_ONLY_WHEN_AWAY),
-            ): selector.BooleanSelector(),
-            vol.Optional(
-                CONF_PRESENCE_ENTITY,
-                description={
-                    "suggested_value": defaults.get(CONF_PRESENCE_ENTITY, "")
-                },
-            ): selector.EntitySelector(
-                selector.EntitySelectorConfig(domain=["person", "group"])
-            ),
         }
     )
+    if include_simulation:
+        fields.update(
+            {
+                vol.Required(
+                    CONF_RANDOMIZE,
+                    default=defaults.get(CONF_RANDOMIZE, DEFAULT_RANDOMIZE),
+                ): selector.BooleanSelector(),
+                vol.Required(
+                    CONF_RANDOM_MAX_MINUTES,
+                    default=defaults.get(
+                        CONF_RANDOM_MAX_MINUTES, DEFAULT_RANDOM_MAX_MINUTES
+                    ),
+                ): selector.NumberSelector(
+                    selector.NumberSelectorConfig(
+                        min=0,
+                        max=240,
+                        step=1,
+                        unit_of_measurement="min",
+                        mode=selector.NumberSelectorMode.BOX,
+                    )
+                ),
+                vol.Required(
+                    CONF_ONLY_WHEN_AWAY,
+                    default=defaults.get(
+                        CONF_ONLY_WHEN_AWAY, DEFAULT_ONLY_WHEN_AWAY
+                    ),
+                ): selector.BooleanSelector(),
+                vol.Optional(
+                    CONF_PRESENCE_ENTITY,
+                    description={
+                        "suggested_value": defaults.get(
+                            CONF_PRESENCE_ENTITY, ""
+                        )
+                    },
+                ): selector.EntitySelector(
+                    selector.EntitySelectorConfig(domain=["person", "group"])
+                ),
+            }
+        )
     return vol.Schema(fields)
 
 
@@ -474,7 +494,7 @@ class ShuttersManagementConfigFlow(ConfigFlow, domain=DOMAIN):
     :class:`ShuttersInstanceSubentryFlow`.
     """
 
-    VERSION = 4
+    VERSION = 5
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
@@ -500,6 +520,7 @@ class ShuttersManagementConfigFlow(ConfigFlow, domain=DOMAIN):
     ) -> dict[str, type[ConfigSubentryFlow]]:
         return {
             SUBENTRY_TYPE_INSTANCE: ShuttersInstanceSubentryFlow,
+            SUBENTRY_TYPE_PRESENCE_SIM: ShuttersPresenceSimulationSubentryFlow,
             SUBENTRY_TYPE_SUN_PROTECTION: ShuttersSunProtectionSubentryFlow,
         }
 
@@ -553,7 +574,11 @@ class ShuttersHubOptionsFlow(OptionsFlow):
 
 
 class ShuttersInstanceSubentryFlow(ConfigSubentryFlow):
-    """Create or edit an *instance* subentry (one shutter schedule)."""
+    """Create or edit an *instance* subentry (deterministic schedule)."""
+
+    # Subclasses set this to True to expose the four presence-simulation
+    # fields. Plain Planification keeps it False.
+    INCLUDE_SIMULATION: bool = False
 
     def __init__(self) -> None:
         super().__init__()
@@ -595,7 +620,9 @@ class ShuttersInstanceSubentryFlow(ConfigSubentryFlow):
                 errors[CONF_DAYS] = "no_days"
             else:
                 data[CONF_NAME] = name
-                if _needs_presence_warning(self.hass, data):
+                if self.INCLUDE_SIMULATION and _needs_presence_warning(
+                    self.hass, data
+                ):
                     self._pending_data = data
                     self._pending_name = name
                     self._pending_edit_id = edit_subentry_id
@@ -614,7 +641,9 @@ class ShuttersInstanceSubentryFlow(ConfigSubentryFlow):
         step_id = "reconfigure" if edit_subentry_id is not None else "user"
         return self.async_show_form(
             step_id=step_id,
-            data_schema=_build_instance_schema(defaults),
+            data_schema=_build_instance_schema(
+                defaults, include_simulation=self.INCLUDE_SIMULATION
+            ),
             errors=errors,
         )
 
@@ -684,6 +713,17 @@ class ShuttersInstanceSubentryFlow(ConfigSubentryFlow):
             data=payload,
             unique_id=unique_id,
         )
+
+
+class ShuttersPresenceSimulationSubentryFlow(ShuttersInstanceSubentryFlow):
+    """Create or edit a *presence_simulation* subentry.
+
+    Same scheduling form as Planification, with the four presence-simulation
+    fields (``randomize`` / ``random_max_minutes`` / ``only_when_away``
+    / ``presence_entity``) appended to the schema.
+    """
+
+    INCLUDE_SIMULATION = True
 
 
 # ---------------------------------------------------------------------------

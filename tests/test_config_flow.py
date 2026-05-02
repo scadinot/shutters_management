@@ -1,6 +1,7 @@
 """Tests for the Shutters Management config and subentry flows."""
 from __future__ import annotations
 
+import pytest
 from homeassistant.config_entries import SOURCE_USER
 from homeassistant.const import CONF_NAME
 from homeassistant.core import HomeAssistant
@@ -44,13 +45,19 @@ from custom_components.shutters_management.const import (
     MODE_AWAY_ONLY,
     MODE_DISABLED,
     SUBENTRY_TYPE_INSTANCE,
+    SUBENTRY_TYPE_PRESENCE_SIM,
     SUBENTRY_TYPE_SUN_PROTECTION,
     TYPE_HUB,
 )
 
 
 def _valid_instance_input(**overrides):
-    """Subentry user input matching the section-based instance schema."""
+    """Subentry user input matching the section-based Planification schema.
+
+    Planification is the deterministic schedule type; it does not expose the
+    presence-simulation fields. Use ``_valid_presence_sim_input`` when testing
+    the presence-simulation flow.
+    """
     data: dict[str, object] = {
         CONF_NAME: "Bureau",
         CONF_COVERS: ["cover.living_room"],
@@ -65,9 +72,6 @@ def _valid_instance_input(**overrides):
             CONF_CLOSE_OFFSET: 0,
         },
         CONF_DAYS: list(DAYS),
-        CONF_RANDOMIZE: False,
-        CONF_RANDOM_MAX_MINUTES: 30,
-        CONF_ONLY_WHEN_AWAY: False,
     }
     open_keys = {CONF_OPEN_MODE, CONF_OPEN_TIME, CONF_OPEN_OFFSET}
     close_keys = {CONF_CLOSE_MODE, CONF_CLOSE_TIME, CONF_CLOSE_OFFSET}
@@ -78,6 +82,24 @@ def _valid_instance_input(**overrides):
             data["close"][key] = value
         else:
             data[key] = value
+    return data
+
+
+def _valid_presence_sim_input(**overrides):
+    """Subentry user input matching the presence-simulation schema.
+
+    Same shape as Planification plus the four simulation fields.
+    """
+    data = _valid_instance_input(
+        **{k: v for k, v in overrides.items() if k != CONF_NAME}
+    )
+    data[CONF_NAME] = overrides.get(CONF_NAME, "Bureau")
+    data.setdefault(CONF_RANDOMIZE, False)
+    data.setdefault(CONF_RANDOM_MAX_MINUTES, 30)
+    data.setdefault(CONF_ONLY_WHEN_AWAY, False)
+    for key in (CONF_RANDOMIZE, CONF_RANDOM_MAX_MINUTES, CONF_ONLY_WHEN_AWAY):
+        if key in overrides:
+            data[key] = overrides[key]
     return data
 
 
@@ -284,14 +306,18 @@ async def test_subentry_user_flow_aborts_on_title_collision_after_rename(
 async def test_subentry_user_flow_confirms_when_no_presence_source(
     hass: HomeAssistant, setup_integration, mock_config_entry: MockConfigEntry
 ) -> None:
-    """only_when_away with no person.* and no presence_entity must confirm."""
+    """only_when_away with no person.* and no presence_entity must confirm.
+
+    The confirm-no-presence step is specific to the presence-simulation
+    flow (Planification ignores ``only_when_away``).
+    """
     result = await hass.config_entries.subentries.async_init(
-        (mock_config_entry.entry_id, SUBENTRY_TYPE_INSTANCE),
+        (mock_config_entry.entry_id, SUBENTRY_TYPE_PRESENCE_SIM),
         context={"source": SOURCE_USER},
     )
     result = await hass.config_entries.subentries.async_configure(
         result["flow_id"],
-        user_input=_valid_instance_input(
+        user_input=_valid_presence_sim_input(
             **{CONF_NAME: "RDC", CONF_ONLY_WHEN_AWAY: True}
         ),
     )
@@ -329,6 +355,65 @@ async def test_subentry_reconfigure_updates_existing(
     assert updated.title == "Étage"
     assert updated.data[CONF_OPEN_TIME] == "07:30:00"
     assert CONF_NAME not in updated.data
+
+
+# ---- Presence-simulation subentry flow --------------------------------------
+
+
+async def test_presence_simulation_subentry_user_flow_success(
+    hass: HomeAssistant, setup_integration, mock_config_entry: MockConfigEntry
+) -> None:
+    """Creating a presence-simulation subentry stores the four simulation fields."""
+    initial_count = len(mock_config_entry.subentries)
+
+    result = await hass.config_entries.subentries.async_init(
+        (mock_config_entry.entry_id, SUBENTRY_TYPE_PRESENCE_SIM),
+        context={"source": SOURCE_USER},
+    )
+    assert result["type"] == FlowResultType.FORM
+    assert result["step_id"] == "user"
+
+    result = await hass.config_entries.subentries.async_configure(
+        result["flow_id"],
+        user_input=_valid_presence_sim_input(
+            **{
+                CONF_NAME: "Présence",
+                CONF_RANDOMIZE: True,
+                CONF_RANDOM_MAX_MINUTES: 45,
+            }
+        ),
+    )
+    assert result["type"] == FlowResultType.CREATE_ENTRY
+    assert result["title"] == "Présence"
+
+    assert len(mock_config_entry.subentries) == initial_count + 1
+    new_subentry = next(
+        s for s in mock_config_entry.subentries.values()
+        if s.title == "Présence"
+    )
+    assert new_subentry.subentry_type == SUBENTRY_TYPE_PRESENCE_SIM
+    assert new_subentry.data[CONF_RANDOMIZE] is True
+    assert new_subentry.data[CONF_RANDOM_MAX_MINUTES] == 45
+    assert new_subentry.data[CONF_ONLY_WHEN_AWAY] is False
+
+
+async def test_instance_subentry_does_not_accept_simulation_fields(
+    hass: HomeAssistant, setup_integration, mock_config_entry: MockConfigEntry
+) -> None:
+    """Submitting simulation fields to the instance flow must fail validation."""
+    result = await hass.config_entries.subentries.async_init(
+        (mock_config_entry.entry_id, SUBENTRY_TYPE_INSTANCE),
+        context={"source": SOURCE_USER},
+    )
+    payload = _valid_instance_input(**{CONF_NAME: "RDC"})
+    payload[CONF_RANDOMIZE] = True
+
+    import voluptuous as vol
+
+    with pytest.raises(vol.Invalid):
+        await hass.config_entries.subentries.async_configure(
+            result["flow_id"], user_input=payload
+        )
 
 
 # ---- Sun-protection subentry flow -------------------------------------------

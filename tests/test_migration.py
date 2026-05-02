@@ -67,12 +67,13 @@ async def test_migration_promotes_single_legacy_entry_to_hub(
     assert await hass.config_entries.async_setup(legacy.entry_id)
     await hass.async_block_till_done()
 
-    # The original entry was promoted to a hub (v2→v3) then migrated to v4.
+    # The original entry was promoted to a hub (v2→v3), then v3→v4 (notify
+    # mode constants), then v4→v5 (presence_simulation split).
     entries = hass.config_entries.async_entries(DOMAIN)
     assert len(entries) == 1
     hub = entries[0]
     assert hub.entry_id == "legacy_a"
-    assert hub.version == 4
+    assert hub.version == 5
     assert hub.title == HUB_TITLE
     assert hub.unique_id == HUB_UNIQUE_ID
     assert hub.data[CONF_TYPE] == TYPE_HUB
@@ -115,7 +116,7 @@ async def test_migration_folds_two_legacy_entries_into_one_hub(
         f"Expected exactly one hub, got {[(e.entry_id, e.title) for e in entries]}"
     )
     hub = entries[0]
-    assert hub.version == 4
+    assert hub.version == 5
     assert hub.data[CONF_TYPE] == TYPE_HUB
 
     titles = sorted(s.title for s in hub.subentries.values())
@@ -161,13 +162,72 @@ async def test_migration_v3_to_v4_converts_boolean_flags(
     assert len(entries) == 1
     entry = entries[0]
     assert entry.entry_id == "native_hub"
-    assert entry.version == 4
+    assert entry.version == 5
     assert entry.data[CONF_NOTIFY_SERVICES] == [
         "notify.persistent_notification"
     ]
     assert entry.data[CONF_NOTIFY_MODE] == MODE_AWAY_ONLY
     assert CONF_NOTIFY_WHEN_AWAY_ONLY not in entry.data
     assert entry.data[CONF_TTS_MODE] == MODE_DISABLED
+
+
+async def test_migration_v4_to_v5_strips_simulation_fields_from_instance(
+    hass: HomeAssistant,
+) -> None:
+    """v4 instance subentries are kept as Planification with simulation fields purged.
+
+    v0.5.0 splits the former mixed ``instance`` subentry into a deterministic
+    Planification (still ``subentry_type='instance'``) and a new
+    ``presence_simulation`` type. Existing instances become Planification:
+    their ``randomize`` / ``random_max_minutes`` / ``only_when_away`` /
+    ``presence_entity`` fields are stripped from ``data``.
+    """
+    from homeassistant.config_entries import ConfigSubentryData
+
+    hub = MockConfigEntry(
+        domain=DOMAIN,
+        title=HUB_TITLE,
+        data={
+            CONF_TYPE: TYPE_HUB,
+            CONF_NOTIFY_SERVICES: [],
+            CONF_NOTIFY_MODE: MODE_DISABLED,
+        },
+        options={},
+        entry_id="hub_v4",
+        unique_id=HUB_UNIQUE_ID,
+        version=4,
+        subentries_data=[
+            ConfigSubentryData(
+                subentry_type=SUBENTRY_TYPE_INSTANCE,
+                title="Bureau",
+                unique_id="bureau",
+                data={
+                    CONF_COVERS: ["cover.bureau"],
+                    CONF_OPEN_TIME: "08:00:00",
+                    CONF_CLOSE_TIME: "20:00:00",
+                    CONF_DAYS: list(DAYS),
+                    CONF_RANDOMIZE: True,
+                    CONF_RANDOM_MAX_MINUTES: 45,
+                    CONF_ONLY_WHEN_AWAY: True,
+                },
+            )
+        ],
+    )
+    hub.add_to_hass(hass)
+
+    assert await hass.config_entries.async_setup(hub.entry_id)
+    await hass.async_block_till_done()
+
+    entry = hass.config_entries.async_get_entry(hub.entry_id)
+    assert entry.version == 5
+
+    subentry = next(iter(entry.subentries.values()))
+    assert subentry.subentry_type == SUBENTRY_TYPE_INSTANCE
+    assert subentry.data[CONF_OPEN_TIME] == "08:00:00"
+    assert subentry.data[CONF_CLOSE_TIME] == "20:00:00"
+    assert CONF_RANDOMIZE not in subentry.data
+    assert CONF_RANDOM_MAX_MINUTES not in subentry.data
+    assert CONF_ONLY_WHEN_AWAY not in subentry.data
 
 
 async def test_migration_reuses_legacy_entry_id_as_subentry_id(

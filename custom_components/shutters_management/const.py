@@ -10,6 +10,7 @@ PLATFORMS: list[Platform] = [Platform.SENSOR, Platform.SWITCH, Platform.BUTTON, 
 # Hub + subentry architecture (v0.4.0).
 TYPE_HUB = "hub"
 SUBENTRY_TYPE_INSTANCE = "instance"
+SUBENTRY_TYPE_PRESENCE_SIM = "presence_simulation"
 SUBENTRY_TYPE_SUN_PROTECTION = "sun_protection"
 HUB_UNIQUE_ID = "_global"
 HUB_TITLE = "Shutters Management"

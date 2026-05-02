@@ -106,23 +106,94 @@
     "instance": {
       "entry_type": "service",
       "initiate_flow": {
-        "user": "Add a shutter schedule"
+        "user": "Add a schedule"
       },
       "error": {
-        "name_required": "Choose a name for this instance.",
+        "name_required": "Choose a name for this schedule.",
         "no_covers": "Select at least one cover.",
         "no_days": "Select at least one day."
       },
       "abort": {
-        "already_configured": "An instance with this name is already configured.",
+        "already_configured": "A schedule with this name is already configured.",
         "reconfigure_successful": "Configuration updated."
       },
       "step": {
         "user": {
-          "title": "Add a shutter schedule",
-          "description": "Configure shutters to simulate presence.",
+          "title": "Add a schedule",
+          "description": "Configure deterministic open/close times for a group of covers.",
           "data": {
-            "name": "Instance name",
+            "name": "Schedule name",
+            "covers": "Shutters to control",
+            "days": "Active days"
+          },
+          "sections": {
+            "open": {
+              "name": "Opening",
+              "data": {
+                "open_mode": "Opening trigger",
+                "open_time": "Opening time (used when trigger is fixed)",
+                "open_offset": "Opening offset in minutes (used when trigger is sunrise/sunset)"
+              }
+            },
+            "close": {
+              "name": "Closing",
+              "data": {
+                "close_mode": "Closing trigger",
+                "close_time": "Closing time (used when trigger is fixed)",
+                "close_offset": "Closing offset in minutes (used when trigger is sunrise/sunset)"
+              }
+            }
+          }
+        },
+        "reconfigure": {
+          "title": "Edit schedule",
+          "description": "Update the configuration.",
+          "data": {
+            "name": "Schedule name",
+            "covers": "Shutters to control",
+            "days": "Active days"
+          },
+          "sections": {
+            "open": {
+              "name": "Opening",
+              "data": {
+                "open_mode": "Opening trigger",
+                "open_time": "Opening time (used when trigger is fixed)",
+                "open_offset": "Opening offset in minutes (used when trigger is sunrise/sunset)"
+              }
+            },
+            "close": {
+              "name": "Closing",
+              "data": {
+                "close_mode": "Closing trigger",
+                "close_time": "Closing time (used when trigger is fixed)",
+                "close_offset": "Closing offset in minutes (used when trigger is sunrise/sunset)"
+              }
+            }
+          }
+        }
+      }
+    },
+    "presence_simulation": {
+      "entry_type": "service",
+      "initiate_flow": {
+        "user": "Add a presence simulation"
+      },
+      "error": {
+        "name_required": "Choose a name for this simulation.",
+        "no_covers": "Select at least one cover.",
+        "no_days": "Select at least one day."
+      },
+      "abort": {
+        "already_configured": "A simulation with this name is already configured.",
+        "reconfigure_successful": "Configuration updated."
+      },
+      "step": {
+        "user": {
+          "title": "Add a presence simulation",
+          "description": "Mimic an occupied home: scheduled open/close with random offsets and optional away-only condition.",
+          "data": {
+            "name": "Simulation name",
             "covers": "Shutters to control",
             "days": "Active days",
             "randomize": "Randomize times",
@@ -150,10 +221,10 @@
           }
         },
         "reconfigure": {
-          "title": "Edit shutter schedule",
+          "title": "Edit presence simulation",
           "description": "Update the configuration.",
           "data": {
-            "name": "Instance name",
+            "name": "Simulation name",
             "covers": "Shutters to control",
             "days": "Active days",
             "randomize": "Randomize times",
@@ -228,7 +299,10 @@
   },
   "device": {
     "instance": {
-      "name": "Presence schedule"
+      "name": "Schedule"
+    },
+    "presence_simulation": {
+      "name": "Presence simulation"
     },
     "sun_protection": {
       "name": "Sun protection"
@@ -250,7 +324,7 @@
     },
     "switch": {
       "simulation_active": {
-        "name": "Simulation active"
+        "name": "Enabled"
       },
       "sun_protection": {
         "name": "Sun protection"

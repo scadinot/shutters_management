@@ -106,23 +106,94 @@
     "instance": {
       "entry_type": "service",
       "initiate_flow": {
-        "user": "Ajouter un planning de volets"
+        "user": "Ajouter une planification"
       },
       "error": {
-        "name_required": "Choisissez un nom pour cette instance.",
+        "name_required": "Choisissez un nom pour cette planification.",
         "no_covers": "Sélectionnez au moins un volet.",
         "no_days": "Sélectionnez au moins un jour."
       },
       "abort": {
-        "already_configured": "Une instance portant ce nom est déjà configurée.",
+        "already_configured": "Une planification portant ce nom est déjà configurée.",
         "reconfigure_successful": "Configuration mise à jour."
       },
       "step": {
         "user": {
-          "title": "Ajouter un planning de volets",
-          "description": "Configurer les volets pour simuler une présence.",
+          "title": "Ajouter une planification",
+          "description": "Configurer des heures fixes d'ouverture / fermeture pour un groupe de volets.",
           "data": {
-            "name": "Nom de l'instance",
+            "name": "Nom de la planification",
+            "covers": "Volets à piloter",
+            "days": "Jours actifs"
+          },
+          "sections": {
+            "open": {
+              "name": "Ouverture",
+              "data": {
+                "open_mode": "Déclencheur d'ouverture",
+                "open_time": "Heure d'ouverture (utilisée si déclencheur = heure fixe)",
+                "open_offset": "Décalage d'ouverture en minutes (utilisé si déclencheur = lever/coucher)"
+              }
+            },
+            "close": {
+              "name": "Fermeture",
+              "data": {
+                "close_mode": "Déclencheur de fermeture",
+                "close_time": "Heure de fermeture (utilisée si déclencheur = heure fixe)",
+                "close_offset": "Décalage de fermeture en minutes (utilisé si déclencheur = lever/coucher)"
+              }
+            }
+          }
+        },
+        "reconfigure": {
+          "title": "Modifier la planification",
+          "description": "Mettre à jour la configuration.",
+          "data": {
+            "name": "Nom de la planification",
+            "covers": "Volets à piloter",
+            "days": "Jours actifs"
+          },
+          "sections": {
+            "open": {
+              "name": "Ouverture",
+              "data": {
+                "open_mode": "Déclencheur d'ouverture",
+                "open_time": "Heure d'ouverture (utilisée si déclencheur = heure fixe)",
+                "open_offset": "Décalage d'ouverture en minutes (utilisé si déclencheur = lever/coucher)"
+              }
+            },
+            "close": {
+              "name": "Fermeture",
+              "data": {
+                "close_mode": "Déclencheur de fermeture",
+                "close_time": "Heure de fermeture (utilisée si déclencheur = heure fixe)",
+                "close_offset": "Décalage de fermeture en minutes (utilisé si déclencheur = lever/coucher)"
+              }
+            }
+          }
+        }
+      }
+    },
+    "presence_simulation": {
+      "entry_type": "service",
+      "initiate_flow": {
+        "user": "Ajouter une simulation de présence"
+      },
+      "error": {
+        "name_required": "Choisissez un nom pour cette simulation.",
+        "no_covers": "Sélectionnez au moins un volet.",
+        "no_days": "Sélectionnez au moins un jour."
+      },
+      "abort": {
+        "already_configured": "Une simulation portant ce nom est déjà configurée.",
+        "reconfigure_successful": "Configuration mise à jour."
+      },
+      "step": {
+        "user": {
+          "title": "Ajouter une simulation de présence",
+          "description": "Donner l'illusion d'une maison occupée : ouverture / fermeture programmées avec décalage aléatoire et condition d'absence optionnelle.",
+          "data": {
+            "name": "Nom de la simulation",
             "covers": "Volets à piloter",
             "days": "Jours actifs",
             "randomize": "Activer le décalage aléatoire",
@@ -150,10 +221,10 @@
           }
         },
         "reconfigure": {
-          "title": "Modifier le planning de volets",
+          "title": "Modifier la simulation de présence",
           "description": "Mettre à jour la configuration.",
           "data": {
-            "name": "Nom de l'instance",
+            "name": "Nom de la simulation",
             "covers": "Volets à piloter",
             "days": "Jours actifs",
             "randomize": "Activer le décalage aléatoire",
@@ -228,7 +299,10 @@
   },
   "device": {
     "instance": {
-      "name": "Planning de présence"
+      "name": "Planification"
+    },
+    "presence_simulation": {
+      "name": "Simulation de présence"
     },
     "sun_protection": {
       "name": "Protection solaire"
@@ -250,7 +324,7 @@
     },
     "switch": {
       "simulation_active": {
-        "name": "Simulation active"
+        "name": "Activé"
       },
       "sun_protection": {
         "name": "Protection solaire"

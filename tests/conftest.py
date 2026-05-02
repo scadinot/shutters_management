@@ -34,6 +34,7 @@ from custom_components.shutters_management.const import (
     HUB_TITLE,
     HUB_UNIQUE_ID,
     SUBENTRY_TYPE_INSTANCE,
+    SUBENTRY_TYPE_PRESENCE_SIM,
     TYPE_HUB,
 )
 
@@ -80,10 +81,11 @@ def make_subentry_data(
     title: str = "Bureau",
     unique_id: str = "bureau",
     data: dict[str, Any] | None = None,
+    subentry_type: str = SUBENTRY_TYPE_INSTANCE,
 ) -> ConfigSubentryData:
-    """Build a ``ConfigSubentryData`` for an instance subentry."""
+    """Build a ``ConfigSubentryData`` for a schedule or presence-sim subentry."""
     return ConfigSubentryData(
-        subentry_type=SUBENTRY_TYPE_INSTANCE,
+        subentry_type=subentry_type,
         title=title,
         unique_id=unique_id,
         data=dict(data) if data is not None else {},
@@ -100,7 +102,7 @@ def mock_config_entry(base_config: dict[str, Any]) -> MockConfigEntry:
         options={},
         entry_id="test_entry_id",
         unique_id=HUB_UNIQUE_ID,
-        version=4,
+        version=5,
         subentries_data=[
             make_subentry_data(
                 title="Bureau",
@@ -127,8 +129,14 @@ def build_hub_with_instance(
     instance_unique_id: str = "bureau",
     hub_data: dict[str, Any] | None = None,
     entry_id: str = "test_entry_id",
+    subentry_type: str = SUBENTRY_TYPE_INSTANCE,
 ) -> MockConfigEntry:
-    """Build a v3 hub MockConfigEntry containing exactly one instance subentry."""
+    """Build a v5 hub MockConfigEntry containing exactly one schedule subentry.
+
+    ``subentry_type`` defaults to plain Planification (``instance``); pass
+    ``SUBENTRY_TYPE_PRESENCE_SIM`` to exercise the presence-simulation flow
+    (which keeps ``randomize`` / ``only_when_away`` / ``presence_entity``).
+    """
     return MockConfigEntry(
         domain=DOMAIN,
         title=HUB_TITLE,
@@ -136,12 +144,13 @@ def build_hub_with_instance(
         options={},
         entry_id=entry_id,
         unique_id=HUB_UNIQUE_ID,
-        version=4,
+        version=5,
         subentries_data=[
             make_subentry_data(
                 title=instance_title,
                 unique_id=instance_unique_id,
                 data=instance_data,
+                subentry_type=subentry_type,
             )
         ],
     )
