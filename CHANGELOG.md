@@ -11,9 +11,13 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le pr
 ### Ajouté
 
 - **Champ `model` sur les devices** pour différencier visuellement les deux
-  familles de sous-entrées dans la fiche détail HA :
-  - Sous-entrée `instance` → `model = "Planning de présence"`
-  - Sous-entrée `sun_protection` → `model = "Protection solaire"`
+  familles de sous-entrées dans la fiche détaillée HA :
+  - Sous-entrée `instance` → `model = "Presence schedule"`
+  - Sous-entrée `sun_protection` → `model = "Sun protection"`
+  - Libellés en anglais car `DeviceInfo.model` n'est pas traduit par HA.
+  - Centralisés dans `const.py` (`DEVICE_MODEL_INSTANCE`,
+    `DEVICE_MODEL_SUN_PROTECTION`) pour éviter les divergences entre
+    plateformes (switch, sensor, button, binary_sensor).
 - C'est le pattern utilisé par toutes les intégrations natives (Shelly,
   TP-Link, ZHA, Z-Wave JS, MQTT) pour distinguer plusieurs types de devices
   d'une même intégration.
