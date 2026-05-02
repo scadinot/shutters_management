@@ -98,6 +98,7 @@ from .const import (
     DEFAULT_MIN_UV,
     DEFAULT_TARGET_POSITION,
     SUBENTRY_TYPE_INSTANCE,
+    SUBENTRY_TYPE_PRESENCE_SIM,
     SUBENTRY_TYPE_SUN_PROTECTION,
     SUN_ENTITY,
     TRIGGER_MODES,
@@ -345,7 +346,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             device_registry.async_update_device(device.id, model=None)
 
     for subentry in entry.subentries.values():
-        if subentry.subentry_type == SUBENTRY_TYPE_INSTANCE:
+        if subentry.subentry_type in (SUBENTRY_TYPE_INSTANCE, SUBENTRY_TYPE_PRESENCE_SIM):
             scheduler = ShuttersScheduler(hass, entry, subentry)
             scheduler.async_schedule()
             hass.data[DOMAIN][subentry.subentry_id] = scheduler
@@ -399,7 +400,11 @@ async def _async_update_listener(hass: HomeAssistant, entry: ConfigEntry) -> Non
     current = {
         sub.subentry_id: dict(sub.data)
         for sub in entry.subentries.values()
-        if sub.subentry_type in (SUBENTRY_TYPE_INSTANCE, SUBENTRY_TYPE_SUN_PROTECTION)
+        if sub.subentry_type in (
+            SUBENTRY_TYPE_INSTANCE,
+            SUBENTRY_TYPE_PRESENCE_SIM,
+            SUBENTRY_TYPE_SUN_PROTECTION,
+        )
     }
     loaded = {
         sid: dict(mgr.subentry.data)
@@ -424,10 +429,13 @@ async def async_migrate_entry(
     v3→v4: Replace the two boolean ``*_when_away_only`` flags with a
     three-state mode constant (``disabled`` / ``always`` / ``away_only``)
     on each notification channel.
-    """
-    if entry.version >= 4:
-        return True
 
+    v4→v5: Split the former ``instance`` subentry into a deterministic
+    ``Planification`` (still ``subentry_type='instance'``) and a new
+    ``presence_simulation`` type. Existing ``instance`` subentries are
+    kept as Planification, with the now-irrelevant simulation fields
+    purged from their ``data``.
+    """
     if entry.version < 3:
         _LOGGER.warning(
             "Entry %s is still at version %s after pre-setup migration; refusing to load",
@@ -436,32 +444,54 @@ async def async_migrate_entry(
         )
         return False
 
-    # v3 → v4
-    data = dict(entry.data)
+    if entry.version < 4:
+        data = dict(entry.data)
 
-    if CONF_NOTIFY_MODE not in data:
-        services = data.get(CONF_NOTIFY_SERVICES, [])
-        away_only = data.pop(CONF_NOTIFY_WHEN_AWAY_ONLY, False)
-        if not services:
-            data[CONF_NOTIFY_MODE] = MODE_DISABLED
-        elif away_only:
-            data[CONF_NOTIFY_MODE] = MODE_AWAY_ONLY
-        else:
-            data[CONF_NOTIFY_MODE] = MODE_ALWAYS
+        if CONF_NOTIFY_MODE not in data:
+            services = data.get(CONF_NOTIFY_SERVICES, [])
+            away_only = data.pop(CONF_NOTIFY_WHEN_AWAY_ONLY, False)
+            if not services:
+                data[CONF_NOTIFY_MODE] = MODE_DISABLED
+            elif away_only:
+                data[CONF_NOTIFY_MODE] = MODE_AWAY_ONLY
+            else:
+                data[CONF_NOTIFY_MODE] = MODE_ALWAYS
 
-    if CONF_TTS_MODE not in data:
-        engine = data.get(CONF_TTS_ENGINE)
-        tts_targets = data.get(CONF_TTS_TARGETS, [])
-        tts_away_only = data.pop(CONF_TTS_WHEN_AWAY_ONLY, False)
-        if not engine or not tts_targets:
-            data[CONF_TTS_MODE] = MODE_DISABLED
-        elif tts_away_only:
-            data[CONF_TTS_MODE] = MODE_AWAY_ONLY
-        else:
-            data[CONF_TTS_MODE] = MODE_ALWAYS
+        if CONF_TTS_MODE not in data:
+            engine = data.get(CONF_TTS_ENGINE)
+            tts_targets = data.get(CONF_TTS_TARGETS, [])
+            tts_away_only = data.pop(CONF_TTS_WHEN_AWAY_ONLY, False)
+            if not engine or not tts_targets:
+                data[CONF_TTS_MODE] = MODE_DISABLED
+            elif tts_away_only:
+                data[CONF_TTS_MODE] = MODE_AWAY_ONLY
+            else:
+                data[CONF_TTS_MODE] = MODE_ALWAYS
 
-    hass.config_entries.async_update_entry(entry, data=data, version=4)
-    _LOGGER.info("Migrated entry %s from version 3 to 4", entry.entry_id)
+        hass.config_entries.async_update_entry(entry, data=data, version=4)
+        _LOGGER.info("Migrated entry %s from version 3 to 4", entry.entry_id)
+
+    if entry.version < 5:
+        _PRESENCE_SIM_FIELDS = (
+            CONF_RANDOMIZE,
+            CONF_RANDOM_MAX_MINUTES,
+            CONF_ONLY_WHEN_AWAY,
+            CONF_PRESENCE_ENTITY,
+        )
+        for subentry in entry.subentries.values():
+            if subentry.subentry_type != SUBENTRY_TYPE_INSTANCE:
+                continue
+            stripped = {
+                k: v for k, v in subentry.data.items()
+                if k not in _PRESENCE_SIM_FIELDS
+            }
+            if stripped != dict(subentry.data):
+                hass.config_entries.async_update_subentry(
+                    entry, subentry, data=stripped
+                )
+        hass.config_entries.async_update_entry(entry, version=5)
+        _LOGGER.info("Migrated entry %s from version 4 to 5", entry.entry_id)
+
     return True
 
 
@@ -743,7 +773,18 @@ class ShuttersScheduler:
 
     @property
     def _settings(self) -> dict[str, Any]:
-        return dict(self.subentry.data)
+        data = dict(self.subentry.data)
+        # Plain "Planification" (instance) ignores presence-simulation fields
+        # even if leftover values exist in storage from a pre-v0.5.0 install.
+        if self.subentry.subentry_type == SUBENTRY_TYPE_INSTANCE:
+            for key in (
+                CONF_RANDOMIZE,
+                CONF_RANDOM_MAX_MINUTES,
+                CONF_ONLY_WHEN_AWAY,
+                CONF_PRESENCE_ENTITY,
+            ):
+                data.pop(key, None)
+        return data
 
     @callback
     def async_schedule(self) -> None:

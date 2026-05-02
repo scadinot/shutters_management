@@ -6,6 +6,43 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le pr
 
 ## [Non publié]
 
+## [0.5.0] — 2026-05-02
+
+### Ajouté
+
+- **Nouveau type de sous-entrée « Simulation de présence »** (clé interne
+  `presence_simulation`). Trois types de groupe sont désormais proposés via
+  « Ajouter un service » : **Planification**, **Simulation de présence**,
+  **Protection solaire**.
+- La Simulation de présence reprend le formulaire de Planification et y
+  ajoute les quatre champs dédiés à la simulation : `randomize`,
+  `random_max_minutes`, `only_when_away`, `presence_entity`.
+
+### Modifié
+
+- **Planification (sous-entrée `instance`)** : les champs `randomize`,
+  `random_max_minutes`, `only_when_away` et `presence_entity` sont retirés
+  du formulaire. La planification redevient strictement déterministe.
+- Libellés : « Planning de présence » → **« Planification »** (FR) /
+  « Presence schedule » → **« Schedule »** (EN). Le switch « Simulation
+  active » devient simplement **« Activé »** / **« Enabled »** (la clé de
+  traduction `simulation_active` reste inchangée pour ne pas casser les
+  `entity_id` existants).
+- Le scheduler ignore désormais `randomize` / `only_when_away` /
+  `presence_entity` pour les sous-entrées `instance`, même si ces clés
+  subsistent dans `subentry.data`.
+
+### Migration (v4 → v5)
+
+- Toutes les sous-entrées `instance` existantes deviennent des
+  Planifications. Les quatre champs de simulation sont **purgés** de leur
+  `data` lors du chargement. Pour retrouver le comportement d'avant
+  (aléa / condition d'absence), créer une sous-entrée
+  **« Simulation de présence »**.
+- Les `entity_id` (`switch.{...}_simulation_active`,
+  `sensor.{...}_next_open`, `sensor.{...}_next_close`,
+  `button.{...}_test_open`, `button.{...}_test_close`) sont conservés.
+
 ## [0.4.11] — 2026-05-02
 
 ### Corrigé
@@ -731,7 +768,8 @@ Aucun changement de code dans l'intégration. Seules les méta-données (`manife
 - Annulation propre des déclencheurs et des callbacks différés au déchargement / rechargement.
 - Traductions français et anglais.
 
-[Non publié]: https://github.com/scadinot/shutters_management/compare/0.4.11...HEAD
+[Non publié]: https://github.com/scadinot/shutters_management/compare/0.5.0...HEAD
+[0.5.0]: https://github.com/scadinot/shutters_management/compare/0.4.11...0.5.0
 [0.4.11]: https://github.com/scadinot/shutters_management/compare/0.4.10...0.4.11
 [0.4.10]: https://github.com/scadinot/shutters_management/compare/0.4.9...0.4.10
 [0.4.9]: https://github.com/scadinot/shutters_management/compare/0.4.8...0.4.9
