@@ -7,6 +7,10 @@
         "data": {
           "sequential_covers": "Operate covers one at a time in random order"
         },
+        "data": {
+          "sequential_covers": "Operate covers one at a time in random order",
+          "uv_entity": "UV index sensor (optional)"
+        },
         "sections": {
           "notifications": {
             "name": "Push notifications",
@@ -36,7 +40,8 @@
         "title": "Hub settings",
         "description": "Update the shared hub settings.",
         "data": {
-          "sequential_covers": "Operate covers one at a time in random order"
+          "sequential_covers": "Operate covers one at a time in random order",
+          "uv_entity": "UV index sensor (optional)"
         },
         "sections": {
           "notifications": {
@@ -59,6 +64,48 @@
     }
   },
   "config_subentries": {
+    "sun_protection": {
+      "entry_type": "service",
+      "initiate_flow": {
+        "user": "Add a sun-protection group"
+      },
+      "error": {
+        "name_required": "Choose a name for this group.",
+        "no_covers": "Select at least one cover."
+      },
+      "abort": {
+        "already_configured": "A group with this name is already configured.",
+        "reconfigure_successful": "Configuration updated."
+      },
+      "step": {
+        "user": {
+          "title": "Add a sun-protection group",
+          "description": "Configure covers to lower automatically when the sun faces this orientation.",
+          "data": {
+            "name": "Group name",
+            "covers": "Covers to control",
+            "orientation": "Facing direction",
+            "arc": "Exposure arc (± degrees)",
+            "min_elevation": "Minimum sun elevation (°)",
+            "min_uv": "Minimum UV index",
+            "target_position": "Position when sun is facing (% open)"
+          }
+        },
+        "reconfigure": {
+          "title": "Edit sun-protection group",
+          "description": "Update the configuration.",
+          "data": {
+            "name": "Group name",
+            "covers": "Covers to control",
+            "orientation": "Facing direction",
+            "arc": "Exposure arc (± degrees)",
+            "min_elevation": "Minimum sun elevation (°)",
+            "min_uv": "Minimum UV index",
+            "target_position": "Position when sun is facing (% open)"
+          }
+        }
+      }
+    },
     "instance": {
       "entry_type": "service",
       "initiate_flow": {
@@ -144,6 +191,18 @@
     }
   },
   "selector": {
+    "orientation": {
+      "options": {
+        "N": "North",
+        "NE": "North-East",
+        "E": "East",
+        "SE": "South-East",
+        "S": "South",
+        "SW": "South-West",
+        "W": "West",
+        "NW": "North-West"
+      }
+    },
     "notification_mode": {
       "options": {
         "disabled": "Disabled",
@@ -171,6 +230,11 @@
     }
   },
   "entity": {
+    "binary_sensor": {
+      "sun_protection_active": {
+        "name": "Sun protection active"
+      }
+    },
     "sensor": {
       "next_open": {
         "name": "Next opening"
@@ -182,6 +246,9 @@
     "switch": {
       "simulation_active": {
         "name": "Simulation active"
+      },
+      "sun_protection": {
+        "name": "Sun protection"
       }
     },
     "button": {

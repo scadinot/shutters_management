@@ -29,15 +29,20 @@ from homeassistant.helpers import selector
 from homeassistant.util import slugify
 
 from .const import (
+    CONF_ARC,
     CONF_CLOSE_MODE,
     CONF_CLOSE_OFFSET,
     CONF_CLOSE_TIME,
     CONF_COVERS,
     CONF_DAYS,
+    CONF_MIN_ELEVATION,
+    CONF_MIN_UV,
     CONF_NOTIFY_MODE,
     CONF_NOTIFY_SERVICES,
     CONF_ONLY_WHEN_AWAY,
+    CONF_ORIENTATION,
     CONF_SEQUENTIAL_COVERS,
+    CONF_TARGET_POSITION,
     CONF_TTS_ENGINE,
     CONF_TTS_MODE,
     CONF_TTS_TARGETS,
@@ -48,15 +53,21 @@ from .const import (
     CONF_RANDOMIZE,
     CONF_RANDOM_MAX_MINUTES,
     CONF_TYPE,
+    CONF_UV_ENTITY,
     DAYS,
+    DEFAULT_ARC,
     DEFAULT_CLOSE_MODE,
     DEFAULT_CLOSE_OFFSET,
     DEFAULT_CLOSE_TIME,
     DEFAULT_DAYS,
+    DEFAULT_MIN_ELEVATION,
+    DEFAULT_MIN_UV,
     DEFAULT_NOTIFY_MODE,
     DEFAULT_NOTIFY_SERVICES,
     DEFAULT_ONLY_WHEN_AWAY,
+    DEFAULT_ORIENTATION,
     DEFAULT_SEQUENTIAL_COVERS,
+    DEFAULT_TARGET_POSITION,
     DEFAULT_TTS_MODE,
     DEFAULT_TTS_TARGETS,
     DEFAULT_OPEN_MODE,
@@ -64,6 +75,7 @@ from .const import (
     DEFAULT_OPEN_TIME,
     DEFAULT_RANDOMIZE,
     DEFAULT_RANDOM_MAX_MINUTES,
+    DEFAULT_UV_ENTITY,
     MODE_ALWAYS,
     MODE_AWAY_ONLY,
     MODE_DISABLED,
@@ -72,7 +84,9 @@ from .const import (
     HUB_UNIQUE_ID,
     OFFSET_MAX_MINUTES,
     OFFSET_MIN_MINUTES,
+    ORIENTATION_CARDINALS,
     SUBENTRY_TYPE_INSTANCE,
+    SUBENTRY_TYPE_SUN_PROTECTION,
     TRIGGER_MODES,
     TYPE_HUB,
 )
@@ -213,6 +227,14 @@ def _build_hub_schema(
                     CONF_SEQUENTIAL_COVERS, DEFAULT_SEQUENTIAL_COVERS
                 ),
             ): selector.BooleanSelector(),
+            vol.Optional(
+                CONF_UV_ENTITY,
+                description={
+                    "suggested_value": defaults.get(CONF_UV_ENTITY, DEFAULT_UV_ENTITY)
+                },
+            ): selector.EntitySelector(
+                selector.EntitySelectorConfig(domain="sensor")
+            ),
             vol.Required(SECTION_NOTIFICATIONS): notifications_section,
             vol.Required(SECTION_VOICE_ANNOUNCEMENT): tts_section,
         }
@@ -428,6 +450,9 @@ def _normalize_hub(user_input: dict[str, Any]) -> dict[str, Any]:
     else:
         flat[CONF_TTS_TARGETS] = list(targets)
     flat.setdefault(CONF_TTS_MODE, DEFAULT_TTS_MODE)
+
+    uv_entity = flat.get(CONF_UV_ENTITY)
+    flat[CONF_UV_ENTITY] = uv_entity or ""
     return flat
 
 
@@ -473,7 +498,10 @@ class ShuttersManagementConfigFlow(ConfigFlow, domain=DOMAIN):
     def async_get_supported_subentry_types(
         cls, config_entry: ConfigEntry
     ) -> dict[str, type[ConfigSubentryFlow]]:
-        return {SUBENTRY_TYPE_INSTANCE: ShuttersInstanceSubentryFlow}
+        return {
+            SUBENTRY_TYPE_INSTANCE: ShuttersInstanceSubentryFlow,
+            SUBENTRY_TYPE_SUN_PROTECTION: ShuttersSunProtectionSubentryFlow,
+        }
 
     @staticmethod
     @callback
@@ -513,6 +541,9 @@ class ShuttersHubOptionsFlow(OptionsFlow):
             ),
             CONF_TTS_MODE: self.config_entry.data.get(
                 CONF_TTS_MODE, DEFAULT_TTS_MODE
+            ),
+            CONF_UV_ENTITY: self.config_entry.data.get(
+                CONF_UV_ENTITY, DEFAULT_UV_ENTITY
             ),
         }
         return self.async_show_form(
@@ -652,4 +683,173 @@ class ShuttersInstanceSubentryFlow(ConfigSubentryFlow):
             title=name,
             data=payload,
             unique_id=unique_id,
+        )
+
+
+# ---------------------------------------------------------------------------
+# Sun protection subentry
+# ---------------------------------------------------------------------------
+
+def _degrees_to_cardinal(degrees: int) -> str:
+    """Return the nearest cardinal key for a degree value."""
+    return min(ORIENTATION_CARDINALS, key=lambda k: abs(ORIENTATION_CARDINALS[k] - degrees))
+
+
+def _build_sun_protection_schema(defaults: dict[str, Any]) -> vol.Schema:
+    """Schema for a sun-protection group subentry."""
+    current_orientation = defaults.get(CONF_ORIENTATION, DEFAULT_ORIENTATION)
+    if isinstance(current_orientation, int):
+        current_orientation = _degrees_to_cardinal(current_orientation)
+
+    return vol.Schema(
+        {
+            vol.Required(
+                CONF_NAME,
+                default=defaults.get(CONF_NAME, ""),
+            ): selector.TextSelector(selector.TextSelectorConfig()),
+            vol.Required(
+                CONF_COVERS,
+                default=defaults.get(CONF_COVERS, []),
+            ): selector.EntitySelector(
+                selector.EntitySelectorConfig(domain="cover", multiple=True)
+            ),
+            vol.Required(
+                CONF_ORIENTATION,
+                default=current_orientation,
+            ): selector.SelectSelector(
+                selector.SelectSelectorConfig(
+                    options=list(ORIENTATION_CARDINALS.keys()),
+                    mode=selector.SelectSelectorMode.LIST,
+                    translation_key="orientation",
+                )
+            ),
+            vol.Required(
+                CONF_ARC,
+                default=defaults.get(CONF_ARC, DEFAULT_ARC),
+            ): selector.NumberSelector(
+                selector.NumberSelectorConfig(
+                    min=10,
+                    max=120,
+                    step=5,
+                    unit_of_measurement="°",
+                    mode=selector.NumberSelectorMode.SLIDER,
+                )
+            ),
+            vol.Required(
+                CONF_MIN_ELEVATION,
+                default=defaults.get(CONF_MIN_ELEVATION, DEFAULT_MIN_ELEVATION),
+            ): selector.NumberSelector(
+                selector.NumberSelectorConfig(
+                    min=0,
+                    max=60,
+                    step=1,
+                    unit_of_measurement="°",
+                    mode=selector.NumberSelectorMode.BOX,
+                )
+            ),
+            vol.Required(
+                CONF_MIN_UV,
+                default=defaults.get(CONF_MIN_UV, DEFAULT_MIN_UV),
+            ): selector.NumberSelector(
+                selector.NumberSelectorConfig(
+                    min=0,
+                    max=11,
+                    step=1,
+                    mode=selector.NumberSelectorMode.BOX,
+                )
+            ),
+            vol.Required(
+                CONF_TARGET_POSITION,
+                default=defaults.get(CONF_TARGET_POSITION, DEFAULT_TARGET_POSITION),
+            ): selector.NumberSelector(
+                selector.NumberSelectorConfig(
+                    min=0,
+                    max=100,
+                    step=5,
+                    unit_of_measurement="%",
+                    mode=selector.NumberSelectorMode.SLIDER,
+                )
+            ),
+        }
+    )
+
+
+def _normalize_sun_protection(user_input: dict[str, Any]) -> dict[str, Any]:
+    """Cast types and convert cardinal string to degree integer."""
+    flat = dict(user_input)
+    orientation_str = flat.get(CONF_ORIENTATION, "S")
+    flat[CONF_ORIENTATION] = ORIENTATION_CARDINALS.get(
+        orientation_str, DEFAULT_ORIENTATION
+    )
+    for key in (CONF_ARC, CONF_MIN_ELEVATION, CONF_MIN_UV, CONF_TARGET_POSITION):
+        if key in flat:
+            flat[key] = int(flat[key])
+    return flat
+
+
+class ShuttersSunProtectionSubentryFlow(ConfigSubentryFlow):
+    """Create or edit a *sun_protection* subentry (one orientation group)."""
+
+    async def async_step_user(
+        self, user_input: dict[str, Any] | None = None
+    ) -> SubentryFlowResult:
+        return await self._async_handle(user_input, edit_subentry_id=None)
+
+    async def async_step_reconfigure(
+        self, user_input: dict[str, Any] | None = None
+    ) -> SubentryFlowResult:
+        return await self._async_handle(
+            user_input, edit_subentry_id=self._reconfigure_subentry_id
+        )
+
+    async def _async_handle(
+        self,
+        user_input: dict[str, Any] | None,
+        *,
+        edit_subentry_id: str | None,
+    ) -> SubentryFlowResult:
+        errors: dict[str, str] = {}
+        entry = self._get_entry()
+
+        if user_input is not None:
+            data = _normalize_sun_protection(user_input)
+            name = (data.get(CONF_NAME) or "").strip()
+            if not name:
+                errors[CONF_NAME] = "name_required"
+            elif not data.get(CONF_COVERS):
+                errors[CONF_COVERS] = "no_covers"
+            else:
+                data[CONF_NAME] = name
+                payload = _strip_name(data)
+                unique_id = slugify(name)
+                normalized_title = name.casefold()
+
+                for sub_id, existing in entry.subentries.items():
+                    if sub_id == edit_subentry_id:
+                        continue
+                    if existing.unique_id == unique_id:
+                        return self.async_abort(reason="already_configured")
+                    if existing.title.casefold() == normalized_title:
+                        return self.async_abort(reason="already_configured")
+
+                if edit_subentry_id is not None:
+                    subentry = entry.subentries[edit_subentry_id]
+                    return self.async_update_and_abort(
+                        entry, subentry, title=name, data=payload
+                    )
+                return self.async_create_entry(
+                    title=name, data=payload, unique_id=unique_id
+                )
+
+        if edit_subentry_id is not None:
+            subentry = entry.subentries[edit_subentry_id]
+            defaults = {**subentry.data, CONF_NAME: subentry.title}
+        else:
+            defaults = {}
+
+        step_id = "reconfigure" if edit_subentry_id is not None else "user"
+        return self.async_show_form(
+            step_id=step_id,
+            data_schema=_build_sun_protection_schema(defaults),
+            errors=errors,
         )

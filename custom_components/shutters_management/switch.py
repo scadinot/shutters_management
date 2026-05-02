@@ -10,8 +10,13 @@ from homeassistant.helpers.device_registry import DeviceEntryType, DeviceInfo
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from . import ShuttersScheduler
-from .const import DOMAIN, SUBENTRY_TYPE_INSTANCE, signal_state_update
+from . import ShuttersScheduler, ShuttersSunProtectionManager
+from .const import (
+    DOMAIN,
+    SUBENTRY_TYPE_INSTANCE,
+    SUBENTRY_TYPE_SUN_PROTECTION,
+    signal_state_update,
+)
 from .entities import _build_entity_id
 
 
@@ -20,15 +25,22 @@ async def async_setup_entry(
     entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    """Set up the simulation switch for every instance subentry of the hub."""
+    """Set up switch entities for every subentry of the hub."""
     for subentry in entry.subentries.values():
-        if subentry.subentry_type != SUBENTRY_TYPE_INSTANCE:
-            continue
-        scheduler: ShuttersScheduler = hass.data[DOMAIN][subentry.subentry_id]
-        async_add_entities(
-            [ShuttersSimulationSwitch(scheduler)],
-            config_subentry_id=subentry.subentry_id,
-        )
+        if subentry.subentry_type == SUBENTRY_TYPE_INSTANCE:
+            scheduler: ShuttersScheduler = hass.data[DOMAIN][subentry.subentry_id]
+            async_add_entities(
+                [ShuttersSimulationSwitch(scheduler)],
+                config_subentry_id=subentry.subentry_id,
+            )
+        elif subentry.subentry_type == SUBENTRY_TYPE_SUN_PROTECTION:
+            manager: ShuttersSunProtectionManager = hass.data[DOMAIN][
+                subentry.subentry_id
+            ]
+            async_add_entities(
+                [SunProtectionSwitch(manager)],
+                config_subentry_id=subentry.subentry_id,
+            )
 
 
 class ShuttersSimulationSwitch(SwitchEntity):
@@ -70,6 +82,48 @@ class ShuttersSimulationSwitch(SwitchEntity):
             async_dispatcher_connect(
                 self.hass,
                 signal_state_update(self._scheduler.subentry_id),
+                self._handle_update,
+            )
+        )
+
+    @callback
+    def _handle_update(self) -> None:
+        self.async_write_ha_state()
+
+
+class SunProtectionSwitch(SwitchEntity):
+    """Switch to enable or disable a sun-protection group."""
+
+    _attr_has_entity_name = True
+    _attr_translation_key = "sun_protection"
+    _attr_should_poll = False
+
+    def __init__(self, manager: ShuttersSunProtectionManager) -> None:
+        self._manager = manager
+        subentry = manager.subentry
+        self._attr_unique_id = f"{subentry.subentry_id}_sun_protection"
+        self._attr_device_info = DeviceInfo(
+            identifiers={(DOMAIN, subentry.subentry_id)},
+            name=subentry.title,
+            manufacturer="Shutters Management",
+            entry_type=DeviceEntryType.SERVICE,
+        )
+
+    @property
+    def is_on(self) -> bool:
+        return self._manager.is_enabled
+
+    async def async_turn_on(self, **kwargs: Any) -> None:
+        self._manager.set_enabled(True)
+
+    async def async_turn_off(self, **kwargs: Any) -> None:
+        self._manager.set_enabled(False)
+
+    async def async_added_to_hass(self) -> None:
+        self.async_on_remove(
+            async_dispatcher_connect(
+                self.hass,
+                signal_state_update(self._manager.subentry_id),
                 self._handle_update,
             )
         )

@@ -5,7 +5,8 @@
         "title": "Shutters Management",
         "description": "Configurer les paramètres partagés du hub. Vous ajouterez ensuite des plannings de volets en créant des instances sur le hub de l'intégration.",
         "data": {
-          "sequential_covers": "Actionner les volets successivement dans un ordre aléatoire"
+          "sequential_covers": "Actionner les volets successivement dans un ordre aléatoire",
+          "uv_entity": "Capteur d'indice UV (optionnel)"
         },
         "sections": {
           "notifications": {
@@ -36,7 +37,8 @@
         "title": "Paramètres du hub",
         "description": "Mettre à jour les paramètres partagés du hub.",
         "data": {
-          "sequential_covers": "Actionner les volets successivement dans un ordre aléatoire"
+          "sequential_covers": "Actionner les volets successivement dans un ordre aléatoire",
+          "uv_entity": "Capteur d'indice UV (optionnel)"
         },
         "sections": {
           "notifications": {
@@ -59,6 +61,48 @@
     }
   },
   "config_subentries": {
+    "sun_protection": {
+      "entry_type": "service",
+      "initiate_flow": {
+        "user": "Ajouter un groupe de protection solaire"
+      },
+      "error": {
+        "name_required": "Choisissez un nom pour ce groupe.",
+        "no_covers": "Sélectionnez au moins un volet."
+      },
+      "abort": {
+        "already_configured": "Un groupe portant ce nom est déjà configuré.",
+        "reconfigure_successful": "Configuration mise à jour."
+      },
+      "step": {
+        "user": {
+          "title": "Ajouter un groupe de protection solaire",
+          "description": "Configurer les volets à baisser automatiquement quand le soleil fait face à cette orientation.",
+          "data": {
+            "name": "Nom du groupe",
+            "covers": "Volets à piloter",
+            "orientation": "Orientation",
+            "arc": "Arc d'exposition (± degrés)",
+            "min_elevation": "Élévation solaire minimale (°)",
+            "min_uv": "Indice UV minimum",
+            "target_position": "Position quand le soleil est en face (% ouvert)"
+          }
+        },
+        "reconfigure": {
+          "title": "Modifier le groupe de protection solaire",
+          "description": "Mettre à jour la configuration.",
+          "data": {
+            "name": "Nom du groupe",
+            "covers": "Volets à piloter",
+            "orientation": "Orientation",
+            "arc": "Arc d'exposition (± degrés)",
+            "min_elevation": "Élévation solaire minimale (°)",
+            "min_uv": "Indice UV minimum",
+            "target_position": "Position quand le soleil est en face (% ouvert)"
+          }
+        }
+      }
+    },
     "instance": {
       "entry_type": "service",
       "initiate_flow": {
@@ -144,6 +188,18 @@
     }
   },
   "selector": {
+    "orientation": {
+      "options": {
+        "N": "Nord",
+        "NE": "Nord-Est",
+        "E": "Est",
+        "SE": "Sud-Est",
+        "S": "Sud",
+        "SW": "Sud-Ouest",
+        "W": "Ouest",
+        "NW": "Nord-Ouest"
+      }
+    },
     "notification_mode": {
       "options": {
         "disabled": "Sans",
@@ -171,6 +227,11 @@
     }
   },
   "entity": {
+    "binary_sensor": {
+      "sun_protection_active": {
+        "name": "Protection solaire active"
+      }
+    },
     "sensor": {
       "next_open": {
         "name": "Prochaine ouverture"
@@ -182,6 +243,9 @@
     "switch": {
       "simulation_active": {
         "name": "Simulation active"
+      },
+      "sun_protection": {
+        "name": "Protection solaire"
       }
     },
     "button": {

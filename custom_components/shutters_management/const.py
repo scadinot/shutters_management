@@ -5,11 +5,12 @@ from homeassistant.const import Platform
 
 DOMAIN = "shutters_management"
 
-PLATFORMS: list[Platform] = [Platform.SENSOR, Platform.SWITCH, Platform.BUTTON]
+PLATFORMS: list[Platform] = [Platform.SENSOR, Platform.SWITCH, Platform.BUTTON, Platform.BINARY_SENSOR]
 
 # Hub + subentry architecture (v0.4.0).
 TYPE_HUB = "hub"
 SUBENTRY_TYPE_INSTANCE = "instance"
+SUBENTRY_TYPE_SUN_PROTECTION = "sun_protection"
 HUB_UNIQUE_ID = "_global"
 HUB_TITLE = "Shutters Management"
 CONF_TYPE = "type"
@@ -26,6 +27,28 @@ CONF_RANDOMIZE = "randomize"
 CONF_RANDOM_MAX_MINUTES = "random_max_minutes"
 CONF_ONLY_WHEN_AWAY = "only_when_away"
 CONF_PRESENCE_ENTITY = "presence_entity"
+
+# Sun protection (v0.4.6)
+CONF_UV_ENTITY = "uv_entity"
+CONF_ORIENTATION = "orientation"
+CONF_ARC = "arc"
+CONF_MIN_ELEVATION = "min_elevation"
+CONF_MIN_UV = "min_uv"
+CONF_TARGET_POSITION = "target_position"
+
+ORIENTATION_CARDINALS: dict[str, int] = {
+    "N": 0, "NE": 45, "E": 90, "SE": 135,
+    "S": 180, "SW": 225, "W": 270, "NW": 315,
+}
+
+DEFAULT_UV_ENTITY: str = ""
+DEFAULT_ORIENTATION = 180  # South
+DEFAULT_ARC = 60
+DEFAULT_MIN_ELEVATION = 15
+DEFAULT_MIN_UV = 3
+DEFAULT_TARGET_POSITION = 50
+
+SUN_ENTITY = "sun.sun"
 
 CONF_NOTIFY_SERVICES = "notify_services"
 CONF_NOTIFY_WHEN_AWAY_ONLY = "notify_when_away_only"  # kept for v3→v4 migration
