@@ -6,6 +6,26 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le pr
 
 ## [Non publié]
 
+## [0.4.9] — 2026-05-02
+
+### Corrigé
+
+- **Nom du device sur la carte** : restauration au titre de la sous-entrée
+  (« Bureau », « Chambres », « Séjour ») au lieu de la clé brute « instance »
+  ou « sun_protection » qui s'affichait depuis la v0.4.7.
+- Cause racine : `translation_key` avait été ajouté sur `DeviceInfo` pour une
+  tentative d'icône via `icons.json`, mécanisme non supporté par HA. Sans
+  traduction correspondante dans `strings.json`, HA tombait en fallback sur
+  la clé brute, ce qui écrasait le `name=subentry.title`. Référence :
+  `homeassistant/helpers/device_registry.py:871-881`
+  (`translations.get(full_translation_key, translation_key)`).
+- Le champ `model` ajouté en v0.4.8 (« Presence schedule » / « Sun protection »)
+  reste en place et continue de différencier les deux familles de devices.
+
+> **Note** : pour les installations existantes, recharger l'intégration
+> (`Settings > Devices > Shutters Management > … > Reload`) pour que HA
+> recalcule le nom du device depuis `DeviceInfo`.
+
 ## [0.4.8] — 2026-05-02
 
 ### Ajouté
@@ -668,7 +688,17 @@ Aucun changement de code dans l'intégration. Seules les méta-données (`manife
 - Annulation propre des déclencheurs et des callbacks différés au déchargement / rechargement.
 - Traductions français et anglais.
 
-[Non publié]: https://github.com/scadinot/shutters_management/compare/v0.3.5...HEAD
+[Non publié]: https://github.com/scadinot/shutters_management/compare/0.4.9...HEAD
+[0.4.9]: https://github.com/scadinot/shutters_management/compare/0.4.8...0.4.9
+[0.4.8]: https://github.com/scadinot/shutters_management/compare/0.4.7...0.4.8
+[0.4.7]: https://github.com/scadinot/shutters_management/compare/0.4.6...0.4.7
+[0.4.6]: https://github.com/scadinot/shutters_management/compare/0.4.5...0.4.6
+[0.4.5]: https://github.com/scadinot/shutters_management/compare/0.4.4...0.4.5
+[0.4.4]: https://github.com/scadinot/shutters_management/compare/0.4.3...0.4.4
+[0.4.3]: https://github.com/scadinot/shutters_management/compare/0.4.2...0.4.3
+[0.4.2]: https://github.com/scadinot/shutters_management/compare/0.4.1...0.4.2
+[0.4.1]: https://github.com/scadinot/shutters_management/compare/0.4.0...0.4.1
+[0.4.0]: https://github.com/scadinot/shutters_management/compare/0.3.5...0.4.0
 [0.3.5]: https://github.com/scadinot/shutters_management/compare/v0.3.4...v0.3.5
 [0.3.4]: https://github.com/scadinot/shutters_management/compare/v0.3.3...v0.3.4
 [0.3.3]: https://github.com/scadinot/shutters_management/compare/v0.3.2...v0.3.3
