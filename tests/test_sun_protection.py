@@ -186,6 +186,9 @@ async def test_exits_sun_mode_and_restores_position(hass: HomeAssistant) -> None
     manager = hass.data[DOMAIN][subentry_id]
     assert manager.is_active
 
+    # async_mock_service doesn't update HA state; simulate cover reaching target.
+    hass.states.async_set("cover.living_room", "open", {"current_position": 50})
+
     # Sun moves away from arc.
     cover_calls = async_mock_service(hass, "cover", "set_cover_position")
     _set_sun(hass, azimuth=0, elevation=30)
@@ -320,6 +323,9 @@ async def test_switch_disabled_exits_sun_mode(hass: HomeAssistant) -> None:
 
     manager = hass.data[DOMAIN][subentry_id]
     assert manager.is_active
+
+    # async_mock_service doesn't update HA state; simulate cover reaching target.
+    hass.states.async_set("cover.living_room", "open", {"current_position": 50})
 
     restore_calls = async_mock_service(hass, "cover", "set_cover_position")
     manager.set_enabled(False)

@@ -687,10 +687,17 @@ class ShuttersSunProtectionManager:
             return
         new_pos_int = int(new_pos)
         applied = self._applied_positions.get(cover_id)
-        # If position changed from what we set → external move; update snapshot.
-        if new_pos_int != applied:
-            self._snapshots[cover_id] = new_pos_int
-            self._applied_positions[cover_id] = new_pos_int
+        snapshot = self._snapshots.get(cover_id)
+        # Ignore intermediate positions while the cover is moving toward our target.
+        # Only consider it an external move when it lands outside the transit range.
+        if (
+            applied is not None
+            and snapshot is not None
+            and min(snapshot, applied) <= new_pos_int <= max(snapshot, applied)
+        ):
+            return
+        self._snapshots[cover_id] = new_pos_int
+        self._applied_positions[cover_id] = new_pos_int
 
     def set_enabled(self, enabled: bool) -> None:
         """Toggle the group on/off (called by the switch entity)."""

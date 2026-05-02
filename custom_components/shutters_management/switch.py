@@ -102,6 +102,9 @@ class SunProtectionSwitch(SwitchEntity):
         self._manager = manager
         subentry = manager.subentry
         self._attr_unique_id = f"{subentry.subentry_id}_sun_protection"
+        suggested = _build_entity_id("switch", subentry, self._attr_translation_key)
+        if suggested is not None:
+            self.entity_id = suggested
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, subentry.subentry_id)},
             name=subentry.title,

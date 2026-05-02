@@ -5,9 +5,6 @@
         "title": "Shutters Management",
         "description": "Configure shared hub settings. Add shutter schedules afterwards by adding instances on the integration's hub.",
         "data": {
-          "sequential_covers": "Operate covers one at a time in random order"
-        },
-        "data": {
           "sequential_covers": "Operate covers one at a time in random order",
           "uv_entity": "UV index sensor (optional)"
         },
@@ -193,14 +190,14 @@
   "selector": {
     "orientation": {
       "options": {
-        "N": "North",
-        "NE": "North-East",
-        "E": "East",
-        "SE": "South-East",
-        "S": "South",
-        "SW": "South-West",
-        "W": "West",
-        "NW": "North-West"
+        "n": "North",
+        "ne": "North-East",
+        "e": "East",
+        "se": "South-East",
+        "s": "South",
+        "sw": "South-West",
+        "w": "West",
+        "nw": "North-West"
       }
     },
     "notification_mode": {

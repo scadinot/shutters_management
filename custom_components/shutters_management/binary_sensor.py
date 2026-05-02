@@ -10,6 +10,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from . import ShuttersSunProtectionManager
 from .const import DOMAIN, SUBENTRY_TYPE_SUN_PROTECTION, signal_state_update
+from .entities import _build_entity_id
 
 
 async def async_setup_entry(
@@ -41,6 +42,11 @@ class SunProtectionActiveSensor(BinarySensorEntity):
         self._manager = manager
         subentry = manager.subentry
         self._attr_unique_id = f"{subentry.subentry_id}_sun_protection_active"
+        suggested = _build_entity_id(
+            "binary_sensor", subentry, self._attr_translation_key
+        )
+        if suggested is not None:
+            self.entity_id = suggested
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, subentry.subentry_id)},
             name=subentry.title,

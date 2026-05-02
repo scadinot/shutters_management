@@ -8,32 +8,43 @@ from homeassistant.data_entry_flow import FlowResultType
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.shutters_management.const import (
+    CONF_ARC,
     CONF_CLOSE_MODE,
     CONF_CLOSE_OFFSET,
     CONF_CLOSE_TIME,
     CONF_COVERS,
     CONF_DAYS,
+    CONF_MIN_ELEVATION,
+    CONF_MIN_UV,
     CONF_NOTIFY_MODE,
     CONF_NOTIFY_SERVICES,
     CONF_ONLY_WHEN_AWAY,
     CONF_OPEN_MODE,
     CONF_OPEN_OFFSET,
     CONF_OPEN_TIME,
+    CONF_ORIENTATION,
     CONF_RANDOMIZE,
     CONF_RANDOM_MAX_MINUTES,
     CONF_SEQUENTIAL_COVERS,
+    CONF_TARGET_POSITION,
     CONF_TTS_MODE,
     CONF_TTS_TARGETS,
     CONF_TYPE,
+    CONF_UV_ENTITY,
     DAYS,
+    DEFAULT_ARC,
     DEFAULT_CLOSE_MODE,
+    DEFAULT_MIN_ELEVATION,
+    DEFAULT_MIN_UV,
     DEFAULT_OPEN_MODE,
+    DEFAULT_TARGET_POSITION,
     DOMAIN,
     HUB_TITLE,
     MODE_ALWAYS,
     MODE_AWAY_ONLY,
     MODE_DISABLED,
     SUBENTRY_TYPE_INSTANCE,
+    SUBENTRY_TYPE_SUN_PROTECTION,
     TYPE_HUB,
 )
 
@@ -318,3 +329,163 @@ async def test_subentry_reconfigure_updates_existing(
     assert updated.title == "Étage"
     assert updated.data[CONF_OPEN_TIME] == "07:30:00"
     assert CONF_NAME not in updated.data
+
+
+# ---- Sun-protection subentry flow -------------------------------------------
+
+
+def _valid_sun_protection_input(**overrides):
+    """Flat user_input matching the sun-protection subentry schema."""
+    data: dict[str, object] = {
+        CONF_NAME: "Salon Sud",
+        CONF_COVERS: ["cover.living_room"],
+        CONF_ORIENTATION: "s",
+        CONF_ARC: DEFAULT_ARC,
+        CONF_MIN_ELEVATION: DEFAULT_MIN_ELEVATION,
+        CONF_MIN_UV: DEFAULT_MIN_UV,
+        CONF_TARGET_POSITION: DEFAULT_TARGET_POSITION,
+    }
+    data.update(overrides)
+    return data
+
+
+async def test_sun_protection_subentry_user_flow_success(
+    hass: HomeAssistant, setup_integration, mock_config_entry: MockConfigEntry
+) -> None:
+    """Creating a sun-protection subentry stores normalized data."""
+    initial_count = len(mock_config_entry.subentries)
+
+    result = await hass.config_entries.subentries.async_init(
+        (mock_config_entry.entry_id, SUBENTRY_TYPE_SUN_PROTECTION),
+        context={"source": SOURCE_USER},
+    )
+    assert result["type"] == FlowResultType.FORM
+    assert result["step_id"] == "user"
+
+    result = await hass.config_entries.subentries.async_configure(
+        result["flow_id"],
+        user_input=_valid_sun_protection_input(),
+    )
+    assert result["type"] == FlowResultType.CREATE_ENTRY
+    assert result["title"] == "Salon Sud"
+
+    assert len(mock_config_entry.subentries) == initial_count + 1
+    new_subentry = next(
+        s for s in mock_config_entry.subentries.values() if s.title == "Salon Sud"
+    )
+    assert new_subentry.unique_id == "salon_sud"
+    # Orientation cardinal "s" normalises to 180 degrees.
+    assert new_subentry.data[CONF_ORIENTATION] == 180
+    assert new_subentry.data[CONF_ARC] == DEFAULT_ARC
+    assert new_subentry.data[CONF_TARGET_POSITION] == DEFAULT_TARGET_POSITION
+    assert CONF_NAME not in new_subentry.data
+
+
+async def test_sun_protection_subentry_user_flow_no_covers_error(
+    hass: HomeAssistant, setup_integration, mock_config_entry: MockConfigEntry
+) -> None:
+    """Submitting an empty covers list surfaces a validation error."""
+    result = await hass.config_entries.subentries.async_init(
+        (mock_config_entry.entry_id, SUBENTRY_TYPE_SUN_PROTECTION),
+        context={"source": SOURCE_USER},
+    )
+    result = await hass.config_entries.subentries.async_configure(
+        result["flow_id"],
+        user_input=_valid_sun_protection_input(**{CONF_COVERS: []}),
+    )
+    assert result["type"] == FlowResultType.FORM
+    assert result["errors"] == {CONF_COVERS: "no_covers"}
+
+
+async def test_sun_protection_subentry_user_flow_aborts_on_duplicate_name(
+    hass: HomeAssistant, setup_integration, mock_config_entry: MockConfigEntry
+) -> None:
+    """Creating a second group with the same name aborts with already_configured."""
+    # Create first group.
+    result = await hass.config_entries.subentries.async_init(
+        (mock_config_entry.entry_id, SUBENTRY_TYPE_SUN_PROTECTION),
+        context={"source": SOURCE_USER},
+    )
+    await hass.config_entries.subentries.async_configure(
+        result["flow_id"],
+        user_input=_valid_sun_protection_input(**{CONF_NAME: "Salon"}),
+    )
+
+    # Attempt duplicate.
+    result = await hass.config_entries.subentries.async_init(
+        (mock_config_entry.entry_id, SUBENTRY_TYPE_SUN_PROTECTION),
+        context={"source": SOURCE_USER},
+    )
+    result = await hass.config_entries.subentries.async_configure(
+        result["flow_id"],
+        user_input=_valid_sun_protection_input(**{CONF_NAME: "Salon"}),
+    )
+    assert result["type"] == FlowResultType.ABORT
+    assert result["reason"] == "already_configured"
+
+
+async def test_sun_protection_subentry_reconfigure_updates_existing(
+    hass: HomeAssistant, setup_integration, mock_config_entry: MockConfigEntry
+) -> None:
+    """Reconfigure flow updates an existing sun-protection subentry."""
+    # First create a sun-protection subentry.
+    result = await hass.config_entries.subentries.async_init(
+        (mock_config_entry.entry_id, SUBENTRY_TYPE_SUN_PROTECTION),
+        context={"source": SOURCE_USER},
+    )
+    result = await hass.config_entries.subentries.async_configure(
+        result["flow_id"],
+        user_input=_valid_sun_protection_input(**{CONF_NAME: "Terrasse Est"}),
+    )
+    assert result["type"] == FlowResultType.CREATE_ENTRY
+    subentry_id = next(
+        sid
+        for sid, s in mock_config_entry.subentries.items()
+        if s.title == "Terrasse Est"
+    )
+
+    # Reconfigure: change orientation and target position.
+    result = await mock_config_entry.start_subentry_reconfigure_flow(
+        hass, subentry_id
+    )
+    assert result["type"] == FlowResultType.FORM
+    assert result["step_id"] == "reconfigure"
+
+    result = await hass.config_entries.subentries.async_configure(
+        result["flow_id"],
+        user_input=_valid_sun_protection_input(
+            **{CONF_NAME: "Terrasse Est", CONF_ORIENTATION: "e", CONF_TARGET_POSITION: 30}
+        ),
+    )
+    assert result["type"] == FlowResultType.ABORT
+    assert result["reason"] == "reconfigure_successful"
+
+    updated = mock_config_entry.subentries[subentry_id]
+    assert updated.data[CONF_ORIENTATION] == 90  # "e" → 90°
+    assert updated.data[CONF_TARGET_POSITION] == 30
+
+
+async def test_hub_user_flow_persists_uv_entity(hass: HomeAssistant) -> None:
+    """uv_entity submitted in hub config flow is stored in entry.data."""
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": SOURCE_USER}
+    )
+    assert result["type"] == FlowResultType.FORM
+
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"],
+        user_input={
+            CONF_SEQUENTIAL_COVERS: False,
+            CONF_UV_ENTITY: "sensor.uv_index",
+            "notifications": {
+                CONF_NOTIFY_SERVICES: [],
+                CONF_NOTIFY_MODE: MODE_ALWAYS,
+            },
+            "voice_announcement": {
+                CONF_TTS_TARGETS: [],
+                CONF_TTS_MODE: MODE_DISABLED,
+            },
+        },
+    )
+    assert result["type"] == FlowResultType.CREATE_ENTRY
+    assert result["data"][CONF_UV_ENTITY] == "sensor.uv_index"

@@ -37,8 +37,8 @@ CONF_MIN_UV = "min_uv"
 CONF_TARGET_POSITION = "target_position"
 
 ORIENTATION_CARDINALS: dict[str, int] = {
-    "N": 0, "NE": 45, "E": 90, "SE": 135,
-    "S": 180, "SW": 225, "W": 270, "NW": 315,
+    "n": 0, "ne": 45, "e": 90, "se": 135,
+    "s": 180, "sw": 225, "w": 270, "nw": 315,
 }
 
 DEFAULT_UV_ENTITY: str = ""
