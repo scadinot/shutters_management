@@ -67,7 +67,6 @@ class ShuttersSimulationSwitch(SwitchEntity):
             manufacturer="Shutters Management",
             model=DEVICE_MODEL_INSTANCE,
             entry_type=DeviceEntryType.SERVICE,
-            translation_key="instance",
         )
 
     @property
@@ -115,7 +114,6 @@ class SunProtectionSwitch(SwitchEntity):
             manufacturer="Shutters Management",
             model=DEVICE_MODEL_SUN_PROTECTION,
             entry_type=DeviceEntryType.SERVICE,
-            translation_key="sun_protection",
         )
 
     @property

@@ -6,6 +6,26 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le pr
 
 ## [Non publié]
 
+## [0.4.9] — 2026-05-02
+
+### Corrigé
+
+- **Nom du device sur la carte** : restauration au titre de la sous-entrée
+  (« Bureau », « Chambres », « Séjour ») au lieu de la clé brute « instance »
+  ou « sun_protection » qui s'affichait depuis la v0.4.7.
+- Cause racine : `translation_key` avait été ajouté sur `DeviceInfo` pour une
+  tentative d'icône via `icons.json`, mécanisme non supporté par HA. Sans
+  traduction correspondante dans `strings.json`, HA tombait en fallback sur
+  la clé brute, ce qui écrasait le `name=subentry.title`. Référence :
+  `homeassistant/helpers/device_registry.py:871-881`
+  (`translations.get(full_translation_key, translation_key)`).
+- Le champ `model` ajouté en v0.4.8 (« Presence schedule » / « Sun protection »)
+  reste en place et continue de différencier les deux familles de devices.
+
+> **Note** : pour les installations existantes, recharger l'intégration
+> (`Settings > Devices > Shutters Management > … > Reload`) pour que HA
+> recalcule le nom du device depuis `DeviceInfo`.
+
 ## [0.4.8] — 2026-05-02
 
 ### Ajouté

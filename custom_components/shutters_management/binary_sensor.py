@@ -58,7 +58,6 @@ class SunProtectionActiveSensor(BinarySensorEntity):
             manufacturer="Shutters Management",
             model=DEVICE_MODEL_SUN_PROTECTION,
             entry_type=DeviceEntryType.SERVICE,
-            translation_key="sun_protection",
         )
 
     @property
