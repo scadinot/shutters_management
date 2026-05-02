@@ -64,6 +64,7 @@ class ShuttersSimulationSwitch(SwitchEntity):
             name=subentry.title,
             manufacturer="Shutters Management",
             entry_type=DeviceEntryType.SERVICE,
+            translation_key="instance",
         )
 
     @property
@@ -110,6 +111,7 @@ class SunProtectionSwitch(SwitchEntity):
             name=subentry.title,
             manufacturer="Shutters Management",
             entry_type=DeviceEntryType.SERVICE,
+            translation_key="sun_protection",
         )
 
     @property

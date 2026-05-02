@@ -6,6 +6,67 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le pr
 
 ## [Non publié]
 
+## [0.4.7] — 2026-05-02
+
+### Ajouté
+
+- **Icônes MDI** par entité via `icons.json` : chaque entité affiche
+  désormais une icône distinctive dans le tableau de bord et les listes
+  d'entités HA.
+  - Switch simulation active → `mdi:calendar-clock`
+  - Switch protection solaire → `mdi:weather-sunny`
+  - Binary sensor protection solaire active → `mdi:sun-angle`
+  - Sensor prochaine ouverture → `mdi:blinds-open`
+  - Sensor prochaine fermeture → `mdi:blinds`
+  - Bouton tester ouverture → `mdi:arrow-up-circle-outline`
+  - Bouton tester fermeture → `mdi:arrow-down-circle-outline`
+- `translation_key` sur chaque `DeviceInfo` (`"instance"` /
+  `"sun_protection"`) pour préparer les noms de devices traduits dans
+  les futures versions de HA.
+
+> **Note** : les sections `device` et `services` d'`icons.json` ne sont
+> pas acceptées par hassfest dans la version HA actuelle — seule la
+> section `entity` est prise en charge. Les icônes des device cards de la
+> vue intégration restent donc génériques.
+
+## [0.4.6] — 2026-05-02
+
+### Ajouté
+
+- **Protection solaire par orientation** — nouveau type de sous-entrée
+  `sun_protection` à créer depuis le hub :
+  - Orientation (8 cardinaux N/NE/E/SE/S/SO/O/NO), arc d'exposition
+    (±°), élévation solaire minimale, indice UV minimum, position cible.
+  - Abaisse les volets exposés automatiquement quand le soleil fait face à
+    l'orientation configurée.
+  - Restauration automatique de la position d'origine à la sortie du mode
+    soleil (sauf mouvement manuel détecté).
+  - Le scheduler de présence **gagne toujours** en cas de conflit.
+  - S'applique en permanence (indépendant de la détection de présence).
+- **Capteur UV optionnel** au niveau du hub (`uv_entity`) : si renseigné,
+  l'activation du groupe n'a lieu qu'au-dessus du seuil UV configuré.
+- Deux nouvelles entités par groupe de protection solaire :
+  - `switch.<groupe>` — activer/désactiver le groupe
+  - `binary_sensor.<groupe>_active` — vrai quand les volets sont en mode
+    soleil (attributs : élévation, azimut, UV, statut)
+- Plateforme `binary_sensor` ajoutée à l'intégration.
+
+### Correctifs
+
+- Clés du sélecteur d'orientation en minuscules (`n/ne/e/…`) pour
+  satisfaire la règle hassfest `[a-z0-9-_]+`.
+- `entity_id` dérivé de la `translation_key` anglaise (stable quel que
+  soit la locale active à l'installation).
+- Snapshots protégés contre les positions intermédiaires émises par HA
+  pendant le mouvement d'un volet vers la position commandée.
+
+### Tests
+
+- Nouvelle suite `tests/test_sun_protection.py` (10 tests).
+- Couverture du config flow étendue aux groupes `sun_protection`
+  (création, erreurs de validation, reconfiguration, persistance de
+  `uv_entity`).
+
 ## [0.4.5] — 2026-05-01
 
 ### Modifié

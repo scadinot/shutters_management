@@ -57,6 +57,7 @@ class ShuttersNextTriggerSensor(SensorEntity):
             name=subentry.title,
             manufacturer="Shutters Management",
             entry_type=DeviceEntryType.SERVICE,
+            translation_key="instance",
         )
 
     @property
