@@ -81,6 +81,7 @@ from .const import (
     MODE_AWAY_ONLY,
     MODE_DISABLED,
     MODE_FIXED,
+    MODE_NONE,
     MODE_SUNRISE,
     MODE_SUNSET,
     PLATFORMS,
@@ -849,6 +850,8 @@ class ShuttersScheduler:
         offset_min: int,
     ) -> Callable[[], None]:
         """Register a single open/close trigger for the given mode."""
+        if mode == MODE_NONE:
+            return lambda: None
         handler = self._make_handler(service)
         if mode == MODE_FIXED:
             time_obj = _parse_time(time_value)
@@ -1252,6 +1255,8 @@ class ShuttersScheduler:
         mode = self._resolve_mode(
             settings.get(mode_key, default_mode), default_mode, mode_key
         )
+        if mode == MODE_NONE:
+            return None
         if mode == MODE_FIXED:
             time_value = _parse_time(settings[time_key])
             local_now = dt_util.as_local(dt_util.utcnow())

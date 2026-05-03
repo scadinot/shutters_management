@@ -22,6 +22,7 @@ from custom_components.shutters_management.const import (
     DAYS,
     DOMAIN,
     MODE_FIXED,
+    MODE_NONE,
     MODE_SUNRISE,
     MODE_SUNSET,
 )
@@ -163,3 +164,58 @@ async def test_unknown_mode_falls_back_safely(
     scheduler = hass.data[DOMAIN][subentry_id]
     result = scheduler.next_open()
     assert result is not None
+
+
+async def test_none_open_mode_registers_no_trigger(
+    hass: HomeAssistant,
+) -> None:
+    """With open_mode=none no time/sun tracker must be registered for opening."""
+    entry = _build_entry(open_mode=MODE_NONE)
+    entry.add_to_hass(hass)
+    with patch(
+        "custom_components.shutters_management.async_track_time_change"
+    ) as mock_time, patch(
+        "custom_components.shutters_management.async_track_sunrise"
+    ) as mock_rise, patch(
+        "custom_components.shutters_management.async_track_sunset"
+    ) as mock_set:
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+
+    mock_time.assert_called_once()  # only the close trigger (fixed by default)
+    mock_rise.assert_not_called()
+    mock_set.assert_not_called()
+
+    subentry_id = get_only_subentry_id(entry)
+    scheduler = hass.data[DOMAIN][subentry_id]
+    assert len(scheduler._unsubs) == 2  # two slots: open no-op + close real
+
+
+async def test_none_open_mode_next_open_is_none(
+    hass: HomeAssistant,
+) -> None:
+    """next_open() must return None when open_mode is none."""
+    entry = _build_entry(open_mode=MODE_NONE)
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    subentry_id = get_only_subentry_id(entry)
+    scheduler = hass.data[DOMAIN][subentry_id]
+    assert scheduler.next_open() is None
+    assert scheduler.next_close() is not None
+
+
+async def test_none_close_mode_next_close_is_none(
+    hass: HomeAssistant,
+) -> None:
+    """next_close() must return None when close_mode is none."""
+    entry = _build_entry(close_mode=MODE_NONE)
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    subentry_id = get_only_subentry_id(entry)
+    scheduler = hass.data[DOMAIN][subentry_id]
+    assert scheduler.next_close() is None
+    assert scheduler.next_open() is not None

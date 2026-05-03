@@ -288,6 +288,7 @@
     },
     "trigger_modes": {
       "options": {
+        "none": "None",
         "fixed": "Fixed time",
         "sunrise": "Sunrise",
         "sunset": "Sunset"

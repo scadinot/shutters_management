@@ -288,6 +288,7 @@
     },
     "trigger_modes": {
       "options": {
+        "none": "Sans",
         "fixed": "Heure fixe",
         "sunrise": "Lever du soleil",
         "sunset": "Coucher du soleil"
