@@ -6,6 +6,20 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le pr
 
 ## [Non publié]
 
+## [0.5.4] — 2026-05-03
+
+### Ajouté
+
+- **Mode « Sans » pour les déclencheurs Ouverture et Fermeture** (Planification
+  et Simulation de présence). Sélectionner « Sans » pour un sens désactive
+  entièrement ce déclencheur : le volet s'ouvre (ou se ferme) uniquement via
+  l'autre sens, sans déclenchement automatique opposé.
+  - Nouveau mode interne `none` dans `TRIGGER_MODES`.
+  - Quand `mode = none`, aucun `async_track_*` n'est enregistré.
+  - `next_open()` / `next_close()` retournent `None` → capteur en état `unknown`.
+  - Le mode apparaît en premier dans le dropdown : **Sans** / Heure fixe /
+    Lever du soleil / Coucher du soleil.
+
 ## [0.5.3] — 2026-05-03
 
 ### Supprimé
@@ -815,7 +829,8 @@ Aucun changement de code dans l'intégration. Seules les méta-données (`manife
 - Annulation propre des déclencheurs et des callbacks différés au déchargement / rechargement.
 - Traductions français et anglais.
 
-[Non publié]: https://github.com/scadinot/shutters_management/compare/0.5.3...HEAD
+[Non publié]: https://github.com/scadinot/shutters_management/compare/0.5.4...HEAD
+[0.5.4]: https://github.com/scadinot/shutters_management/compare/0.5.3...0.5.4
 [0.5.3]: https://github.com/scadinot/shutters_management/compare/0.5.2...0.5.3
 [0.5.2]: https://github.com/scadinot/shutters_management/compare/0.5.1...0.5.2
 [0.5.1]: https://github.com/scadinot/shutters_management/compare/0.5.0...0.5.1
