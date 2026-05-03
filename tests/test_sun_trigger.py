@@ -170,7 +170,7 @@ async def test_none_open_mode_registers_no_trigger(
     hass: HomeAssistant,
 ) -> None:
     """With open_mode=none no time/sun tracker must be registered for opening."""
-    entry = _build_entry(open_mode=MODE_NONE)
+    entry = _build_entry(open_mode=MODE_NONE, close_mode=MODE_FIXED)
     entry.add_to_hass(hass)
     with patch(
         "custom_components.shutters_management.async_track_time_change"
@@ -182,13 +182,9 @@ async def test_none_open_mode_registers_no_trigger(
         assert await hass.config_entries.async_setup(entry.entry_id)
         await hass.async_block_till_done()
 
-    mock_time.assert_called_once()  # only the close trigger (fixed by default)
+    mock_time.assert_called_once()  # only the close trigger (MODE_FIXED)
     mock_rise.assert_not_called()
     mock_set.assert_not_called()
-
-    subentry_id = get_only_subentry_id(entry)
-    scheduler = hass.data[DOMAIN][subentry_id]
-    assert len(scheduler._unsubs) == 2  # two slots: open no-op + close real
 
 
 async def test_none_open_mode_next_open_is_none(

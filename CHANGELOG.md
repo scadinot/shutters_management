@@ -16,7 +16,7 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le pr
   l'autre sens, sans déclenchement automatique opposé.
   - Nouveau mode interne `none` dans `TRIGGER_MODES`.
   - Quand `mode = none`, aucun `async_track_*` n'est enregistré.
-  - `next_open()` / `next_close()` retournent `None` → capteur `unavailable`.
+  - `next_open()` / `next_close()` retournent `None` → capteur en état `unknown`.
   - Le mode apparaît en premier dans le dropdown : **Sans** / Heure fixe /
     Lever du soleil / Coucher du soleil.
 
