@@ -85,9 +85,9 @@
           },
           "sections": {
             "shutters": {
-              "name": "Covers to control",
+              "name": "Shutters to control",
               "data": {
-                "covers": "Covers to control"
+                "covers": "Shutters to control"
               }
             }
           }
@@ -105,9 +105,9 @@
           },
           "sections": {
             "shutters": {
-              "name": "Covers to control",
+              "name": "Shutters to control",
               "data": {
-                "covers": "Covers to control"
+                "covers": "Shutters to control"
               }
             }
           }
