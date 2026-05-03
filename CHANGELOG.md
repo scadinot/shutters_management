@@ -12,9 +12,12 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le pr
 
 - **Suite de la v0.5.7** : la chaîne vide `""` utilisée pour masquer le label
   redondant du sélecteur d'entités provoquait un fallback côté frontend HA,
-  qui ré-affichait alors la clé brute « covers ». Remplacée par un espace
-  insécable (` `) qui satisfait le frontend sans afficher de texte
-  visible.
+  qui ré-affichait alors la clé brute « covers ». Le label interne devient
+  désormais « Sélection » (FR) / « Selection » (EN), distinct du titre de la
+  section « Volets à piloter » / « Shutters to control » et donc non
+  redondant. (Une tentative intermédiaire avec un espace insécable a été
+  rejetée par Hassfest qui interdit les chaînes vides ou composées
+  uniquement d'espaces.)
 
 ## [0.5.7] — 2026-05-03
 
