@@ -12,8 +12,8 @@
       "next_close": { "default": "mdi:blinds" }
     },
     "button": {
-      "test_open": { "default": "mdi:arrow-up-circle-outline" },
-      "test_close": { "default": "mdi:arrow-down-circle-outline" }
+      "open": { "default": "mdi:arrow-up-circle-outline" },
+      "close": { "default": "mdi:arrow-down-circle-outline" }
     }
   }
 }

@@ -6,6 +6,21 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le pr
 
 ## [Non publié]
 
+## [0.5.5] — 2026-05-03
+
+### Changé
+
+- **Boutons d'action renommés.** « Tester l'ouverture / la fermeture »
+  deviennent « Ouverture / Fermeture » (FR) et « Test open / Test close »
+  deviennent « Opening / Closing » (EN). Reflète leur usage légitime dans des
+  automatisations (`button.press`).
+- Pour les nouvelles installations, l'entity_id passe de
+  `button.<nom>_test_open` / `_test_close` à `button.<nom>_open` / `_close`.
+- **Compatibilité préservée** : le `unique_id` interne reste identique. Les
+  installations existantes conservent leur entity_id (`_test_open` /
+  `_test_close`) et leurs automatisations continuent de fonctionner sans
+  changement.
+
 ## [0.5.4] — 2026-05-03
 
 ### Ajouté
@@ -830,6 +845,7 @@ Aucun changement de code dans l'intégration. Seules les méta-données (`manife
 - Traductions français et anglais.
 
 [Non publié]: https://github.com/scadinot/shutters_management/compare/0.5.4...HEAD
+[0.5.5]: https://github.com/scadinot/shutters_management/compare/0.5.4...0.5.5
 [0.5.4]: https://github.com/scadinot/shutters_management/compare/0.5.3...0.5.4
 [0.5.3]: https://github.com/scadinot/shutters_management/compare/0.5.2...0.5.3
 [0.5.2]: https://github.com/scadinot/shutters_management/compare/0.5.1...0.5.2

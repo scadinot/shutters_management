@@ -329,11 +329,11 @@
       }
     },
     "button": {
-      "test_open": {
-        "name": "Tester l'ouverture"
+      "open": {
+        "name": "Ouverture"
       },
-      "test_close": {
-        "name": "Tester la fermeture"
+      "close": {
+        "name": "Fermeture"
       }
     }
   },

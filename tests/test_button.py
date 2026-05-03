@@ -1,4 +1,4 @@
-"""Tests for the test_open / test_close button entities."""
+"""Tests for the open / close button entities."""
 from __future__ import annotations
 
 from unittest.mock import AsyncMock, patch
@@ -56,8 +56,8 @@ async def test_button_entity_ids_are_stable_english(
     close_id = registry.async_get_entity_id(
         "button", DOMAIN, f"{subentry_id}_test_{ACTION_CLOSE}"
     )
-    assert open_id == "button.bureau_test_open"
-    assert close_id == "button.bureau_test_close"
+    assert open_id == "button.bureau_open"
+    assert close_id == "button.bureau_close"
 
 
 async def test_button_press_open_calls_run_now(
