@@ -9,5 +9,6 @@
   "iot_class": "calculated",
   "issue_tracker": "https://github.com/scadinot/shutters_management/issues",
   "requirements": [],
-  "version": "0.5.1"
+  "single_config_entry": true,
+  "version": "0.5.2"
 }

@@ -145,12 +145,12 @@ async def test_hub_user_flow_creates_singleton(hass: HomeAssistant) -> None:
 async def test_hub_user_flow_aborts_when_already_configured(
     hass: HomeAssistant, setup_integration
 ) -> None:
-    """A second hub creation must abort with already_configured."""
+    """A second hub creation must abort: HA core enforces single_config_entry."""
     result = await hass.config_entries.flow.async_init(
         DOMAIN, context={"source": SOURCE_USER}
     )
     assert result["type"] == FlowResultType.ABORT
-    assert result["reason"] == "already_configured"
+    assert result["reason"] == "single_instance_allowed"
 
 
 async def test_hub_options_flow_updates_notification_settings(
