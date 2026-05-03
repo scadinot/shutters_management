@@ -87,7 +87,7 @@
             "shutters": {
               "name": "Shutters to control",
               "data": {
-                "covers": ""
+                "covers": "Selection"
               }
             }
           }
@@ -107,7 +107,7 @@
             "shutters": {
               "name": "Shutters to control",
               "data": {
-                "covers": ""
+                "covers": "Selection"
               }
             }
           }
@@ -140,7 +140,7 @@
             "shutters": {
               "name": "Shutters to control",
               "data": {
-                "covers": ""
+                "covers": "Selection"
               }
             },
             "open": {
@@ -172,7 +172,7 @@
             "shutters": {
               "name": "Shutters to control",
               "data": {
-                "covers": ""
+                "covers": "Selection"
               }
             },
             "open": {
@@ -225,7 +225,7 @@
             "shutters": {
               "name": "Shutters to control",
               "data": {
-                "covers": ""
+                "covers": "Selection"
               }
             },
             "open": {
@@ -261,7 +261,7 @@
             "shutters": {
               "name": "Shutters to control",
               "data": {
-                "covers": ""
+                "covers": "Selection"
               }
             },
             "open": {

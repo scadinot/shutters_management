@@ -1,6 +1,9 @@
 """Tests for the Shutters Management config and subentry flows."""
 from __future__ import annotations
 
+import json
+from pathlib import Path
+
 import pytest
 import voluptuous as vol
 from homeassistant import data_entry_flow
@@ -709,3 +712,46 @@ async def test_hub_user_flow_persists_uv_entity(hass: HomeAssistant) -> None:
     )
     assert result["type"] == FlowResultType.CREATE_ENTRY
     assert result["data"][CONF_UV_ENTITY] == "sensor.uv_index"
+
+
+_TRANSLATION_PATHS = [
+    Path(__file__).resolve().parent.parent
+    / "custom_components"
+    / "shutters_management"
+    / "strings.json",
+    Path(__file__).resolve().parent.parent
+    / "custom_components"
+    / "shutters_management"
+    / "translations"
+    / "en.json",
+    Path(__file__).resolve().parent.parent
+    / "custom_components"
+    / "shutters_management"
+    / "translations"
+    / "fr.json",
+]
+
+
+@pytest.mark.parametrize("path", _TRANSLATION_PATHS, ids=lambda p: p.name)
+@pytest.mark.parametrize(
+    "subentry", ["instance", "presence_simulation", "sun_protection"]
+)
+@pytest.mark.parametrize("step", ["user", "reconfigure"])
+def test_shutters_section_covers_label_is_non_empty(
+    path: Path, subentry: str, step: str
+) -> None:
+    """Inner ``covers`` label must be a non-empty, non-whitespace string.
+
+    Empty (``""``) or whitespace-only values trigger a Hassfest failure
+    or a frontend fallback that renders the raw ``covers`` key. This
+    test guards against both regressions for every translation file and
+    every subentry/step combination that uses the ``shutters`` section.
+    """
+    data = json.loads(path.read_text(encoding="utf-8"))
+    label = (
+        data["config_subentries"][subentry]["step"][step]["sections"]
+        ["shutters"]["data"]["covers"]
+    )
+    assert isinstance(label, str) and label.strip(), (
+        f"{path.name} {subentry}.{step}: covers label must be non-empty, got {label!r}"
+    )
