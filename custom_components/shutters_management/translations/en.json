@@ -28,7 +28,7 @@
       }
     },
     "abort": {
-      "already_configured": "Shutters Management is already configured. Add schedules and presence simulations from the existing hub."
+      "already_configured": "Shutters Management is already configured. Add schedules, presence simulations, and sun protection from the existing hub."
     }
   },
   "options": {
