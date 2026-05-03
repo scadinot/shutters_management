@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import pytest
+import voluptuous as vol
+from homeassistant import data_entry_flow
 from homeassistant.config_entries import SOURCE_USER
 from homeassistant.const import CONF_NAME
 from homeassistant.core import HomeAssistant
@@ -60,7 +62,7 @@ def _valid_instance_input(**overrides):
     """
     data: dict[str, object] = {
         CONF_NAME: "Bureau",
-        CONF_COVERS: ["cover.living_room"],
+        "shutters": {CONF_COVERS: ["cover.living_room"]},
         "open": {
             CONF_OPEN_MODE: DEFAULT_OPEN_MODE,
             CONF_OPEN_TIME: "08:00:00",
@@ -80,6 +82,8 @@ def _valid_instance_input(**overrides):
             data["open"][key] = value
         elif key in close_keys:
             data["close"][key] = value
+        elif key == CONF_COVERS:
+            data["shutters"][CONF_COVERS] = value
         else:
             data[key] = value
     return data
@@ -475,17 +479,21 @@ async def test_instance_subentry_does_not_accept_simulation_fields(
 
 
 def _valid_sun_protection_input(**overrides):
-    """Flat user_input matching the sun-protection subentry schema."""
+    """User_input matching the sun-protection subentry schema (covers in section)."""
     data: dict[str, object] = {
         CONF_NAME: "Salon Sud",
-        CONF_COVERS: ["cover.living_room"],
+        "shutters": {CONF_COVERS: ["cover.living_room"]},
         CONF_ORIENTATION: "s",
         CONF_ARC: DEFAULT_ARC,
         CONF_MIN_ELEVATION: DEFAULT_MIN_ELEVATION,
         CONF_MIN_UV: DEFAULT_MIN_UV,
         CONF_TARGET_POSITION: DEFAULT_TARGET_POSITION,
     }
-    data.update(overrides)
+    for key, value in overrides.items():
+        if key == CONF_COVERS:
+            data["shutters"][CONF_COVERS] = value
+        else:
+            data[key] = value
     return data
 
 
@@ -603,6 +611,78 @@ async def test_sun_protection_subentry_reconfigure_updates_existing(
     updated = mock_config_entry.subentries[subentry_id]
     assert updated.data[CONF_ORIENTATION] == 90  # "e" → 90°
     assert updated.data[CONF_TARGET_POSITION] == 30
+
+
+# ---- Reconfigure form pre-population (covers section) -----------------------
+
+
+def _section_field_default(schema: vol.Schema, section_key: str, field_key: str):
+    """Walk a vol.Schema to read the default of a field nested in a section."""
+    for marker, value in schema.schema.items():
+        if marker.schema == section_key and isinstance(value, data_entry_flow.section):
+            for inner_marker in value.schema.schema:
+                if inner_marker.schema == field_key:
+                    return inner_marker.default()
+    raise AssertionError(
+        f"Field {field_key!r} not found in section {section_key!r}"
+    )
+
+
+async def test_subentry_reconfigure_preloads_covers_in_section(
+    hass: HomeAssistant, setup_integration, mock_config_entry: MockConfigEntry
+) -> None:
+    """The schedule reconfigure form must pre-populate the shutters section.
+
+    Regression for the section-based covers refactor: when reopening the
+    form, the existing flat ``CONF_COVERS`` stored in subentry.data must
+    appear as the default value of the ``covers`` field nested inside the
+    new ``shutters`` section.
+    """
+    subentry_id = next(iter(mock_config_entry.subentries))
+    stored_covers = mock_config_entry.subentries[subentry_id].data[CONF_COVERS]
+    assert stored_covers, "fixture must store at least one cover"
+
+    result = await mock_config_entry.start_subentry_reconfigure_flow(
+        hass, subentry_id
+    )
+    assert result["type"] == FlowResultType.FORM
+
+    default = _section_field_default(
+        result["data_schema"], "shutters", CONF_COVERS
+    )
+    assert default == stored_covers
+
+
+async def test_sun_protection_subentry_reconfigure_preloads_covers_in_section(
+    hass: HomeAssistant, setup_integration, mock_config_entry: MockConfigEntry
+) -> None:
+    """The sun-protection reconfigure form must pre-populate the shutters section."""
+    result = await hass.config_entries.subentries.async_init(
+        (mock_config_entry.entry_id, SUBENTRY_TYPE_SUN_PROTECTION),
+        context={"source": SOURCE_USER},
+    )
+    result = await hass.config_entries.subentries.async_configure(
+        result["flow_id"],
+        user_input=_valid_sun_protection_input(
+            **{CONF_NAME: "Façade Sud", CONF_COVERS: ["cover.south_a", "cover.south_b"]}
+        ),
+    )
+    assert result["type"] == FlowResultType.CREATE_ENTRY
+    subentry_id = next(
+        sid
+        for sid, s in mock_config_entry.subentries.items()
+        if s.title == "Façade Sud"
+    )
+
+    result = await mock_config_entry.start_subentry_reconfigure_flow(
+        hass, subentry_id
+    )
+    assert result["type"] == FlowResultType.FORM
+
+    default = _section_field_default(
+        result["data_schema"], "shutters", CONF_COVERS
+    )
+    assert default == ["cover.south_a", "cover.south_b"]
 
 
 async def test_hub_user_flow_persists_uv_entity(hass: HomeAssistant) -> None:
