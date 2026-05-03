@@ -501,7 +501,6 @@ class ShuttersManagementConfigFlow(ConfigFlow, domain=DOMAIN):
     ) -> FlowResult:
         """Create the hub. Only one hub may exist (singleton)."""
         await self.async_set_unique_id(HUB_UNIQUE_ID)
-        self._abort_if_unique_id_configured()
 
         if user_input is not None:
             normalized = _normalize_hub(user_input)
