@@ -6,6 +6,22 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le pr
 
 ## [Non publié]
 
+## [0.5.3] — 2026-05-03
+
+### Supprimé
+
+- **Code mort post-`single_config_entry`** : depuis v0.5.2, HA core
+  intercepte toutes les tentatives de second flow hub avant d'atteindre
+  `async_step_user` (`config_entries.py:1460`). En conséquence :
+  - `_abort_if_unique_id_configured()` retiré de `async_step_user`
+    (jamais déclenché en présence d'une entrée existante).
+  - Clé `config.abort.already_configured` retirée de `strings.json`,
+    `translations/fr.json` et `translations/en.json` (jamais affichée).
+
+Les `config_subentries.*.abort.already_configured` (détection de noms
+dupliqués sur les sous-entrées Planification, Simulation de présence et
+Protection solaire) sont conservés — toujours actifs.
+
 ## [0.5.2] — 2026-05-03
 
 ### Corrigé
@@ -799,7 +815,8 @@ Aucun changement de code dans l'intégration. Seules les méta-données (`manife
 - Annulation propre des déclencheurs et des callbacks différés au déchargement / rechargement.
 - Traductions français et anglais.
 
-[Non publié]: https://github.com/scadinot/shutters_management/compare/0.5.2...HEAD
+[Non publié]: https://github.com/scadinot/shutters_management/compare/0.5.3...HEAD
+[0.5.3]: https://github.com/scadinot/shutters_management/compare/0.5.2...0.5.3
 [0.5.2]: https://github.com/scadinot/shutters_management/compare/0.5.1...0.5.2
 [0.5.1]: https://github.com/scadinot/shutters_management/compare/0.5.0...0.5.1
 [0.5.0]: https://github.com/scadinot/shutters_management/compare/0.4.11...0.5.0
