@@ -6,6 +6,18 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le pr
 
 ## [Non publié]
 
+## [0.5.1] — 2026-05-03
+
+### Corrigé
+
+- **Bouton « Ajouter un pont » masqué** quand l'intégration est déjà
+  configurée : `single_config_entry = True` est désormais déclaré sur le
+  `ConfigFlow` du hub. Il devenait inutile (et trompeur) puisque l'unique
+  hub est créé au premier setup.
+- Message d'abandon `already_configured` mis à jour pour refléter les trois
+  types de sous-entrée (Planification, Simulation de présence, Protection
+  solaire) au lieu de mentionner uniquement « instance ».
+
 ## [0.5.0] — 2026-05-02
 
 ### Ajouté

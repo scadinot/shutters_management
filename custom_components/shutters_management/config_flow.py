@@ -495,6 +495,7 @@ class ShuttersManagementConfigFlow(ConfigFlow, domain=DOMAIN):
     """
 
     VERSION = 5
+    single_config_entry = True
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
