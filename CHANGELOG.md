@@ -6,6 +6,15 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le pr
 
 ## [Non publié]
 
+## [0.5.6] — 2026-05-03
+
+### Changé
+
+- **Volets à piloter dans une section repliable** (Planification, Simulation
+  de présence et Protection solaire). Le sélecteur multi-entités est désormais
+  encapsulé dans un groupe « Volets à piloter » (FR) / « Shutters to control »
+  (EN), identique aux groupes Ouverture et Fermeture.
+
 ## [0.5.5] — 2026-05-03
 
 ### Changé
@@ -844,7 +853,8 @@ Aucun changement de code dans l'intégration. Seules les méta-données (`manife
 - Annulation propre des déclencheurs et des callbacks différés au déchargement / rechargement.
 - Traductions français et anglais.
 
-[Non publié]: https://github.com/scadinot/shutters_management/compare/0.5.5...HEAD
+[Non publié]: https://github.com/scadinot/shutters_management/compare/0.5.6...HEAD
+[0.5.6]: https://github.com/scadinot/shutters_management/compare/0.5.5...0.5.6
 [0.5.5]: https://github.com/scadinot/shutters_management/compare/0.5.4...0.5.5
 [0.5.4]: https://github.com/scadinot/shutters_management/compare/0.5.3...0.5.4
 [0.5.3]: https://github.com/scadinot/shutters_management/compare/0.5.2...0.5.3

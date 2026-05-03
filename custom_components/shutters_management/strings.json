@@ -77,12 +77,19 @@
           "description": "Configure covers to lower automatically when the sun faces this orientation.",
           "data": {
             "name": "Group name",
-            "covers": "Covers to control",
             "orientation": "Facing direction",
             "arc": "Exposure arc (± degrees)",
             "min_elevation": "Minimum sun elevation (°)",
             "min_uv": "Minimum UV index",
             "target_position": "Position when sun is facing (% open)"
+          },
+          "sections": {
+            "shutters": {
+              "name": "Covers to control",
+              "data": {
+                "covers": "Covers to control"
+              }
+            }
           }
         },
         "reconfigure": {
@@ -90,12 +97,19 @@
           "description": "Update the configuration.",
           "data": {
             "name": "Group name",
-            "covers": "Covers to control",
             "orientation": "Facing direction",
             "arc": "Exposure arc (± degrees)",
             "min_elevation": "Minimum sun elevation (°)",
             "min_uv": "Minimum UV index",
             "target_position": "Position when sun is facing (% open)"
+          },
+          "sections": {
+            "shutters": {
+              "name": "Covers to control",
+              "data": {
+                "covers": "Covers to control"
+              }
+            }
           }
         }
       }
@@ -120,10 +134,15 @@
           "description": "Configure deterministic open / close triggers (fixed time, sunrise or sunset) for a group of covers.",
           "data": {
             "name": "Schedule name",
-            "covers": "Shutters to control",
             "days": "Active days"
           },
           "sections": {
+            "shutters": {
+              "name": "Shutters to control",
+              "data": {
+                "covers": "Shutters to control"
+              }
+            },
             "open": {
               "name": "Opening",
               "data": {
@@ -147,10 +166,15 @@
           "description": "Update the configuration.",
           "data": {
             "name": "Schedule name",
-            "covers": "Shutters to control",
             "days": "Active days"
           },
           "sections": {
+            "shutters": {
+              "name": "Shutters to control",
+              "data": {
+                "covers": "Shutters to control"
+              }
+            },
             "open": {
               "name": "Opening",
               "data": {
@@ -191,7 +215,6 @@
           "description": "Mimic an occupied home: scheduled open/close with random offsets and optional away-only condition.",
           "data": {
             "name": "Simulation name",
-            "covers": "Shutters to control",
             "days": "Active days",
             "randomize": "Randomize times",
             "random_max_minutes": "Maximum random offset (minutes)",
@@ -199,6 +222,12 @@
             "presence_entity": "Presence entity (person or group)"
           },
           "sections": {
+            "shutters": {
+              "name": "Shutters to control",
+              "data": {
+                "covers": "Shutters to control"
+              }
+            },
             "open": {
               "name": "Opening",
               "data": {
@@ -222,7 +251,6 @@
           "description": "Update the configuration.",
           "data": {
             "name": "Simulation name",
-            "covers": "Shutters to control",
             "days": "Active days",
             "randomize": "Randomize times",
             "random_max_minutes": "Maximum random offset (minutes)",
@@ -230,6 +258,12 @@
             "presence_entity": "Presence entity (person or group)"
           },
           "sections": {
+            "shutters": {
+              "name": "Shutters to control",
+              "data": {
+                "covers": "Shutters to control"
+              }
+            },
             "open": {
               "name": "Opening",
               "data": {

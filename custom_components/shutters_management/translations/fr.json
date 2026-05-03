@@ -77,12 +77,19 @@
           "description": "Configurer les volets à baisser automatiquement quand le soleil fait face à cette orientation.",
           "data": {
             "name": "Nom du groupe",
-            "covers": "Volets à piloter",
             "orientation": "Orientation",
             "arc": "Arc d'exposition (± degrés)",
             "min_elevation": "Élévation solaire minimale (°)",
             "min_uv": "Indice UV minimum",
             "target_position": "Position quand le soleil est en face (% ouvert)"
+          },
+          "sections": {
+            "shutters": {
+              "name": "Volets à piloter",
+              "data": {
+                "covers": "Volets à piloter"
+              }
+            }
           }
         },
         "reconfigure": {
@@ -90,12 +97,19 @@
           "description": "Mettre à jour la configuration.",
           "data": {
             "name": "Nom du groupe",
-            "covers": "Volets à piloter",
             "orientation": "Orientation",
             "arc": "Arc d'exposition (± degrés)",
             "min_elevation": "Élévation solaire minimale (°)",
             "min_uv": "Indice UV minimum",
             "target_position": "Position quand le soleil est en face (% ouvert)"
+          },
+          "sections": {
+            "shutters": {
+              "name": "Volets à piloter",
+              "data": {
+                "covers": "Volets à piloter"
+              }
+            }
           }
         }
       }
@@ -120,10 +134,15 @@
           "description": "Configurer des déclencheurs déterministes d'ouverture / fermeture (heure fixe, lever ou coucher du soleil) pour un groupe de volets.",
           "data": {
             "name": "Nom de la planification",
-            "covers": "Volets à piloter",
             "days": "Jours actifs"
           },
           "sections": {
+            "shutters": {
+              "name": "Volets à piloter",
+              "data": {
+                "covers": "Volets à piloter"
+              }
+            },
             "open": {
               "name": "Ouverture",
               "data": {
@@ -147,10 +166,15 @@
           "description": "Mettre à jour la configuration.",
           "data": {
             "name": "Nom de la planification",
-            "covers": "Volets à piloter",
             "days": "Jours actifs"
           },
           "sections": {
+            "shutters": {
+              "name": "Volets à piloter",
+              "data": {
+                "covers": "Volets à piloter"
+              }
+            },
             "open": {
               "name": "Ouverture",
               "data": {
@@ -191,7 +215,6 @@
           "description": "Donner l'illusion d'une maison occupée : ouverture / fermeture programmées avec décalage aléatoire et condition d'absence optionnelle.",
           "data": {
             "name": "Nom de la simulation",
-            "covers": "Volets à piloter",
             "days": "Jours actifs",
             "randomize": "Activer le décalage aléatoire",
             "random_max_minutes": "Amplitude maximale (minutes)",
@@ -199,6 +222,12 @@
             "presence_entity": "Entité de présence (personne ou groupe)"
           },
           "sections": {
+            "shutters": {
+              "name": "Volets à piloter",
+              "data": {
+                "covers": "Volets à piloter"
+              }
+            },
             "open": {
               "name": "Ouverture",
               "data": {
@@ -222,7 +251,6 @@
           "description": "Mettre à jour la configuration.",
           "data": {
             "name": "Nom de la simulation",
-            "covers": "Volets à piloter",
             "days": "Jours actifs",
             "randomize": "Activer le décalage aléatoire",
             "random_max_minutes": "Amplitude maximale (minutes)",
@@ -230,6 +258,12 @@
             "presence_entity": "Entité de présence (personne ou groupe)"
           },
           "sections": {
+            "shutters": {
+              "name": "Volets à piloter",
+              "data": {
+                "covers": "Volets à piloter"
+              }
+            },
             "open": {
               "name": "Ouverture",
               "data": {

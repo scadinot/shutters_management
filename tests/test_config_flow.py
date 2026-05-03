@@ -60,7 +60,7 @@ def _valid_instance_input(**overrides):
     """
     data: dict[str, object] = {
         CONF_NAME: "Bureau",
-        CONF_COVERS: ["cover.living_room"],
+        "shutters": {CONF_COVERS: ["cover.living_room"]},
         "open": {
             CONF_OPEN_MODE: DEFAULT_OPEN_MODE,
             CONF_OPEN_TIME: "08:00:00",
@@ -80,6 +80,8 @@ def _valid_instance_input(**overrides):
             data["open"][key] = value
         elif key in close_keys:
             data["close"][key] = value
+        elif key == CONF_COVERS:
+            data["shutters"][CONF_COVERS] = value
         else:
             data[key] = value
     return data
@@ -475,17 +477,21 @@ async def test_instance_subentry_does_not_accept_simulation_fields(
 
 
 def _valid_sun_protection_input(**overrides):
-    """Flat user_input matching the sun-protection subentry schema."""
+    """User_input matching the sun-protection subentry schema (covers in section)."""
     data: dict[str, object] = {
         CONF_NAME: "Salon Sud",
-        CONF_COVERS: ["cover.living_room"],
+        "shutters": {CONF_COVERS: ["cover.living_room"]},
         CONF_ORIENTATION: "s",
         CONF_ARC: DEFAULT_ARC,
         CONF_MIN_ELEVATION: DEFAULT_MIN_ELEVATION,
         CONF_MIN_UV: DEFAULT_MIN_UV,
         CONF_TARGET_POSITION: DEFAULT_TARGET_POSITION,
     }
-    data.update(overrides)
+    for key, value in overrides.items():
+        if key == CONF_COVERS:
+            data["shutters"][CONF_COVERS] = value
+        else:
+            data[key] = value
     return data
 
 

@@ -94,6 +94,7 @@ from .const import (
 
 SECTION_OPEN = "open"
 SECTION_CLOSE = "close"
+SECTION_COVERS = "shutters"
 SECTION_NOTIFICATIONS = "notifications"
 SECTION_VOICE_ANNOUNCEMENT = "voice_announcement"
 
@@ -333,6 +334,20 @@ def _build_instance_schema(
         {"collapsed": True},
     )
 
+    covers_section = data_entry_flow.section(
+        vol.Schema(
+            {
+                vol.Required(
+                    CONF_COVERS,
+                    default=defaults.get(CONF_COVERS, []),
+                ): selector.EntitySelector(
+                    selector.EntitySelectorConfig(domain="cover", multiple=True)
+                ),
+            }
+        ),
+        {"collapsed": True},
+    )
+
     fields: dict[Any, Any] = {}
     if include_name:
         fields[
@@ -340,12 +355,7 @@ def _build_instance_schema(
         ] = selector.TextSelector(selector.TextSelectorConfig())
     fields.update(
         {
-            vol.Required(
-                CONF_COVERS,
-                default=defaults.get(CONF_COVERS, []),
-            ): selector.EntitySelector(
-                selector.EntitySelectorConfig(domain="cover", multiple=True)
-            ),
+            vol.Required(SECTION_COVERS): covers_section,
             vol.Required(SECTION_OPEN): open_section,
             vol.Required(SECTION_CLOSE): close_section,
             vol.Required(
@@ -416,7 +426,7 @@ def _normalize_instance(user_input: dict[str, Any]) -> dict[str, Any]:
     """Flatten section sub-dicts, cast types, drop empties."""
     flat: dict[str, Any] = {}
     for key, value in user_input.items():
-        if key in (SECTION_OPEN, SECTION_CLOSE) and isinstance(value, dict):
+        if key in (SECTION_OPEN, SECTION_CLOSE, SECTION_COVERS) and isinstance(value, dict):
             flat.update(value)
         else:
             flat[key] = value
@@ -740,18 +750,27 @@ def _build_sun_protection_schema(defaults: dict[str, Any]) -> vol.Schema:
     if isinstance(current_orientation, int):
         current_orientation = _degrees_to_cardinal(current_orientation)
 
+    sun_covers_section = data_entry_flow.section(
+        vol.Schema(
+            {
+                vol.Required(
+                    CONF_COVERS,
+                    default=defaults.get(CONF_COVERS, []),
+                ): selector.EntitySelector(
+                    selector.EntitySelectorConfig(domain="cover", multiple=True)
+                ),
+            }
+        ),
+        {"collapsed": True},
+    )
+
     return vol.Schema(
         {
             vol.Required(
                 CONF_NAME,
                 default=defaults.get(CONF_NAME, ""),
             ): selector.TextSelector(selector.TextSelectorConfig()),
-            vol.Required(
-                CONF_COVERS,
-                default=defaults.get(CONF_COVERS, []),
-            ): selector.EntitySelector(
-                selector.EntitySelectorConfig(domain="cover", multiple=True)
-            ),
+            vol.Required(SECTION_COVERS): sun_covers_section,
             vol.Required(
                 CONF_ORIENTATION,
                 default=current_orientation,
@@ -816,6 +835,8 @@ def _build_sun_protection_schema(defaults: dict[str, Any]) -> vol.Schema:
 def _normalize_sun_protection(user_input: dict[str, Any]) -> dict[str, Any]:
     """Cast types and convert cardinal string to degree integer."""
     flat = dict(user_input)
+    if SECTION_COVERS in flat and isinstance(flat[SECTION_COVERS], dict):
+        flat.update(flat.pop(SECTION_COVERS))
     orientation_str = flat.get(CONF_ORIENTATION, "S")
     flat[CONF_ORIENTATION] = ORIENTATION_CARDINALS.get(
         orientation_str, DEFAULT_ORIENTATION
