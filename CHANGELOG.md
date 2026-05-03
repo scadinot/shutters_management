@@ -6,6 +6,25 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le pr
 
 ## [Non publié]
 
+## [0.5.2] — 2026-05-03
+
+### Corrigé
+
+- **`single_config_entry` déplacé dans `manifest.json`** : le frontend HA
+  ne lit ce flag que depuis le manifest (`loader.py:455`), jamais sur la
+  classe `ConfigFlow`. L'attribut de classe ajouté en v0.5.1 était sans
+  effet et a été retiré. Désormais, cliquer sur « Ajouter un pont »
+  alors qu'un hub existe déjà déclenche le dialogue HA standard
+  *« Cette intégration n'autorise qu'une seule configuration »* (au lieu
+  de notre message `already_configured` custom).
+
+### Note
+
+Le bouton « Ajouter un pont » **reste visible** sur la page de détail de
+l'intégration : c'est le comportement standard de HA pour les intégrations
+de type `hub`. `single_config_entry` ne masque pas le bouton, il rend le
+flow non fonctionnel et affiche un message localisé au clic.
+
 ## [0.5.1] — 2026-05-03
 
 ### Corrigé
@@ -780,7 +799,9 @@ Aucun changement de code dans l'intégration. Seules les méta-données (`manife
 - Annulation propre des déclencheurs et des callbacks différés au déchargement / rechargement.
 - Traductions français et anglais.
 
-[Non publié]: https://github.com/scadinot/shutters_management/compare/0.5.0...HEAD
+[Non publié]: https://github.com/scadinot/shutters_management/compare/0.5.2...HEAD
+[0.5.2]: https://github.com/scadinot/shutters_management/compare/0.5.1...0.5.2
+[0.5.1]: https://github.com/scadinot/shutters_management/compare/0.5.0...0.5.1
 [0.5.0]: https://github.com/scadinot/shutters_management/compare/0.4.11...0.5.0
 [0.4.11]: https://github.com/scadinot/shutters_management/compare/0.4.10...0.4.11
 [0.4.10]: https://github.com/scadinot/shutters_management/compare/0.4.9...0.4.10
