@@ -28,7 +28,7 @@
       }
     },
     "abort": {
-      "already_configured": "Shutters Management est déjà configuré. Ajoutez un nouveau planning en créant une instance sur le hub existant."
+      "already_configured": "Shutters Management est déjà configuré. Ajoutez des planifications et simulations de présence depuis le hub existant."
     }
   },
   "options": {

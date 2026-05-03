@@ -28,7 +28,7 @@
       }
     },
     "abort": {
-      "already_configured": "Shutters Management is already configured. Add a new schedule by creating an instance on the existing hub."
+      "already_configured": "Shutters Management is already configured. Add schedules and presence simulations from the existing hub."
     }
   },
   "options": {
