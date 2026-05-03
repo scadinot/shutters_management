@@ -1,6 +1,7 @@
-"""Tests for the test_open / test_close button entities."""
+"""Tests for the open / close button entities."""
 from __future__ import annotations
 
+from typing import Any
 from unittest.mock import AsyncMock, patch
 
 from homeassistant.components.button import SERVICE_PRESS
@@ -56,8 +57,8 @@ async def test_button_entity_ids_are_stable_english(
     close_id = registry.async_get_entity_id(
         "button", DOMAIN, f"{subentry_id}_test_{ACTION_CLOSE}"
     )
-    assert open_id == "button.bureau_test_open"
-    assert close_id == "button.bureau_test_close"
+    assert open_id == "button.bureau_open"
+    assert close_id == "button.bureau_close"
 
 
 async def test_button_press_open_calls_run_now(
@@ -136,3 +137,45 @@ async def test_presence_simulation_buttons_use_dedicated_device(
     assert open_entity is not None and close_entity is not None
     assert open_entity.device_info["translation_key"] == "presence_simulation"
     assert close_entity.device_info["translation_key"] == "presence_simulation"
+
+
+async def test_upgrade_preserves_existing_entity_ids(
+    hass: HomeAssistant,
+    base_config: dict[str, Any],
+) -> None:
+    """Pre-existing _test_* entity IDs in the registry must survive an upgrade.
+
+    Simulates a pre-0.5.5 installation where the entity registry already holds
+    ``button.<name>_test_open`` / ``_test_close`` entries keyed by the stable
+    unique_id.  After reloading with the new code (translation_key = action),
+    HA must keep the registry entity_ids unchanged so existing automations
+    continue to work.
+    """
+    entry = build_hub_with_instance(
+        instance_data=base_config,
+        entry_id="upgrade_test_entry",
+    )
+    entry.add_to_hass(hass)
+    subentry_id = get_only_subentry_id(entry)
+
+    er_instance = er.async_get(hass)
+    for action in (ACTION_OPEN, ACTION_CLOSE):
+        er_instance.async_get_or_create(
+            "button",
+            DOMAIN,
+            f"{subentry_id}_test_{action}",
+            config_entry=entry,
+            config_subentry_id=subentry_id,
+            suggested_object_id=f"bureau_test_{action}",
+        )
+
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    for action in (ACTION_OPEN, ACTION_CLOSE):
+        entity_id = er_instance.async_get_entity_id(
+            "button", DOMAIN, f"{subentry_id}_test_{action}"
+        )
+        assert entity_id == f"button.bureau_test_{action}", (
+            f"Upgrade must preserve registry entity_id for action '{action}'"
+        )

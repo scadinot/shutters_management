@@ -329,11 +329,11 @@
       }
     },
     "button": {
-      "test_open": {
-        "name": "Test open"
+      "open": {
+        "name": "Opening"
       },
-      "test_close": {
-        "name": "Test close"
+      "close": {
+        "name": "Closing"
       }
     }
   },

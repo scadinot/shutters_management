@@ -51,7 +51,7 @@ class ShuttersRunNowButton(ButtonEntity):
         self._action = action
         subentry = scheduler.subentry
         self._attr_unique_id = f"{subentry.subentry_id}_test_{action}"
-        self._attr_translation_key = f"test_{action}"
+        self._attr_translation_key = action
         suggested = _build_entity_id(
             "button", subentry, self._attr_translation_key
         )
