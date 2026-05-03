@@ -6,6 +6,16 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le pr
 
 ## [Non publié]
 
+## [0.5.7] — 2026-05-03
+
+### Corrigé
+
+- **Label « Volets à piloter » dupliqué** dans la section repliable des
+  Planifications, Simulations de présence et Protections solaires. Le titre
+  de la section et le label du champ sélecteur d'entités étaient identiques,
+  rendant le second redondant. Le label interne du champ est désormais vide
+  côté FR/EN ; seul le titre de la section reste affiché.
+
 ## [0.5.6] — 2026-05-03
 
 ### Changé
@@ -853,7 +863,8 @@ Aucun changement de code dans l'intégration. Seules les méta-données (`manife
 - Annulation propre des déclencheurs et des callbacks différés au déchargement / rechargement.
 - Traductions français et anglais.
 
-[Non publié]: https://github.com/scadinot/shutters_management/compare/0.5.6...HEAD
+[Non publié]: https://github.com/scadinot/shutters_management/compare/0.5.7...HEAD
+[0.5.7]: https://github.com/scadinot/shutters_management/compare/0.5.6...0.5.7
 [0.5.6]: https://github.com/scadinot/shutters_management/compare/0.5.5...0.5.6
 [0.5.5]: https://github.com/scadinot/shutters_management/compare/0.5.4...0.5.5
 [0.5.4]: https://github.com/scadinot/shutters_management/compare/0.5.3...0.5.4
