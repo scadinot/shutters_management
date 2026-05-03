@@ -87,7 +87,7 @@
             "shutters": {
               "name": "Volets à piloter",
               "data": {
-                "covers": ""
+                "covers": " "
               }
             }
           }
@@ -107,7 +107,7 @@
             "shutters": {
               "name": "Volets à piloter",
               "data": {
-                "covers": ""
+                "covers": " "
               }
             }
           }
@@ -140,7 +140,7 @@
             "shutters": {
               "name": "Volets à piloter",
               "data": {
-                "covers": ""
+                "covers": " "
               }
             },
             "open": {
@@ -172,7 +172,7 @@
             "shutters": {
               "name": "Volets à piloter",
               "data": {
-                "covers": ""
+                "covers": " "
               }
             },
             "open": {
@@ -225,7 +225,7 @@
             "shutters": {
               "name": "Volets à piloter",
               "data": {
-                "covers": ""
+                "covers": " "
               }
             },
             "open": {
@@ -261,7 +261,7 @@
             "shutters": {
               "name": "Volets à piloter",
               "data": {
-                "covers": ""
+                "covers": " "
               }
             },
             "open": {

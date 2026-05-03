@@ -6,6 +6,16 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le pr
 
 ## [Non publié]
 
+## [0.5.8] — 2026-05-03
+
+### Corrigé
+
+- **Suite de la v0.5.7** : la chaîne vide `""` utilisée pour masquer le label
+  redondant du sélecteur d'entités provoquait un fallback côté frontend HA,
+  qui ré-affichait alors la clé brute « covers ». Remplacée par un espace
+  insécable (` `) qui satisfait le frontend sans afficher de texte
+  visible.
+
 ## [0.5.7] — 2026-05-03
 
 ### Corrigé
@@ -863,7 +873,8 @@ Aucun changement de code dans l'intégration. Seules les méta-données (`manife
 - Annulation propre des déclencheurs et des callbacks différés au déchargement / rechargement.
 - Traductions français et anglais.
 
-[Non publié]: https://github.com/scadinot/shutters_management/compare/0.5.7...HEAD
+[Non publié]: https://github.com/scadinot/shutters_management/compare/0.5.8...HEAD
+[0.5.8]: https://github.com/scadinot/shutters_management/compare/0.5.7...0.5.8
 [0.5.7]: https://github.com/scadinot/shutters_management/compare/0.5.6...0.5.7
 [0.5.6]: https://github.com/scadinot/shutters_management/compare/0.5.5...0.5.6
 [0.5.5]: https://github.com/scadinot/shutters_management/compare/0.5.4...0.5.5
