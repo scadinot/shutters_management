@@ -21,6 +21,7 @@ from custom_components.shutters_management.const import (
     CONF_COVERS,
     CONF_DAYS,
     CONF_MIN_ELEVATION,
+    CONF_MIN_UV,
     CONF_LUX_ENTITY,
     CONF_TEMP_OUTDOOR_ENTITY,
     CONF_NOTIFY_MODE,
@@ -41,6 +42,7 @@ from custom_components.shutters_management.const import (
     DEFAULT_ARC,
     DEFAULT_CLOSE_MODE,
     DEFAULT_MIN_ELEVATION,
+    DEFAULT_MIN_UV,
     DEFAULT_OPEN_MODE,
     DEFAULT_TARGET_POSITION,
     DOMAIN,
@@ -490,6 +492,7 @@ def _valid_sun_protection_input(**overrides):
         CONF_ORIENTATION: "s",
         CONF_ARC: DEFAULT_ARC,
         CONF_MIN_ELEVATION: DEFAULT_MIN_ELEVATION,
+        CONF_MIN_UV: DEFAULT_MIN_UV,
         CONF_TARGET_POSITION: DEFAULT_TARGET_POSITION,
     }
     for key, value in overrides.items():

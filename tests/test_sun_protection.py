@@ -31,13 +31,16 @@ from custom_components.shutters_management.const import (
     CONF_COVERS,
     CONF_LUX_ENTITY,
     CONF_MIN_ELEVATION,
+    CONF_MIN_UV,
     CONF_ORIENTATION,
     CONF_TARGET_POSITION,
     CONF_TEMP_INDOOR_ENTITY,
     CONF_TEMP_OUTDOOR_ENTITY,
     CONF_TYPE,
+    CONF_UV_ENTITY,
     DEFAULT_ARC,
     DEFAULT_MIN_ELEVATION,
+    DEFAULT_MIN_UV,
     DEFAULT_TARGET_POSITION,
     DOMAIN,
     HUB_TITLE,
@@ -57,8 +60,10 @@ def _build_hub_with_sun_protection(
     orientation: int = 180,
     arc: int = DEFAULT_ARC,
     min_elevation: int = DEFAULT_MIN_ELEVATION,
+    min_uv: int = DEFAULT_MIN_UV,
     target_position: int = DEFAULT_TARGET_POSITION,
     lux_entity: str = "sensor.lux",
+    uv_entity: str = "",
     temp_outdoor_entity: str = "sensor.t_ext",
     temp_indoor_entity: str = "",
     entry_id: str = "test_hub",
@@ -71,6 +76,7 @@ def _build_hub_with_sun_protection(
         "notify_services": [],
         "notify_mode": "always",
         CONF_LUX_ENTITY: lux_entity,
+        CONF_UV_ENTITY: uv_entity,
         CONF_TEMP_OUTDOOR_ENTITY: temp_outdoor_entity,
     }
     group_data: dict[str, Any] = {
@@ -78,6 +84,7 @@ def _build_hub_with_sun_protection(
         CONF_ORIENTATION: orientation,
         CONF_ARC: arc,
         CONF_MIN_ELEVATION: min_elevation,
+        CONF_MIN_UV: min_uv,
         CONF_TARGET_POSITION: target_position,
     }
     if temp_indoor_entity:
@@ -169,20 +176,21 @@ def test_close_indoor_min_brackets() -> None:
 # ---------------------------------------------------------------------------
 
 
-async def test_no_close_without_lux_sensor(hass: HomeAssistant) -> None:
-    """With ``lux_entity=""`` the entire feature is disabled."""
+async def test_no_close_without_any_light_sensor(hass: HomeAssistant) -> None:
+    """Without lux *and* without UV the feature is disabled."""
     cover_calls = async_mock_service(hass, "cover", "set_cover_position")
     _set_sun(hass, azimuth=180, elevation=30)
 
     entry = _build_hub_with_sun_protection(
         covers=["cover.living_room"],
         lux_entity="",
+        uv_entity="",
         temp_outdoor_entity="",
     )
     subentry_id = await _setup(hass, entry)
 
     manager = hass.data[DOMAIN][subentry_id]
-    assert manager.status == "no_lux_sensor"
+    assert manager.status == "no_sensor"
     assert cover_calls == []
 
 
@@ -310,6 +318,102 @@ async def test_indoor_temp_ignored_in_heatwave(hass: HomeAssistant) -> None:
         await manager.async_evaluate()
 
     assert any(c.data.get("position") == 50 for c in cover_calls)
+
+
+# ---------------------------------------------------------------------------
+# UV gating (alternative or additive to lux)
+# ---------------------------------------------------------------------------
+
+
+async def test_uv_only_closes_when_above_threshold(hass: HomeAssistant) -> None:
+    """No lux sensor, UV ≥ min_uv → close immediately (no debounce)."""
+    cover_calls = async_mock_service(hass, "cover", "set_cover_position")
+    hass.states.async_set("cover.living_room", "open", {"current_position": 100})
+    _set_sun(hass, azimuth=180, elevation=30)
+    hass.states.async_set("sensor.uv", "5")
+
+    entry = _build_hub_with_sun_protection(
+        covers=["cover.living_room"],
+        lux_entity="",
+        uv_entity="sensor.uv",
+        temp_outdoor_entity="",
+        min_uv=3,
+    )
+    subentry_id = await _setup(hass, entry)
+    manager = hass.data[DOMAIN][subentry_id]
+
+    assert manager.is_active
+    assert any(c.data.get("position") == 50 for c in cover_calls)
+
+
+async def test_uv_only_blocks_when_below_threshold(hass: HomeAssistant) -> None:
+    """UV-only setup with low UV → status uv_too_low, no close."""
+    cover_calls = async_mock_service(hass, "cover", "set_cover_position")
+    _set_sun(hass, azimuth=180, elevation=30)
+    hass.states.async_set("sensor.uv", "1")
+
+    entry = _build_hub_with_sun_protection(
+        covers=["cover.living_room"],
+        lux_entity="",
+        uv_entity="sensor.uv",
+        temp_outdoor_entity="",
+        min_uv=3,
+    )
+    subentry_id = await _setup(hass, entry)
+    manager = hass.data[DOMAIN][subentry_id]
+
+    assert manager.status == "uv_too_low"
+    assert cover_calls == []
+
+
+async def test_uv_combined_with_lux_both_must_pass(hass: HomeAssistant) -> None:
+    """Lux high but UV below min_uv → no close (UV blocks)."""
+    cover_calls = async_mock_service(hass, "cover", "set_cover_position")
+    _set_sun(hass, azimuth=180, elevation=30)
+    _set_lux(hass, 80000)
+    _set_temp(hass, 26, "sensor.t_ext")
+    hass.states.async_set("sensor.uv", "1")  # below min_uv=3
+
+    entry = _build_hub_with_sun_protection(
+        covers=["cover.living_room"],
+        uv_entity="sensor.uv",
+        min_uv=3,
+    )
+    subentry_id = await _setup(hass, entry)
+    manager = hass.data[DOMAIN][subentry_id]
+
+    assert manager.status == "uv_too_low"
+    assert cover_calls == []
+
+
+async def test_uv_drop_during_sun_mode_triggers_exit(hass: HomeAssistant) -> None:
+    """In sun mode, UV drops below threshold → immediate exit."""
+    async_mock_service(hass, "cover", "set_cover_position")
+    hass.states.async_set("cover.living_room", "open", {"current_position": 80})
+    _set_sun(hass, azimuth=180, elevation=30)
+    hass.states.async_set("sensor.uv", "5")
+
+    entry = _build_hub_with_sun_protection(
+        covers=["cover.living_room"],
+        lux_entity="",
+        uv_entity="sensor.uv",
+        temp_outdoor_entity="",
+        min_uv=3,
+        target_position=50,
+    )
+    subentry_id = await _setup(hass, entry)
+    manager = hass.data[DOMAIN][subentry_id]
+    assert manager.is_active
+
+    # Simulate cover landing at applied target.
+    hass.states.async_set("cover.living_room", "open", {"current_position": 50})
+
+    restore_calls = async_mock_service(hass, "cover", "set_cover_position")
+    hass.states.async_set("sensor.uv", "1")
+    await manager.async_evaluate()
+
+    assert not manager.is_active
+    assert any(c.data.get("position") == 80 for c in restore_calls)
 
 
 # ---------------------------------------------------------------------------

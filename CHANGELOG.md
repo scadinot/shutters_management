@@ -8,33 +8,44 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le pr
 
 ## [0.6.0] — 2026-05-04
 
-### ⚠️ Breaking — refonte de la protection solaire
+### Refonte de la protection solaire
 
 L'algorithme de protection solaire passe d'un simple test
 **élévation + azimut + UV** à une logique combinée
-**lux + température extérieure + température pièce** avec hystérésis,
-debounce et respect d'un override manuel. Le but : ne plus fermer
-inutilement en mi-saison ou ciel couvert, ne plus rouvrir au moindre
-nuage, et respecter les actions manuelles de l'utilisateur jusqu'au
-lendemain matin.
+**lux + UV + température extérieure + température pièce** avec
+hystérésis, debounce et respect d'un override manuel. Le but : ne plus
+fermer inutilement en mi-saison ou ciel couvert, ne plus rouvrir au
+moindre nuage, et respecter les actions manuelles de l'utilisateur
+jusqu'au lendemain matin.
 
 ### Modifié — schéma & configuration
 
-- **Hub** : `uv_entity` est **retiré**. Deux nouveaux capteurs
-  optionnels regroupés dans une section repliable « Capteurs de
-  protection solaire » :
-  - `lux_entity` — capteur de luminosité extérieure (lux). **Sans ce
-    capteur, toute la fonctionnalité de protection solaire est
-    désactivée**, quelle que soit la position des switches par groupe.
+- **Hub** : nouveaux capteurs (tous optionnels) regroupés dans une
+  section repliable « Capteurs de protection solaire » :
+  - `lux_entity` — capteur de luminosité extérieure (lux), capteur
+    *primaire* de l'algorithme.
+  - `uv_entity` — capteur d'indice UV (conservé depuis v0.5.x),
+    *alternative* ou *complément additif* au lux.
   - `temp_outdoor_entity` — capteur de température extérieure (°C).
-- **sun_protection** (par groupe) : `min_uv` est **retiré**. Nouveau
-  champ optionnel :
-  - `temp_indoor_entity` — capteur de température de la pièce ciblée.
-    Sans ce capteur, le critère de température pièce est sauté.
+- **sun_protection** (par groupe) :
+  - `min_uv` (conservé depuis v0.5.x) — utilisé seulement si un
+    capteur UV est configuré au hub.
+  - Nouveau champ optionnel `temp_indoor_entity` — capteur de
+    température de la pièce ciblée. Sans ce capteur, le critère de
+    température pièce est sauté.
+
+### Quatre modes d'activation au choix
+
+| Capteurs configurés | Comportement |
+|---------------------|--------------|
+| **lux seul** | Seuils lux adaptatifs (T_ext) + debounce 10/20 min. |
+| **UV seul** | `uv ≥ min_uv` (sans debounce — l'UV évolue lentement). |
+| **lux + UV** | **Les deux** doivent être satisfaits (défense en profondeur). |
+| **rien** | Feature désactivée (status `no_sensor`). |
 
 ### Ajouté — logique d'activation
 
-- **Table de seuils adaptatifs** (codée en dur, défauts intelligents) :
+- **Table de seuils adaptatifs lux** (codée en dur) :
   - `T_ext < 20 °C` → jamais de fermeture (gain solaire bienvenu).
   - `20 ≤ T_ext < 24` → ferme dès `lux ≥ 70 000` ET `T_pièce ≥ 24 °C`.
   - `24 ≤ T_ext < 30` → ferme dès `lux ≥ 50 000` ET `T_pièce ≥ 23 °C`.
@@ -44,10 +55,10 @@ lendemain matin.
 - **Hystérésis** : la réouverture utilise des seuils plus larges que
   la fermeture pour éviter le yoyo aux limites. Arc + 15°, élévation
   - 5°, lux de réouverture 25 000.
-- **Debouncing** : le lux doit dépasser le seuil pendant **10 minutes**
-  pour fermer (absorbe les éclats de soleil), et descendre sous le
-  seuil de réouverture pendant **20 minutes** pour rouvrir (absorbe
-  les nuages qui passent).
+- **Debouncing** (lux uniquement) : le lux doit dépasser le seuil
+  pendant **10 minutes** pour fermer (absorbe les éclats de soleil),
+  et descendre sous le seuil de réouverture pendant **20 minutes**
+  pour rouvrir (absorbe les nuages qui passent).
 - **Override manuel** : si l'utilisateur déplace un volet à la main
   pendant le mode soleil, l'automatisme s'arrête pour cette façade
   jusqu'à **04:00 le lendemain**. Programmé via `async_track_time_change`.
@@ -56,31 +67,32 @@ lendemain matin.
 
 `binary_sensor.{groupe}_sun_protection_active` expose désormais :
 
-- `lux`, `temp_outdoor`, `temp_indoor` — valeurs lues à l'instant T.
+- `lux`, `uv_index`, `temp_outdoor`, `temp_indoor` — valeurs lues à
+  l'instant T (`null` si capteur absent).
 - `override_until` — ISO 8601 du prochain reset, ou `null`.
-- `status` enrichi : `disabled`, `override`, `no_lux_sensor`,
+- `status` enrichi : `disabled`, `override`, `no_sensor`,
   `below_horizon`, `out_of_arc`, `temp_too_cold`, `lux_too_low`,
-  `room_too_cool`, `pending_close`, `active`.
+  `uv_too_low`, `room_too_cool`, `pending_close`, `active`.
 
-L'attribut `uv_index` est retiré.
+### Migration v5 → v6 — additive (zéro perte)
 
-### Migration v5 → v6 — automatique
-
-- **Hub** : `uv_entity` est purgé de `entry.data`. Les nouveaux
-  capteurs (`lux_entity`, `temp_outdoor_entity`) restent absents
-  jusqu'à ce que l'utilisateur les configure via **Paramètres →
-  Appareils et services → Shutters Management → Configurer**.
-- **sun_protection** : `min_uv` est purgé de `subentry.data`.
-- **Aucune perte de configuration** sur les autres champs (orientation,
-  arc, élévation min, position cible, volets pilotés).
+- **Aucune purge** : `uv_entity` (hub) et `min_uv` (sun_protection)
+  restent intacts. Les installations existantes basées sur l'UV
+  continuent de fonctionner sans modification.
+- Les nouveaux capteurs (`lux_entity`, `temp_outdoor_entity`,
+  `temp_indoor_entity`) restent absents jusqu'à ce que l'utilisateur
+  les configure via **Paramètres → Appareils et services → Shutters
+  Management → Configurer** (et reconfigure du groupe pour T_pièce).
+- Migration purement de version (5 → 6) sans réécriture de schéma.
 
 ### Tests
 
-- Réécriture complète de `tests/test_sun_protection.py` (24 cas) :
+- Réécriture étendue de `tests/test_sun_protection.py` (28 cas) :
   helpers de seuils, gates d'activation, table adaptative,
-  hystérésis arc/élévation, debounce close/open, override + reset
-  04:00, switch enable/disable.
-- Nouveau `test_migration_v5_to_v6_purges_uv` dans
+  hystérésis arc/élévation, debounce close/open, **gate UV
+  (seul / combiné / drop pendant sun mode)**, override + reset
+  04:00, switch enable/disable, no_sensor.
+- Nouveau `test_migration_v5_to_v6_preserves_uv` dans
   `tests/test_migration.py`.
 
 ## [0.5.8] — 2026-05-03

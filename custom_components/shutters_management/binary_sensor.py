@@ -72,6 +72,7 @@ class SunProtectionActiveSensor(BinarySensorEntity):
             "elevation": elevation,
             "azimuth": azimuth,
             "lux": self._manager.lux,
+            "uv_index": self._manager.uv,
             "temp_outdoor": self._manager.temp_outdoor,
             "temp_indoor": self._manager.temp_indoor,
             "override_until": (

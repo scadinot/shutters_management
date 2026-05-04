@@ -33,14 +33,12 @@ CONF_PRESENCE_ENTITY = "presence_entity"
 CONF_LUX_ENTITY = "lux_entity"
 CONF_TEMP_OUTDOOR_ENTITY = "temp_outdoor_entity"
 CONF_TEMP_INDOOR_ENTITY = "temp_indoor_entity"
+CONF_UV_ENTITY = "uv_entity"
 CONF_ORIENTATION = "orientation"
 CONF_ARC = "arc"
 CONF_MIN_ELEVATION = "min_elevation"
-CONF_TARGET_POSITION = "target_position"
-
-# Deprecated v0.5.x keys, kept only so async_migrate_entry can purge them.
-CONF_UV_ENTITY = "uv_entity"
 CONF_MIN_UV = "min_uv"
+CONF_TARGET_POSITION = "target_position"
 
 ORIENTATION_CARDINALS: dict[str, int] = {
     "n": 0, "ne": 45, "e": 90, "se": 135,
@@ -50,9 +48,11 @@ ORIENTATION_CARDINALS: dict[str, int] = {
 DEFAULT_LUX_ENTITY: str = ""
 DEFAULT_TEMP_OUTDOOR_ENTITY: str = ""
 DEFAULT_TEMP_INDOOR_ENTITY: str = ""
+DEFAULT_UV_ENTITY: str = ""
 DEFAULT_ORIENTATION = 180  # South
 DEFAULT_ARC = 60
 DEFAULT_MIN_ELEVATION = 15
+DEFAULT_MIN_UV = 3
 DEFAULT_TARGET_POSITION = 50
 
 # --- Sun protection: adaptive close thresholds (°C / lux) ---

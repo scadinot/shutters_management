@@ -26,7 +26,8 @@
           "sun_protection_sensors": {
             "name": "Capteurs de protection solaire",
             "data": {
-              "lux_entity": "Capteur de luminosité extérieure (laisser vide pour désactiver la protection solaire)",
+              "lux_entity": "Capteur de luminosité extérieure (primaire ; laisser vide pour utiliser l'UV ou désactiver)",
+              "uv_entity": "Capteur d'indice UV (alternative ou complément au lux)",
               "temp_outdoor_entity": "Capteur de température extérieure (optionnel)"
             }
           }
@@ -61,7 +62,8 @@
           "sun_protection_sensors": {
             "name": "Capteurs de protection solaire",
             "data": {
-              "lux_entity": "Capteur de luminosité extérieure (laisser vide pour désactiver la protection solaire)",
+              "lux_entity": "Capteur de luminosité extérieure (primaire ; laisser vide pour utiliser l'UV ou désactiver)",
+              "uv_entity": "Capteur d'indice UV (alternative ou complément au lux)",
               "temp_outdoor_entity": "Capteur de température extérieure (optionnel)"
             }
           }
@@ -92,6 +94,7 @@
             "orientation": "Orientation",
             "arc": "Arc d'exposition (± degrés)",
             "min_elevation": "Élévation solaire minimale (°)",
+            "min_uv": "Indice UV minimum (utilisé seulement si un capteur UV est configuré)",
             "target_position": "Position quand le soleil est en face (% ouvert)",
             "temp_indoor_entity": "Capteur de température de la pièce (optionnel)"
           },
@@ -112,6 +115,7 @@
             "orientation": "Orientation",
             "arc": "Arc d'exposition (± degrés)",
             "min_elevation": "Élévation solaire minimale (°)",
+            "min_uv": "Indice UV minimum (utilisé seulement si un capteur UV est configuré)",
             "target_position": "Position quand le soleil est en face (% ouvert)",
             "temp_indoor_entity": "Capteur de température de la pièce (optionnel)"
           },

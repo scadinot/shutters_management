@@ -93,6 +93,7 @@ from .const import (
     CONF_LUX_ENTITY,
     CONF_MIN_ELEVATION,
     CONF_MIN_UV,
+    DEFAULT_MIN_UV,
     CONF_ORIENTATION,
     CONF_TARGET_POSITION,
     CONF_TEMP_INDOOR_ENTITY,
@@ -512,30 +513,17 @@ async def async_migrate_entry(
         _LOGGER.info("Migrated entry %s from version 4 to 5", entry.entry_id)
 
     if entry.version < 6:
-        # v5 → v6: replace UV-based sun protection with the lux + temp model.
-        # Hub: drop the deprecated CONF_UV_ENTITY (the new CONF_LUX_ENTITY
-        # and CONF_TEMP_OUTDOOR_ENTITY are simply absent until the user
-        # configures them via the options flow). sun_protection subentries:
-        # drop CONF_MIN_UV; CONF_TEMP_INDOOR_ENTITY stays absent until the
-        # user reconfigures the group.
-        new_data = {
-            k: v for k, v in entry.data.items() if k != CONF_UV_ENTITY
-        }
-        hass.config_entries.async_update_entry(
-            entry, data=new_data, version=6
-        )
-        for subentry in list(entry.subentries.values()):
-            if subentry.subentry_type != SUBENTRY_TYPE_SUN_PROTECTION:
-                continue
-            stripped = {
-                k: v for k, v in subentry.data.items() if k != CONF_MIN_UV
-            }
-            if stripped != dict(subentry.data):
-                hass.config_entries.async_update_subentry(
-                    entry, subentry, data=stripped
-                )
+        # v5 → v6: extends sun protection with lux + adaptive temperature.
+        # Existing ``uv_entity`` (hub) and ``min_uv`` (sun_protection
+        # subentry) are preserved — the UV gate remains available as a
+        # standalone alternative or in addition to the lux gate. New
+        # fields (``lux_entity``, ``temp_outdoor_entity``,
+        # ``temp_indoor_entity``) stay absent until the user configures
+        # them via the options / reconfigure flows. Schema-wise this is
+        # purely additive, so the migration is just a version bump.
+        hass.config_entries.async_update_entry(entry, version=6)
         _LOGGER.info(
-            "Migrated entry %s from version 5 to 6 (UV → lux)",
+            "Migrated entry %s from version 5 to 6 (sun-protection v2)",
             entry.entry_id,
         )
 
@@ -670,6 +658,12 @@ class ShuttersSunProtectionManager:
             self.subentry.data.get(CONF_TEMP_INDOOR_ENTITY) or None
         )
 
+    @property
+    def uv(self) -> float | None:
+        return self._read_float(
+            self.hub_entry.data.get(CONF_UV_ENTITY) or None
+        )
+
     # ------------------------------------------------------------------
     # Adaptive thresholds (close)
     # ------------------------------------------------------------------
@@ -720,6 +714,7 @@ class ShuttersSunProtectionManager:
         watched = [SUN_ENTITY]
         for key, src in (
             (CONF_LUX_ENTITY, self.hub_entry.data),
+            (CONF_UV_ENTITY, self.hub_entry.data),
             (CONF_TEMP_OUTDOOR_ENTITY, self.hub_entry.data),
             (CONF_TEMP_INDOOR_ENTITY, self.subentry.data),
         ):
@@ -825,8 +820,13 @@ class ShuttersSunProtectionManager:
             return ("override", False, False)
 
         lux_entity = self.hub_entry.data.get(CONF_LUX_ENTITY) or ""
-        if not lux_entity:
-            return ("no_lux_sensor", False, self._in_sun_mode)
+        uv_entity = self.hub_entry.data.get(CONF_UV_ENTITY) or ""
+        if not lux_entity and not uv_entity:
+            # Neither light sensor configured: feature is OFF. Combined
+            # with the per-group switch this gives users a reliable kill
+            # switch — without a brightness signal we cannot tell if it
+            # is actually sunny vs. just geometrically aligned.
+            return ("no_sensor", False, self._in_sun_mode)
 
         sun_state = self.hass.states.get(SUN_ENTITY)
         if sun_state is None:
@@ -849,27 +849,32 @@ class ShuttersSunProtectionManager:
         t_ext = self.temp_outdoor
         t_indoor = self.temp_indoor
         lux = self.lux
+        uv = self.uv
+        min_uv = int(data.get(CONF_MIN_UV, DEFAULT_MIN_UV))
 
         # ------------------------------------------------------------------
         # Already in sun mode: only the OPEN path applies (with hysteresis).
         # ------------------------------------------------------------------
         if self._in_sun_mode:
-            # Geometric exit: wider arc + lower elevation than for closing.
             if elevation < min_elevation - ELEVATION_HYSTERESIS_DEG:
                 return ("below_horizon", False, True)
             if diff > arc + ARC_HYSTERESIS_DEG:
                 return ("out_of_arc", False, True)
-            # Lux exit (debounced).
-            if lux is not None and lux < LUX_REOPEN:
-                if self._lux_below_since is None:
-                    self._lux_below_since = now
-                if (
-                    now - self._lux_below_since
-                ).total_seconds() >= LUX_OPEN_DEBOUNCE_SEC:
+            # Lux exit (debounced) — only when the lux sensor is wired up.
+            if lux_entity:
+                if lux is not None and lux < LUX_REOPEN:
+                    if self._lux_below_since is None:
+                        self._lux_below_since = now
+                    if (
+                        now - self._lux_below_since
+                    ).total_seconds() >= LUX_OPEN_DEBOUNCE_SEC:
+                        self._lux_below_since = None
+                        return ("lux_too_low", False, True)
+                else:
                     self._lux_below_since = None
-                    return ("lux_too_low", False, True)
-            else:
-                self._lux_below_since = None
+            # UV exit — no debounce, UV index changes slowly enough.
+            if uv_entity and uv is not None and uv < min_uv:
+                return ("uv_too_low", False, True)
             # Comfort exit: room cool AND outdoor cool together.
             if (
                 t_indoor is not None
@@ -890,15 +895,27 @@ class ShuttersSunProtectionManager:
             self._lux_above_since = None
             return ("out_of_arc", False, False)
 
-        close_lux = self._close_lux_threshold(t_ext)
-        if close_lux is None:
+        # Universal: outdoor too cold → keep the solar gain.
+        if t_ext is not None and t_ext < T_OUTDOOR_NO_PROTECT:
             self._lux_above_since = None
             return ("temp_too_cold", False, False)
 
-        if lux is None or lux < close_lux:
-            self._lux_above_since = None
-            return ("lux_too_low", False, False)
+        # Lux gate (only when configured).
+        if lux_entity:
+            # ``_close_lux_threshold`` returns ``None`` only for the
+            # too-cold branch we already handled above, so we coalesce
+            # to the standard threshold defensively.
+            close_lux = self._close_lux_threshold(t_ext) or LUX_STANDARD
+            if lux is None or lux < close_lux:
+                self._lux_above_since = None
+                return ("lux_too_low", False, False)
 
+        # UV gate (only when configured).
+        if uv_entity and (uv is None or uv < min_uv):
+            self._lux_above_since = None
+            return ("uv_too_low", False, False)
+
+        # Indoor comfort gate.
         indoor_min = self._close_indoor_min(t_ext)
         if (
             indoor_min is not None
@@ -908,12 +925,15 @@ class ShuttersSunProtectionManager:
             self._lux_above_since = None
             return ("room_too_cool", False, False)
 
-        # All instantaneous conditions met — debounce sustained sunshine.
-        if self._lux_above_since is None:
-            self._lux_above_since = now
-        elapsed = (now - self._lux_above_since).total_seconds()
-        if elapsed < LUX_CLOSE_DEBOUNCE_SEC:
-            return ("pending_close", False, False)
+        # All instantaneous conditions met. Debounce sustained sunshine
+        # only when lux is the gating signal — UV moves slowly enough on
+        # its own and a UV-only setup should react immediately.
+        if lux_entity:
+            if self._lux_above_since is None:
+                self._lux_above_since = now
+            elapsed = (now - self._lux_above_since).total_seconds()
+            if elapsed < LUX_CLOSE_DEBOUNCE_SEC:
+                return ("pending_close", False, False)
 
         self._lux_above_since = None
         return ("active", True, False)

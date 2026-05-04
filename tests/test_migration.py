@@ -240,14 +240,15 @@ async def test_migration_v4_to_v5_strips_simulation_fields_from_instance(
     assert CONF_PRESENCE_ENTITY not in subentry.data
 
 
-async def test_migration_v5_to_v6_purges_uv(hass: HomeAssistant) -> None:
-    """v5 hub with ``uv_entity`` and a sun_protection subentry with
-    ``min_uv`` are migrated to v6 with both fields removed.
+async def test_migration_v5_to_v6_preserves_uv(hass: HomeAssistant) -> None:
+    """v5 → v6 is purely additive: ``uv_entity`` (hub) and ``min_uv``
+    (sun_protection) survive intact, the new sensor fields stay absent
+    until the user configures them.
 
-    v0.6.0 replaces UV-based protection by lux + adaptive temperature.
-    The migration drops the deprecated keys; the user re-adds the new
-    sensors (``lux_entity`` / ``temp_outdoor_entity`` / ``temp_indoor_entity``)
-    via the options + reconfigure flows.
+    v0.6.0 introduces lux + adaptive temperature alongside the existing
+    UV gate. The user can opt for any combination — lux only, UV only,
+    both, or neither (feature off) — so the migration must NOT erase
+    the legacy UV configuration.
     """
     from homeassistant.config_entries import ConfigSubentryData
 
@@ -288,11 +289,12 @@ async def test_migration_v5_to_v6_purges_uv(hass: HomeAssistant) -> None:
 
     entry = hass.config_entries.async_get_entry(hub.entry_id)
     assert entry.version == 6
-    assert CONF_UV_ENTITY not in entry.data
+    # UV fields are preserved.
+    assert entry.data[CONF_UV_ENTITY] == "sensor.uv"
 
     subentry = next(iter(entry.subentries.values()))
     assert subentry.subentry_type == SUBENTRY_TYPE_SUN_PROTECTION
-    assert CONF_MIN_UV not in subentry.data
+    assert subentry.data[CONF_MIN_UV] == 4
     # Other fields untouched.
     assert subentry.data[CONF_ORIENTATION] == 180
     assert subentry.data[CONF_TARGET_POSITION] == 50
