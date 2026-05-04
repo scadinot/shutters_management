@@ -88,20 +88,39 @@ from .const import (
     SERVICE_PAUSE,
     SERVICE_RESUME,
     SERVICE_RUN_NOW,
+    ARC_HYSTERESIS_DEG,
     CONF_ARC,
+    CONF_LUX_ENTITY,
     CONF_MIN_ELEVATION,
     CONF_MIN_UV,
+    DEFAULT_MIN_UV,
     CONF_ORIENTATION,
     CONF_TARGET_POSITION,
+    CONF_TEMP_INDOOR_ENTITY,
+    CONF_TEMP_OUTDOOR_ENTITY,
     CONF_UV_ENTITY,
     DEFAULT_ARC,
     DEFAULT_MIN_ELEVATION,
-    DEFAULT_MIN_UV,
     DEFAULT_TARGET_POSITION,
+    ELEVATION_HYSTERESIS_DEG,
+    LUX_CLOSE_DEBOUNCE_SEC,
+    LUX_HEATWAVE,
+    LUX_MILD,
+    LUX_OPEN_DEBOUNCE_SEC,
+    LUX_REOPEN,
+    LUX_STANDARD,
+    OVERRIDE_RESET_HOUR,
     SUBENTRY_TYPE_INSTANCE,
     SUBENTRY_TYPE_PRESENCE_SIM,
     SUBENTRY_TYPE_SUN_PROTECTION,
     SUN_ENTITY,
+    T_INDOOR_MILD_MIN,
+    T_INDOOR_REOPEN,
+    T_INDOOR_STANDARD_MIN,
+    T_OUTDOOR_HEATWAVE,
+    T_OUTDOOR_NO_PROTECT,
+    T_OUTDOOR_REOPEN,
+    T_OUTDOOR_STANDARD,
     TRIGGER_MODES,
     TYPE_HUB,
     signal_state_update,
@@ -493,6 +512,21 @@ async def async_migrate_entry(
         hass.config_entries.async_update_entry(entry, version=5)
         _LOGGER.info("Migrated entry %s from version 4 to 5", entry.entry_id)
 
+    if entry.version < 6:
+        # v5 → v6: extends sun protection with lux + adaptive temperature.
+        # Existing ``uv_entity`` (hub) and ``min_uv`` (sun_protection
+        # subentry) are preserved — the UV gate remains available as a
+        # standalone alternative or in addition to the lux gate. New
+        # fields (``lux_entity``, ``temp_outdoor_entity``,
+        # ``temp_indoor_entity``) stay absent until the user configures
+        # them via the options / reconfigure flows. Schema-wise this is
+        # purely additive, so the migration is just a version bump.
+        hass.config_entries.async_update_entry(entry, version=6)
+        _LOGGER.info(
+            "Migrated entry %s from version 5 to 6 (sun-protection v2)",
+            entry.entry_id,
+        )
+
     return True
 
 
@@ -531,7 +565,24 @@ def _async_unregister_services(hass: HomeAssistant) -> None:
 
 
 class ShuttersSunProtectionManager:
-    """Manage sun-position-based shutter lowering for one orientation group."""
+    """Manage sun-position-based shutter lowering for one orientation group.
+
+    Activation logic combines four sources:
+
+    * **Sun position** (azimuth + elevation) — geometric pre-condition.
+    * **Outdoor lux** (mandatory hub sensor) — arbiter of "is the sun
+      actually shining". Adaptive threshold: tighter when it is hot.
+    * **Outdoor temperature** (optional hub sensor) — protects solar gain
+      below ``T_OUTDOOR_NO_PROTECT`` (mid-season / winter).
+    * **Indoor temperature** (optional per-group sensor) — final comfort
+      gate; bypassed in heatwave so we can pre-protect.
+
+    Hysteresis (``ARC_HYSTERESIS_DEG`` / ``LUX_REOPEN`` / ...) and
+    debouncing (``LUX_*_DEBOUNCE_SEC``) prevent yo-yo behaviour at the
+    boundaries and through passing clouds. Manual moves on a controlled
+    cover trigger a per-façade override that pauses the automation
+    until the next ``OVERRIDE_RESET_HOUR`` (default 04:00 local time).
+    """
 
     def __init__(
         self,
@@ -547,7 +598,14 @@ class ShuttersSunProtectionManager:
         self._snapshots: dict[str, int] = {}
         self._applied_positions: dict[str, int] = {}
         self._unsubs: list[Callable[[], None]] = []
+        self._override_until: datetime | None = None
+        self._lux_above_since: datetime | None = None
+        self._lux_below_since: datetime | None = None
+        self._last_status: str = "disabled"
 
+    # ------------------------------------------------------------------
+    # Public properties
+    # ------------------------------------------------------------------
     @property
     def subentry_id(self) -> str:
         return self.subentry.subentry_id
@@ -562,46 +620,112 @@ class ShuttersSunProtectionManager:
 
     @property
     def status(self) -> str:
-        if not self._enabled:
-            return "disabled"
-        sun_state = self.hass.states.get(SUN_ENTITY)
-        if sun_state is None:
-            return "below_horizon"
-        elevation = sun_state.attributes.get("elevation", 0)
-        azimuth = sun_state.attributes.get("azimuth", 0)
-        data = self.subentry.data
-        if elevation < data.get(CONF_MIN_ELEVATION, DEFAULT_MIN_ELEVATION):
-            return "below_horizon"
-        orientation = data.get(CONF_ORIENTATION, 180)
-        arc = data.get(CONF_ARC, DEFAULT_ARC)
-        diff = abs((azimuth - orientation + 180) % 360 - 180)
-        if diff > arc:
-            return "out_of_arc"
-        uv_entity = self.hub_entry.data.get(CONF_UV_ENTITY, "")
-        if uv_entity:
-            uv_state = self.hass.states.get(uv_entity)
-            try:
-                uv_value = float(uv_state.state) if uv_state else 0.0
-            except (ValueError, TypeError):
-                uv_value = 0.0
-            if uv_value < data.get(CONF_MIN_UV, DEFAULT_MIN_UV):
-                return "uv_too_low"
-        return "active"
+        return self._last_status
 
+    @property
+    def override_until(self) -> datetime | None:
+        return self._override_until
+
+    # ------------------------------------------------------------------
+    # Sensor readers (public so binary_sensor / tests can introspect)
+    # ------------------------------------------------------------------
+    def _read_float(self, entity_id: str | None) -> float | None:
+        if not entity_id:
+            return None
+        state = self.hass.states.get(entity_id)
+        if state is None or state.state in ("unknown", "unavailable", None):
+            return None
+        try:
+            return float(state.state)
+        except (ValueError, TypeError):
+            return None
+
+    @property
+    def lux(self) -> float | None:
+        return self._read_float(
+            self.hub_entry.data.get(CONF_LUX_ENTITY) or None
+        )
+
+    @property
+    def temp_outdoor(self) -> float | None:
+        return self._read_float(
+            self.hub_entry.data.get(CONF_TEMP_OUTDOOR_ENTITY) or None
+        )
+
+    @property
+    def temp_indoor(self) -> float | None:
+        return self._read_float(
+            self.subentry.data.get(CONF_TEMP_INDOOR_ENTITY) or None
+        )
+
+    @property
+    def uv(self) -> float | None:
+        return self._read_float(
+            self.hub_entry.data.get(CONF_UV_ENTITY) or None
+        )
+
+    # ------------------------------------------------------------------
+    # Adaptive thresholds (close)
+    # ------------------------------------------------------------------
+    @staticmethod
+    def _close_lux_threshold(t_ext: float | None) -> int | None:
+        """Return the lux threshold required to close at this T_ext.
+
+        ``None`` means the outdoor temperature is below
+        ``T_OUTDOOR_NO_PROTECT`` and we want to keep solar gain.
+        ``T_ext`` itself missing falls back to the standard threshold so
+        the feature still works without an outdoor sensor.
+        """
+        if t_ext is None:
+            return LUX_STANDARD
+        if t_ext < T_OUTDOOR_NO_PROTECT:
+            return None
+        if t_ext < T_OUTDOOR_STANDARD:
+            return LUX_MILD
+        if t_ext < T_OUTDOOR_HEATWAVE:
+            return LUX_STANDARD
+        return LUX_HEATWAVE
+
+    @staticmethod
+    def _close_indoor_min(t_ext: float | None) -> int | None:
+        """Indoor temperature required to close at this T_ext.
+
+        ``None`` means the indoor check is bypassed:
+
+        * no outdoor sensor → we don't know the temperature bracket,
+          fall back to lux-only gating (no comfort gate).
+        * heatwave bracket → pre-protect even with a cool room.
+        """
+        if t_ext is None:
+            return None
+        if t_ext < T_OUTDOOR_NO_PROTECT:
+            return None
+        if t_ext < T_OUTDOOR_STANDARD:
+            return T_INDOOR_MILD_MIN
+        if t_ext < T_OUTDOOR_HEATWAVE:
+            return T_INDOOR_STANDARD_MIN
+        return None  # heatwave: ignore indoor temperature
+
+    # ------------------------------------------------------------------
+    # Setup / teardown
+    # ------------------------------------------------------------------
     async def async_setup(self) -> None:
-        """Subscribe to sun and UV state changes and run an initial evaluation."""
+        """Subscribe to sun, lux, temp and cover state changes."""
+        watched = [SUN_ENTITY]
+        for key, src in (
+            (CONF_LUX_ENTITY, self.hub_entry.data),
+            (CONF_UV_ENTITY, self.hub_entry.data),
+            (CONF_TEMP_OUTDOOR_ENTITY, self.hub_entry.data),
+            (CONF_TEMP_INDOOR_ENTITY, self.subentry.data),
+        ):
+            entity_id = src.get(key) or ""
+            if entity_id:
+                watched.append(entity_id)
         self._unsubs.append(
             async_track_state_change_event(
-                self.hass, [SUN_ENTITY], self._async_on_state_change
+                self.hass, watched, self._async_on_state_change
             )
         )
-        uv_entity = self.hub_entry.data.get(CONF_UV_ENTITY, "")
-        if uv_entity:
-            self._unsubs.append(
-                async_track_state_change_event(
-                    self.hass, [uv_entity], self._async_on_state_change
-                )
-            )
         covers = list(self.subentry.data.get(CONF_COVERS, []))
         if covers:
             self._unsubs.append(
@@ -609,9 +733,22 @@ class ShuttersSunProtectionManager:
                     self.hass, covers, self._async_on_cover_state_change
                 )
             )
+        # Daily reset of the manual override.
         self._unsubs.append(
-            async_call_later(self.hass, 0, self._async_evaluate_cb)
+            async_track_time_change(
+                self.hass,
+                self._async_daily_reset,
+                hour=OVERRIDE_RESET_HOUR,
+                minute=0,
+                second=0,
+            )
         )
+        # Run the initial evaluate inline so callers can rely on the
+        # manager's status / decision state being up-to-date right after
+        # ``async_setup`` returns. (``async_call_later(0, …)`` was
+        # previously used here, but that path is not deterministic under
+        # ``freezegun`` in tests.)
+        await self.async_evaluate()
 
     async def async_unload(self) -> None:
         """Cancel subscriptions and restore positions if in sun mode."""
@@ -624,52 +761,192 @@ class ShuttersSunProtectionManager:
     async def _async_on_state_change(self, event: Any) -> None:
         await self.async_evaluate()
 
-    async def _async_evaluate_cb(self, _now: Any) -> None:
-        await self.async_evaluate()
+    async def _async_daily_reset(self, _now: datetime) -> None:
+        if self._override_until is not None:
+            _LOGGER.debug(
+                "Sun protection %s: override expired at daily reset",
+                self.subentry_id,
+            )
+            self._override_until = None
+            await self.async_evaluate()
 
+    # ------------------------------------------------------------------
+    # Override helpers
+    # ------------------------------------------------------------------
+    @staticmethod
+    def _next_reset_time(now: datetime) -> datetime:
+        """Next ``OVERRIDE_RESET_HOUR`` strictly after ``now`` (local TZ)."""
+        target = now.replace(
+            hour=OVERRIDE_RESET_HOUR, minute=0, second=0, microsecond=0
+        )
+        if target <= now:
+            target += timedelta(days=1)
+        return target
+
+    def _override_active(self, now: datetime) -> bool:
+        return self._override_until is not None and self._override_until > now
+
+    # ------------------------------------------------------------------
+    # Decision engine
+    # ------------------------------------------------------------------
     async def async_evaluate(self) -> None:
-        """Recompute whether sun protection should be active and act accordingly."""
+        """Recompute whether sun protection should be active and act."""
+        now = dt_util.now()
+        new_status, want_close, want_open = self._compute_decision(now)
+        self._last_status = new_status
+
+        if want_close and not self._in_sun_mode:
+            await self._async_enter_sun_mode()
+        elif want_open and self._in_sun_mode:
+            await self._async_exit_sun_mode()
+
+        async_dispatcher_send(
+            self.hass, signal_state_update(self.subentry_id)
+        )
+
+    def _compute_decision(
+        self, now: datetime
+    ) -> tuple[str, bool, bool]:
+        """Pure decision: returns (status, want_close, want_open).
+
+        ``want_close`` and ``want_open`` are mutually exclusive (only one
+        — at most — is True). The status string is exposed by the
+        binary_sensor and is informational; it does not gate behaviour.
+        """
         if not self._enabled:
-            if self._in_sun_mode:
-                await self._async_exit_sun_mode()
-            return
+            return ("disabled", False, self._in_sun_mode)
+
+        if self._override_active(now):
+            return ("override", False, False)
+
+        lux_entity = self.hub_entry.data.get(CONF_LUX_ENTITY) or ""
+        uv_entity = self.hub_entry.data.get(CONF_UV_ENTITY) or ""
+        if not lux_entity and not uv_entity:
+            # Neither light sensor configured: feature is OFF. Combined
+            # with the per-group switch this gives users a reliable kill
+            # switch — without a brightness signal we cannot tell if it
+            # is actually sunny vs. just geometrically aligned.
+            return ("no_sensor", False, self._in_sun_mode)
 
         sun_state = self.hass.states.get(SUN_ENTITY)
         if sun_state is None:
-            return
+            # HA startup race or sun integration absent. Treat as
+            # "no sun": clear debounce timers and request an exit if we
+            # were left in sun mode, so the covers don't stay lowered
+            # indefinitely.
+            self._lux_above_since = None
+            self._lux_below_since = None
+            return ("below_horizon", False, self._in_sun_mode)
 
-        elevation = sun_state.attributes.get("elevation", 0)
-        azimuth = sun_state.attributes.get("azimuth", 0)
+        elevation = float(sun_state.attributes.get("elevation", 0) or 0)
+        azimuth = float(sun_state.attributes.get("azimuth", 0) or 0)
         data = self.subentry.data
         min_elevation = data.get(CONF_MIN_ELEVATION, DEFAULT_MIN_ELEVATION)
         orientation = data.get(CONF_ORIENTATION, 180)
         arc = data.get(CONF_ARC, DEFAULT_ARC)
-        min_uv = data.get(CONF_MIN_UV, DEFAULT_MIN_UV)
-
-        uv_ok = True
-        uv_entity = self.hub_entry.data.get(CONF_UV_ENTITY, "")
-        if uv_entity:
-            uv_state = self.hass.states.get(uv_entity)
-            try:
-                uv_value = float(uv_state.state) if uv_state else 0.0
-            except (ValueError, TypeError):
-                uv_value = 0.0
-            uv_ok = uv_value >= min_uv
-
         diff = abs((azimuth - orientation + 180) % 360 - 180)
-        should_activate = elevation >= min_elevation and diff <= arc and uv_ok
 
-        if should_activate and not self._in_sun_mode:
-            await self._async_enter_sun_mode()
-        elif not should_activate and self._in_sun_mode:
-            await self._async_exit_sun_mode()
+        t_ext = self.temp_outdoor
+        t_indoor = self.temp_indoor
+        lux = self.lux
+        uv = self.uv
+        min_uv = int(data.get(CONF_MIN_UV, DEFAULT_MIN_UV))
 
-        async_dispatcher_send(self.hass, signal_state_update(self.subentry_id))
+        # ------------------------------------------------------------------
+        # Already in sun mode: only the OPEN path applies (with hysteresis).
+        # ------------------------------------------------------------------
+        if self._in_sun_mode:
+            if elevation < min_elevation - ELEVATION_HYSTERESIS_DEG:
+                return ("below_horizon", False, True)
+            if diff > arc + ARC_HYSTERESIS_DEG:
+                return ("out_of_arc", False, True)
+            # Lux exit (debounced) — only when the lux sensor is wired up.
+            if lux_entity:
+                if lux is not None and lux < LUX_REOPEN:
+                    if self._lux_below_since is None:
+                        self._lux_below_since = now
+                    if (
+                        now - self._lux_below_since
+                    ).total_seconds() >= LUX_OPEN_DEBOUNCE_SEC:
+                        self._lux_below_since = None
+                        return ("lux_too_low", False, True)
+                else:
+                    self._lux_below_since = None
+            # UV exit — no debounce, UV index changes slowly enough.
+            if uv_entity and uv is not None and uv < min_uv:
+                return ("uv_too_low", False, True)
+            # Comfort exit: room cool AND outdoor cool together.
+            if (
+                t_indoor is not None
+                and t_indoor < T_INDOOR_REOPEN
+                and t_ext is not None
+                and t_ext < T_OUTDOOR_REOPEN
+            ):
+                return ("room_too_cool", False, True)
+            return ("active", False, False)
 
+        # ------------------------------------------------------------------
+        # Not in sun mode: evaluate the CLOSE path.
+        # ------------------------------------------------------------------
+        if elevation < min_elevation:
+            self._lux_above_since = None
+            return ("below_horizon", False, False)
+        if diff > arc:
+            self._lux_above_since = None
+            return ("out_of_arc", False, False)
+
+        # Universal: outdoor too cold → keep the solar gain.
+        if t_ext is not None and t_ext < T_OUTDOOR_NO_PROTECT:
+            self._lux_above_since = None
+            return ("temp_too_cold", False, False)
+
+        # Lux gate (only when configured).
+        if lux_entity:
+            # ``_close_lux_threshold`` returns ``None`` only for the
+            # too-cold branch we already handled above, so we coalesce
+            # to the standard threshold defensively.
+            close_lux = self._close_lux_threshold(t_ext) or LUX_STANDARD
+            if lux is None or lux < close_lux:
+                self._lux_above_since = None
+                return ("lux_too_low", False, False)
+
+        # UV gate (only when configured).
+        if uv_entity and (uv is None or uv < min_uv):
+            self._lux_above_since = None
+            return ("uv_too_low", False, False)
+
+        # Indoor comfort gate.
+        indoor_min = self._close_indoor_min(t_ext)
+        if (
+            indoor_min is not None
+            and t_indoor is not None
+            and t_indoor < indoor_min
+        ):
+            self._lux_above_since = None
+            return ("room_too_cool", False, False)
+
+        # All instantaneous conditions met. Debounce sustained sunshine
+        # only when lux is the gating signal — UV moves slowly enough on
+        # its own and a UV-only setup should react immediately.
+        if lux_entity:
+            if self._lux_above_since is None:
+                self._lux_above_since = now
+            elapsed = (now - self._lux_above_since).total_seconds()
+            if elapsed < LUX_CLOSE_DEBOUNCE_SEC:
+                return ("pending_close", False, False)
+
+        self._lux_above_since = None
+        return ("active", True, False)
+
+    # ------------------------------------------------------------------
+    # Cover commands
+    # ------------------------------------------------------------------
     async def _async_enter_sun_mode(self) -> None:
         """Snapshot current positions and lower covers to target."""
         covers = list(self.subentry.data.get(CONF_COVERS, []))
-        target = self.subentry.data.get(CONF_TARGET_POSITION, DEFAULT_TARGET_POSITION)
+        target = self.subentry.data.get(
+            CONF_TARGET_POSITION, DEFAULT_TARGET_POSITION
+        )
 
         for cover_id in covers:
             state = self.hass.states.get(cover_id)
@@ -706,7 +983,6 @@ class ShuttersSunProtectionManager:
                 raw = state.attributes.get("current_position")
                 if raw is not None:
                     current_pos = int(raw)
-            # Only restore if the cover hasn't been moved manually.
             if current_pos is None or current_pos == applied:
                 await self.hass.services.async_call(
                     "cover",
@@ -720,7 +996,25 @@ class ShuttersSunProtectionManager:
         _LOGGER.debug("Sun protection %s: exited sun mode", self.subentry_id)
 
     async def _async_on_cover_state_change(self, event: Any) -> None:
-        """Update snapshot when a cover we control is moved externally."""
+        """Detect external cover moves and arm the manual override.
+
+        While the cover is transiting toward the applied target the
+        registry replays intermediate positions in the
+        ``[snapshot, applied]`` range; these must be ignored. A move is
+        "manual" if either:
+
+        * the cover has already **settled at the applied target** (its
+          previous state had ``current_position == applied``) and now
+          changed — it could only change because the user pressed a
+          remote / app button, OR
+        * the new position lands **outside the transit range** (the
+          cover is e.g. opening past ``snapshot`` or closing past
+          ``applied``).
+
+        In either case we arm the per-façade override until the next
+        ``OVERRIDE_RESET_HOUR`` and exit sun mode without re-driving the
+        covers (the user just expressed a preference).
+        """
         if not self._in_sun_mode:
             return
         cover_id = event.data.get("entity_id")
@@ -735,16 +1029,45 @@ class ShuttersSunProtectionManager:
         new_pos_int = int(new_pos)
         applied = self._applied_positions.get(cover_id)
         snapshot = self._snapshots.get(cover_id)
-        # Ignore intermediate positions while the cover is moving toward our target.
-        # Only consider it an external move when it lands outside the transit range.
-        if (
+
+        old_state = event.data.get("old_state")
+        old_pos: int | None = None
+        if old_state is not None:
+            raw_old = old_state.attributes.get("current_position")
+            if raw_old is not None:
+                old_pos = int(raw_old)
+
+        # Settled-at-target heuristic: if the cover was at the applied
+        # target and now isn't, it's a manual change.
+        settled_then_moved = (
+            applied is not None
+            and old_pos is not None
+            and old_pos == applied
+            and new_pos_int != applied
+        )
+        out_of_transit = (
             applied is not None
             and snapshot is not None
-            and min(snapshot, applied) <= new_pos_int <= max(snapshot, applied)
-        ):
-            return
-        self._snapshots[cover_id] = new_pos_int
-        self._applied_positions[cover_id] = new_pos_int
+            and not (min(snapshot, applied) <= new_pos_int <= max(snapshot, applied))
+        )
+
+        if not (settled_then_moved or out_of_transit):
+            return  # transit position; nothing to do.
+
+        now = dt_util.now()
+        self._override_until = self._next_reset_time(now)
+        self._in_sun_mode = False
+        self._snapshots.clear()
+        self._applied_positions.clear()
+        self._last_status = "override"
+        _LOGGER.debug(
+            "Sun protection %s: manual move detected, override until %s",
+            self.subentry_id,
+            self._override_until.isoformat(),
+        )
+        async_dispatcher_send(
+            self.hass, signal_state_update(self.subentry_id)
+        )
 
     def set_enabled(self, enabled: bool) -> None:
         """Toggle the group on/off (called by the switch entity)."""

@@ -65,22 +65,19 @@ class SunProtectionActiveSensor(BinarySensorEntity):
         elevation = sun_state.attributes.get("elevation") if sun_state else None
         azimuth = sun_state.attributes.get("azimuth") if sun_state else None
 
-        uv_entity = self._manager.hub_entry.data.get("uv_entity", "")
-        uv_index = None
-        if uv_entity:
-            uv_state = self.hass.states.get(uv_entity)
-            if uv_state is not None:
-                try:
-                    uv_index = float(uv_state.state)
-                except (ValueError, TypeError):
-                    uv_index = None
-
+        override_until = self._manager.override_until
         return {
             "orientation": data.get("orientation"),
             "arc": data.get("arc"),
             "elevation": elevation,
             "azimuth": azimuth,
-            "uv_index": uv_index,
+            "lux": self._manager.lux,
+            "uv_index": self._manager.uv,
+            "temp_outdoor": self._manager.temp_outdoor,
+            "temp_indoor": self._manager.temp_indoor,
+            "override_until": (
+                override_until.isoformat() if override_until else None
+            ),
             "status": self._manager.status,
         }
 
