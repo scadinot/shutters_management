@@ -195,6 +195,7 @@ def _build_hub_schema(
                             CONF_TTS_ENGINE,
                             "",
                         )
+                        or None
                     },
                 ): selector.EntitySelector(
                     selector.EntitySelectorConfig(domain="tts")
@@ -244,6 +245,7 @@ def _build_hub_schema(
                             CONF_LUX_ENTITY,
                             DEFAULT_LUX_ENTITY,
                         )
+                        or None
                     },
                 ): selector.EntitySelector(
                     selector.EntitySelectorConfig(domain="sensor")
@@ -257,6 +259,7 @@ def _build_hub_schema(
                             CONF_UV_ENTITY,
                             DEFAULT_UV_ENTITY,
                         )
+                        or None
                     },
                 ): selector.EntitySelector(
                     selector.EntitySelectorConfig(domain="sensor")
@@ -270,6 +273,7 @@ def _build_hub_schema(
                             CONF_TEMP_OUTDOOR_ENTITY,
                             DEFAULT_TEMP_OUTDOOR_ENTITY,
                         )
+                        or None
                     },
                 ): selector.EntitySelector(
                     selector.EntitySelectorConfig(domain="sensor")
@@ -457,6 +461,7 @@ def _build_instance_schema(
                         "suggested_value": defaults.get(
                             CONF_PRESENCE_ENTITY, ""
                         )
+                        or None
                     },
                 ): selector.EntitySelector(
                     selector.EntitySelectorConfig(domain=["person", "group"])
@@ -894,6 +899,7 @@ def _build_sun_protection_schema(defaults: dict[str, Any]) -> vol.Schema:
                     "suggested_value": defaults.get(
                         CONF_TEMP_INDOOR_ENTITY, DEFAULT_TEMP_INDOOR_ENTITY
                     )
+                    or None
                 },
             ): selector.EntitySelector(
                 selector.EntitySelectorConfig(domain="sensor")

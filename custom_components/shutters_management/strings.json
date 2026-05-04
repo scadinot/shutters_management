@@ -26,8 +26,8 @@
           "sun_protection_sensors": {
             "name": "Sun protection sensors",
             "data": {
-              "lux_entity": "Outdoor lux sensor (primary; leave empty to fall back to UV / disable)",
-              "uv_entity": "UV index sensor (alternative or additive to lux)",
+              "lux_entity": "Outdoor lux sensor (optional — leave empty to use UV only or disable)",
+              "uv_entity": "UV index sensor (optional — used as fallback or alongside lux)",
               "temp_outdoor_entity": "Outdoor temperature sensor (optional)"
             }
           }
@@ -62,8 +62,8 @@
           "sun_protection_sensors": {
             "name": "Sun protection sensors",
             "data": {
-              "lux_entity": "Outdoor lux sensor (primary; leave empty to fall back to UV / disable)",
-              "uv_entity": "UV index sensor (alternative or additive to lux)",
+              "lux_entity": "Outdoor lux sensor (optional — leave empty to use UV only or disable)",
+              "uv_entity": "UV index sensor (optional — used as fallback or alongside lux)",
               "temp_outdoor_entity": "Outdoor temperature sensor (optional)"
             }
           }
