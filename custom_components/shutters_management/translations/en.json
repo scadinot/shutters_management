@@ -378,7 +378,7 @@
           "disabled": "Disabled",
           "override": "Manual override",
           "no_sensor": "No sensor configured",
-          "below_horizon": "Sun below horizon",
+          "below_horizon": "Sun too low",
           "out_of_arc": "Sun out of arc",
           "temp_too_cold": "Outdoor too cold",
           "lux_too_low": "Lux too low",

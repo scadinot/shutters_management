@@ -20,6 +20,8 @@ from homeassistant.components.sensor import (
     SensorEntity,
     SensorStateClass,
 )
+from datetime import timedelta
+
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
     DEGREE,
@@ -32,6 +34,7 @@ from homeassistant.helpers.device_registry import DeviceEntryType, DeviceInfo
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.event import async_track_time_interval
 
 from . import ShuttersScheduler, ShuttersSunProtectionManager
 from .const import (
@@ -245,7 +248,13 @@ class SunProtectionLuxThresholdSensor(_SunProtectionDiagnosticSensor):
 
 
 class SunProtectionPendingSensor(_SunProtectionDiagnosticSensor):
-    """Seconds remaining in the close or open debounce window."""
+    """Seconds remaining in the close or open debounce window.
+
+    The decision engine only re-evaluates when a watched state changes,
+    so the dispatcher signal alone would leave this countdown frozen
+    between events. We additionally refresh the entity state on a fixed
+    10-second cadence so the value ticks down in real time.
+    """
 
     _attr_device_class = SensorDeviceClass.DURATION
     _attr_native_unit_of_measurement = UnitOfTime.SECONDS
@@ -257,6 +266,20 @@ class SunProtectionPendingSensor(_SunProtectionDiagnosticSensor):
     @property
     def native_value(self) -> int:
         return self._manager.pending_seconds
+
+    async def async_added_to_hass(self) -> None:
+        await super().async_added_to_hass()
+        self.async_on_remove(
+            async_track_time_interval(
+                self.hass,
+                self._handle_periodic_refresh,
+                timedelta(seconds=10),
+            )
+        )
+
+    @callback
+    def _handle_periodic_refresh(self, _now: Any) -> None:
+        self.async_write_ha_state()
 
 
 class SunProtectionOverrideUntilSensor(_SunProtectionDiagnosticSensor):

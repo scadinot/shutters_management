@@ -695,8 +695,8 @@ class ShuttersSunProtectionManager:
     def azimuth_diff(self) -> float | None:
         """Absolute angular distance from configured orientation, or ``None``.
 
-        Positive integer in [0, 180]. Compared against ``CONF_ARC`` to decide
-        whether the sun is in front of the façade.
+        Positive ``float`` in ``[0, 180]``. Compared against ``CONF_ARC`` to
+        decide whether the sun is in front of the façade.
         """
         az = self.azimuth
         if az is None:
@@ -900,11 +900,18 @@ class ShuttersSunProtectionManager:
         ``want_close`` and ``want_open`` are mutually exclusive (only one
         — at most — is True). The status string is exposed by the
         binary_sensor and is informational; it does not gate behaviour.
+        Every early-return branch clears the debounce timestamps so the
+        ``pending_seconds`` diagnostic never advertises a phantom
+        countdown when no debounce is in flight.
         """
         if not self._enabled:
+            self._lux_above_since = None
+            self._lux_below_since = None
             return ("disabled", False, self._in_sun_mode)
 
         if self._override_active(now):
+            self._lux_above_since = None
+            self._lux_below_since = None
             return ("override", False, False)
 
         lux_entity = self.hub_entry.data.get(CONF_LUX_ENTITY) or ""
@@ -914,6 +921,8 @@ class ShuttersSunProtectionManager:
             # with the per-group switch this gives users a reliable kill
             # switch — without a brightness signal we cannot tell if it
             # is actually sunny vs. just geometrically aligned.
+            self._lux_above_since = None
+            self._lux_below_since = None
             return ("no_sensor", False, self._in_sun_mode)
 
         sun_state = self.hass.states.get(SUN_ENTITY)
@@ -942,11 +951,15 @@ class ShuttersSunProtectionManager:
 
         # ------------------------------------------------------------------
         # Already in sun mode: only the OPEN path applies (with hysteresis).
+        # The close-debounce timer is irrelevant here, clear it once.
         # ------------------------------------------------------------------
         if self._in_sun_mode:
+            self._lux_above_since = None
             if elevation < min_elevation - ELEVATION_HYSTERESIS_DEG:
+                self._lux_below_since = None
                 return ("below_horizon", False, True)
             if diff > arc + ARC_HYSTERESIS_DEG:
+                self._lux_below_since = None
                 return ("out_of_arc", False, True)
             # Lux exit (debounced) — also fires when the configured lux
             # sensor goes unknown/unavailable, so we don't stay stuck
@@ -962,10 +975,14 @@ class ShuttersSunProtectionManager:
                         return ("lux_too_low", False, True)
                 else:
                     self._lux_below_since = None
+            else:
+                # No lux gate at all — the timer must not linger.
+                self._lux_below_since = None
             # UV exit — no debounce, UV index changes slowly enough. A
             # missing reading (sensor unknown/unavailable) is treated as
             # a failed gate so we exit rather than freezing closed.
             if uv_entity and (uv is None or uv < min_uv):
+                self._lux_below_since = None
                 return ("uv_too_low", False, True)
             # Comfort exit: room cool AND outdoor cool together.
             if (
@@ -974,12 +991,15 @@ class ShuttersSunProtectionManager:
                 and t_ext is not None
                 and t_ext < T_OUTDOOR_REOPEN
             ):
+                self._lux_below_since = None
                 return ("room_too_cool", False, True)
             return ("active", False, False)
 
         # ------------------------------------------------------------------
-        # Not in sun mode: evaluate the CLOSE path.
+        # Not in sun mode: evaluate the CLOSE path. The open-debounce
+        # timer is irrelevant here, clear it once.
         # ------------------------------------------------------------------
+        self._lux_below_since = None
         if elevation < min_elevation:
             self._lux_above_since = None
             return ("below_horizon", False, False)
@@ -1154,6 +1174,8 @@ class ShuttersSunProtectionManager:
         self._in_sun_mode = False
         self._snapshots.clear()
         self._applied_positions.clear()
+        self._lux_above_since = None
+        self._lux_below_since = None
         self._last_status = "override"
         _LOGGER.debug(
             "Sun protection %s: manual move detected, override until %s",

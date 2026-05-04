@@ -11,6 +11,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.util import dt as dt_util
 from pytest_homeassistant_custom_component.common import (
     MockConfigEntry,
+    async_fire_time_changed,
     async_mock_service,
 )
 
@@ -448,3 +449,88 @@ async def test_lux_margin_unknown_without_threshold(hass: HomeAssistant) -> None
     state = hass.states.get("sensor.salon_sud_sun_protection_lux_margin")
     assert state is not None
     assert state.state in ("unknown", "unavailable")
+
+
+# ---------------------------------------------------------------------------
+# Refresh + stale-timer cleanup (entity-level)
+# ---------------------------------------------------------------------------
+
+
+async def test_pending_sensor_ticks_down_on_time_interval(
+    hass: HomeAssistant,
+) -> None:
+    """The pending_seconds entity must refresh on its own 10 s timer
+    even when no other state event is fired between dispatcher
+    notifications. Without the periodic refresh the value would stay
+    frozen between sun/lux/temp updates."""
+    async_mock_service(hass, "cover", "set_cover_position")
+    hass.states.async_set("cover.living_room", "open", {"current_position": 100})
+    _set_sun(hass, azimuth=180, elevation=30)
+    hass.states.async_set("sensor.lux", "80000")
+    hass.states.async_set("sensor.t_ext", "26")
+
+    base = datetime(2026, 6, 15, 14, 0, tzinfo=dt_util.UTC)
+    with freeze_time(base) as frozen:
+        entry = _build()
+        await _setup(hass, entry)
+
+        first = hass.states.get(
+            "sensor.salon_sud_sun_protection_pending_seconds"
+        )
+        assert first is not None
+        first_value = int(float(first.state))
+        assert first_value == LUX_CLOSE_DEBOUNCE_SEC
+
+        # Advance time WITHOUT touching any sensor state, then fire the
+        # registered time-interval callback.
+        frozen.tick(timedelta(seconds=120))
+        async_fire_time_changed(hass, dt_util.utcnow())
+        await hass.async_block_till_done()
+
+        second = hass.states.get(
+            "sensor.salon_sud_sun_protection_pending_seconds"
+        )
+        second_value = int(float(second.state))
+        assert second_value <= first_value - 100
+
+
+async def test_pending_seconds_cleared_on_geometric_exit(
+    hass: HomeAssistant,
+) -> None:
+    """Once close conditions are met, the close-debounce timer is armed.
+    If the sun then drifts out of the arc, the diagnostic must report 0
+    seconds rather than the stale leftover countdown.
+    """
+    async_mock_service(hass, "cover", "set_cover_position")
+    _set_sun(hass, azimuth=180, elevation=30)
+    hass.states.async_set("sensor.lux", "80000")
+    hass.states.async_set("sensor.t_ext", "26")
+
+    entry = _build()
+    subentry_id = await _setup(hass, entry)
+    manager = hass.data[DOMAIN][subentry_id]
+    assert manager.pending_seconds > 0
+
+    # Sun drifts out of arc → close-debounce is no longer applicable.
+    _set_sun(hass, azimuth=0, elevation=30)
+    await manager.async_evaluate()
+    assert manager.pending_seconds == 0
+
+
+async def test_pending_seconds_cleared_on_disabled(
+    hass: HomeAssistant,
+) -> None:
+    """Disabling the group must also clear the close-debounce timer."""
+    async_mock_service(hass, "cover", "set_cover_position")
+    _set_sun(hass, azimuth=180, elevation=30)
+    hass.states.async_set("sensor.lux", "80000")
+    hass.states.async_set("sensor.t_ext", "26")
+
+    entry = _build()
+    subentry_id = await _setup(hass, entry)
+    manager = hass.data[DOMAIN][subentry_id]
+    assert manager.pending_seconds > 0
+
+    manager.set_enabled(False)
+    await hass.async_block_till_done()
+    assert manager.pending_seconds == 0

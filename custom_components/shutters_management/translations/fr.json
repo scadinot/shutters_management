@@ -378,7 +378,7 @@
           "disabled": "Désactivé",
           "override": "Override manuel",
           "no_sensor": "Aucun capteur configuré",
-          "below_horizon": "Soleil sous l'horizon",
+          "below_horizon": "Soleil trop bas",
           "out_of_arc": "Soleil hors arc",
           "temp_too_cold": "Trop froid dehors",
           "lux_too_low": "Lux trop bas",
