@@ -5,11 +5,26 @@
       "sun_protection": { "default": "mdi:weather-sunny" }
     },
     "binary_sensor": {
-      "sun_protection_active": { "default": "mdi:sun-angle" }
+      "sun_protection_active": { "default": "mdi:sun-angle" },
+      "sun_facing": { "default": "mdi:weather-sunny" }
     },
     "sensor": {
       "next_open": { "default": "mdi:blinds-open" },
-      "next_close": { "default": "mdi:blinds" }
+      "next_close": { "default": "mdi:blinds" },
+      "sun_protection_status": { "default": "mdi:sun-clock" },
+      "sun_protection_lux_threshold": { "default": "mdi:brightness-7" },
+      "sun_protection_pending_seconds": { "default": "mdi:timer-sand" },
+      "sun_protection_override_until": { "default": "mdi:hand-back-right-outline" },
+      "sun_protection_sun_azimuth": { "default": "mdi:compass" },
+      "sun_protection_sun_elevation": { "default": "mdi:angle-acute" },
+      "sun_protection_lux": { "default": "mdi:white-balance-sunny" },
+      "sun_protection_uv_index": { "default": "mdi:sun-wireless" },
+      "sun_protection_temp_outdoor": { "default": "mdi:thermometer" },
+      "sun_protection_temp_indoor": { "default": "mdi:home-thermometer" },
+      "sun_protection_azimuth_diff": { "default": "mdi:compass-outline" },
+      "sun_protection_elevation_margin": { "default": "mdi:triangle-outline" },
+      "sun_protection_lux_margin": { "default": "mdi:weather-sunny-alert" },
+      "sun_protection_uv_margin": { "default": "mdi:sun-wireless-outline" }
     },
     "button": {
       "open": { "default": "mdi:arrow-up-circle-outline" },
