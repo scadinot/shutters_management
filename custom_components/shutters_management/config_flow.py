@@ -180,7 +180,7 @@ def _build_hub_schema(
                 ),
             }
         ),
-        {"collapsed": False},
+        {"collapsed": True},
     )
 
     tts_section = data_entry_flow.section(
@@ -230,7 +230,7 @@ def _build_hub_schema(
                 ),
             }
         ),
-        {"collapsed": False},
+        {"collapsed": True},
     )
 
     sun_protection_sensors_section = data_entry_flow.section(
