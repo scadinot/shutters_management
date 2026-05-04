@@ -90,19 +90,34 @@
           "title": "Ajouter un groupe de protection solaire",
           "description": "Configurer les volets à baisser automatiquement quand le soleil fait face à cette orientation.",
           "data": {
-            "name": "Nom du groupe",
-            "orientation": "Orientation",
-            "arc": "Arc d'exposition (± degrés)",
-            "min_elevation": "Élévation solaire minimale (°)",
-            "min_uv": "Indice UV minimum (utilisé seulement si un capteur UV est configuré)",
-            "target_position": "Position quand le soleil est en face (% ouvert)",
-            "temp_indoor_entity": "Capteur de température de la pièce (optionnel)"
+            "name": "Nom du groupe"
           },
           "sections": {
             "shutters": {
               "name": "Volets à piloter",
               "data": {
                 "covers": "Sélection"
+              }
+            },
+            "orientation": {
+              "name": "Orientation et exposition",
+              "data": {
+                "orientation": "Orientation",
+                "arc": "Arc d'exposition (± degrés)"
+              }
+            },
+            "thresholds": {
+              "name": "Seuils de déclenchement",
+              "data": {
+                "min_elevation": "Élévation solaire minimale (°)",
+                "min_uv": "Indice UV minimum (utilisé seulement si un capteur UV est configuré)",
+                "target_position": "Position quand le soleil est en face (% ouvert)"
+              }
+            },
+            "room_sensor": {
+              "name": "Capteur intérieur",
+              "data": {
+                "temp_indoor_entity": "Capteur de température de la pièce (optionnel)"
               }
             }
           }
@@ -111,19 +126,34 @@
           "title": "Modifier le groupe de protection solaire",
           "description": "Mettre à jour la configuration.",
           "data": {
-            "name": "Nom du groupe",
-            "orientation": "Orientation",
-            "arc": "Arc d'exposition (± degrés)",
-            "min_elevation": "Élévation solaire minimale (°)",
-            "min_uv": "Indice UV minimum (utilisé seulement si un capteur UV est configuré)",
-            "target_position": "Position quand le soleil est en face (% ouvert)",
-            "temp_indoor_entity": "Capteur de température de la pièce (optionnel)"
+            "name": "Nom du groupe"
           },
           "sections": {
             "shutters": {
               "name": "Volets à piloter",
               "data": {
                 "covers": "Sélection"
+              }
+            },
+            "orientation": {
+              "name": "Orientation et exposition",
+              "data": {
+                "orientation": "Orientation",
+                "arc": "Arc d'exposition (± degrés)"
+              }
+            },
+            "thresholds": {
+              "name": "Seuils de déclenchement",
+              "data": {
+                "min_elevation": "Élévation solaire minimale (°)",
+                "min_uv": "Indice UV minimum (utilisé seulement si un capteur UV est configuré)",
+                "target_position": "Position quand le soleil est en face (% ouvert)"
+              }
+            },
+            "room_sensor": {
+              "name": "Capteur intérieur",
+              "data": {
+                "temp_indoor_entity": "Capteur de température de la pièce (optionnel)"
               }
             }
           }
@@ -149,8 +179,7 @@
           "title": "Ajouter une planification",
           "description": "Configurer des déclencheurs déterministes d'ouverture / fermeture (heure fixe, lever ou coucher du soleil) pour un groupe de volets.",
           "data": {
-            "name": "Nom de la planification",
-            "days": "Jours actifs"
+            "name": "Nom de la planification"
           },
           "sections": {
             "shutters": {
@@ -173,6 +202,12 @@
                 "close_mode": "Déclencheur de fermeture",
                 "close_time": "Heure de fermeture (utilisée si déclencheur = heure fixe)",
                 "close_offset": "Décalage de fermeture en minutes (utilisé si déclencheur = lever/coucher)"
+              }
+            },
+            "schedule_days": {
+              "name": "Jours actifs",
+              "data": {
+                "days": "Jours actifs"
               }
             }
           }
@@ -181,8 +216,7 @@
           "title": "Modifier la planification",
           "description": "Mettre à jour la configuration.",
           "data": {
-            "name": "Nom de la planification",
-            "days": "Jours actifs"
+            "name": "Nom de la planification"
           },
           "sections": {
             "shutters": {
@@ -205,6 +239,12 @@
                 "close_mode": "Déclencheur de fermeture",
                 "close_time": "Heure de fermeture (utilisée si déclencheur = heure fixe)",
                 "close_offset": "Décalage de fermeture en minutes (utilisé si déclencheur = lever/coucher)"
+              }
+            },
+            "schedule_days": {
+              "name": "Jours actifs",
+              "data": {
+                "days": "Jours actifs"
               }
             }
           }
@@ -230,12 +270,7 @@
           "title": "Ajouter une simulation de présence",
           "description": "Donner l'illusion d'une maison occupée : ouverture / fermeture programmées avec décalage aléatoire et condition d'absence optionnelle.",
           "data": {
-            "name": "Nom de la simulation",
-            "days": "Jours actifs",
-            "randomize": "Activer le décalage aléatoire",
-            "random_max_minutes": "Amplitude maximale (minutes)",
-            "only_when_away": "Exécuter uniquement en absence",
-            "presence_entity": "Entité de présence (personne ou groupe)"
+            "name": "Nom de la simulation"
           },
           "sections": {
             "shutters": {
@@ -258,6 +293,26 @@
                 "close_mode": "Déclencheur de fermeture",
                 "close_time": "Heure de fermeture (utilisée si déclencheur = heure fixe)",
                 "close_offset": "Décalage de fermeture en minutes (utilisé si déclencheur = lever/coucher)"
+              }
+            },
+            "schedule_days": {
+              "name": "Jours actifs",
+              "data": {
+                "days": "Jours actifs"
+              }
+            },
+            "randomization": {
+              "name": "Décalage aléatoire",
+              "data": {
+                "randomize": "Activer le décalage aléatoire",
+                "random_max_minutes": "Amplitude maximale (minutes)"
+              }
+            },
+            "presence": {
+              "name": "Conditions de présence",
+              "data": {
+                "only_when_away": "Exécuter uniquement en absence",
+                "presence_entity": "Entité de présence (personne ou groupe)"
               }
             }
           }
@@ -266,12 +321,7 @@
           "title": "Modifier la simulation de présence",
           "description": "Mettre à jour la configuration.",
           "data": {
-            "name": "Nom de la simulation",
-            "days": "Jours actifs",
-            "randomize": "Activer le décalage aléatoire",
-            "random_max_minutes": "Amplitude maximale (minutes)",
-            "only_when_away": "Exécuter uniquement en absence",
-            "presence_entity": "Entité de présence (personne ou groupe)"
+            "name": "Nom de la simulation"
           },
           "sections": {
             "shutters": {
@@ -294,6 +344,26 @@
                 "close_mode": "Déclencheur de fermeture",
                 "close_time": "Heure de fermeture (utilisée si déclencheur = heure fixe)",
                 "close_offset": "Décalage de fermeture en minutes (utilisé si déclencheur = lever/coucher)"
+              }
+            },
+            "schedule_days": {
+              "name": "Jours actifs",
+              "data": {
+                "days": "Jours actifs"
+              }
+            },
+            "randomization": {
+              "name": "Décalage aléatoire",
+              "data": {
+                "randomize": "Activer le décalage aléatoire",
+                "random_max_minutes": "Amplitude maximale (minutes)"
+              }
+            },
+            "presence": {
+              "name": "Conditions de présence",
+              "data": {
+                "only_when_away": "Exécuter uniquement en absence",
+                "presence_entity": "Entité de présence (personne ou groupe)"
               }
             }
           }

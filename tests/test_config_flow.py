@@ -31,10 +31,12 @@ from custom_components.shutters_management.const import (
     CONF_OPEN_OFFSET,
     CONF_OPEN_TIME,
     CONF_ORIENTATION,
+    CONF_PRESENCE_ENTITY,
     CONF_RANDOMIZE,
     CONF_RANDOM_MAX_MINUTES,
     CONF_SEQUENTIAL_COVERS,
     CONF_TARGET_POSITION,
+    CONF_TEMP_INDOOR_ENTITY,
     CONF_TTS_ENGINE,
     CONF_TTS_MODE,
     CONF_TTS_TARGETS,
@@ -79,7 +81,7 @@ def _valid_instance_input(**overrides):
             CONF_CLOSE_TIME: "20:00:00",
             CONF_CLOSE_OFFSET: 0,
         },
-        CONF_DAYS: list(DAYS),
+        "schedule_days": {CONF_DAYS: list(DAYS)},
     }
     open_keys = {CONF_OPEN_MODE, CONF_OPEN_TIME, CONF_OPEN_OFFSET}
     close_keys = {CONF_CLOSE_MODE, CONF_CLOSE_TIME, CONF_CLOSE_OFFSET}
@@ -90,6 +92,8 @@ def _valid_instance_input(**overrides):
             data["close"][key] = value
         elif key == CONF_COVERS:
             data["shutters"][CONF_COVERS] = value
+        elif key == CONF_DAYS:
+            data["schedule_days"][CONF_DAYS] = value
         else:
             data[key] = value
     return data
@@ -98,18 +102,34 @@ def _valid_instance_input(**overrides):
 def _valid_presence_sim_input(**overrides):
     """Subentry user input matching the presence-simulation schema.
 
-    Same shape as Planification plus the four simulation fields.
+    Same shape as Planification plus the randomization and presence
+    sections specific to presence simulation.
     """
     data = _valid_instance_input(
-        **{k: v for k, v in overrides.items() if k != CONF_NAME}
+        **{
+            k: v
+            for k, v in overrides.items()
+            if k
+            not in (
+                CONF_NAME,
+                CONF_RANDOMIZE,
+                CONF_RANDOM_MAX_MINUTES,
+                CONF_ONLY_WHEN_AWAY,
+                CONF_PRESENCE_ENTITY,
+            )
+        }
     )
     data[CONF_NAME] = overrides.get(CONF_NAME, "Bureau")
-    data.setdefault(CONF_RANDOMIZE, False)
-    data.setdefault(CONF_RANDOM_MAX_MINUTES, 30)
-    data.setdefault(CONF_ONLY_WHEN_AWAY, False)
-    for key in (CONF_RANDOMIZE, CONF_RANDOM_MAX_MINUTES, CONF_ONLY_WHEN_AWAY):
-        if key in overrides:
-            data[key] = overrides[key]
+    data["randomization"] = {
+        CONF_RANDOMIZE: overrides.get(CONF_RANDOMIZE, False),
+        CONF_RANDOM_MAX_MINUTES: overrides.get(CONF_RANDOM_MAX_MINUTES, 30),
+    }
+    presence: dict[str, object] = {
+        CONF_ONLY_WHEN_AWAY: overrides.get(CONF_ONLY_WHEN_AWAY, False),
+    }
+    if CONF_PRESENCE_ENTITY in overrides:
+        presence[CONF_PRESENCE_ENTITY] = overrides[CONF_PRESENCE_ENTITY]
+    data["presence"] = presence
     return data
 
 
@@ -487,19 +507,36 @@ async def test_instance_subentry_does_not_accept_simulation_fields(
 
 
 def _valid_sun_protection_input(**overrides):
-    """User_input matching the sun-protection subentry schema (covers in section)."""
+    """User_input matching the sun-protection subentry schema.
+
+    All fields except ``name`` are nested in collapsed sections:
+    ``shutters``, ``orientation``, ``thresholds``, ``room_sensor``.
+    """
     data: dict[str, object] = {
         CONF_NAME: "Salon Sud",
         "shutters": {CONF_COVERS: ["cover.living_room"]},
-        CONF_ORIENTATION: "s",
-        CONF_ARC: DEFAULT_ARC,
-        CONF_MIN_ELEVATION: DEFAULT_MIN_ELEVATION,
-        CONF_MIN_UV: DEFAULT_MIN_UV,
-        CONF_TARGET_POSITION: DEFAULT_TARGET_POSITION,
+        "orientation": {
+            CONF_ORIENTATION: "s",
+            CONF_ARC: DEFAULT_ARC,
+        },
+        "thresholds": {
+            CONF_MIN_ELEVATION: DEFAULT_MIN_ELEVATION,
+            CONF_MIN_UV: DEFAULT_MIN_UV,
+            CONF_TARGET_POSITION: DEFAULT_TARGET_POSITION,
+        },
+        "room_sensor": {},
     }
+    orientation_keys = {CONF_ORIENTATION, CONF_ARC}
+    threshold_keys = {CONF_MIN_ELEVATION, CONF_MIN_UV, CONF_TARGET_POSITION}
     for key, value in overrides.items():
         if key == CONF_COVERS:
             data["shutters"][CONF_COVERS] = value
+        elif key in orientation_keys:
+            data["orientation"][key] = value
+        elif key in threshold_keys:
+            data["thresholds"][key] = value
+        elif key == CONF_TEMP_INDOOR_ENTITY:
+            data["room_sensor"][CONF_TEMP_INDOOR_ENTITY] = value
         else:
             data[key] = value
     return data

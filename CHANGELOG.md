@@ -6,6 +6,27 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le pr
 
 ## [Non publié]
 
+## [0.6.3] — 2026-05-04
+
+### Modifié — UX des formulaires
+
+Tous les réglages des formulaires de configuration sont désormais
+regroupés dans des **panneaux repliés par défaut**, pour réduire
+l'encombrement visuel et harmoniser la présentation entre les
+différents types de configuration.
+
+- **Hub** : les panneaux **Notifications push** et **Annonce vocale**
+  sont désormais repliés par défaut (comme **Capteurs de protection
+  solaire** déjà l'était).
+- **Planification** : nouveau panneau replié **Jours actifs**.
+- **Simulation de présence** : nouveaux panneaux repliés **Jours
+  actifs**, **Décalage aléatoire** et **Conditions de présence**.
+- **Protection solaire** : nouveaux panneaux repliés **Orientation et
+  exposition**, **Seuils de déclenchement** et **Capteur intérieur**.
+
+Aucune migration de données : seul le rendu du formulaire change, les
+données stockées dans les sous-entrées restent inchangées.
+
 ## [0.6.2] — 2026-05-04
 
 ### Corrigé

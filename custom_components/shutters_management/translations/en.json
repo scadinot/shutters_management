@@ -90,19 +90,34 @@
           "title": "Add a sun-protection group",
           "description": "Configure covers to lower automatically when the sun faces this orientation.",
           "data": {
-            "name": "Group name",
-            "orientation": "Facing direction",
-            "arc": "Exposure arc (± degrees)",
-            "min_elevation": "Minimum sun elevation (°)",
-            "min_uv": "Minimum UV index (used only when a UV sensor is configured)",
-            "target_position": "Position when sun is facing (% open)",
-            "temp_indoor_entity": "Room temperature sensor (optional)"
+            "name": "Group name"
           },
           "sections": {
             "shutters": {
               "name": "Shutters to control",
               "data": {
                 "covers": "Selection"
+              }
+            },
+            "orientation": {
+              "name": "Orientation & exposure",
+              "data": {
+                "orientation": "Facing direction",
+                "arc": "Exposure arc (± degrees)"
+              }
+            },
+            "thresholds": {
+              "name": "Trigger thresholds",
+              "data": {
+                "min_elevation": "Minimum sun elevation (°)",
+                "min_uv": "Minimum UV index (used only when a UV sensor is configured)",
+                "target_position": "Position when sun is facing (% open)"
+              }
+            },
+            "room_sensor": {
+              "name": "Indoor sensor",
+              "data": {
+                "temp_indoor_entity": "Room temperature sensor (optional)"
               }
             }
           }
@@ -111,19 +126,34 @@
           "title": "Edit sun-protection group",
           "description": "Update the configuration.",
           "data": {
-            "name": "Group name",
-            "orientation": "Facing direction",
-            "arc": "Exposure arc (± degrees)",
-            "min_elevation": "Minimum sun elevation (°)",
-            "min_uv": "Minimum UV index (used only when a UV sensor is configured)",
-            "target_position": "Position when sun is facing (% open)",
-            "temp_indoor_entity": "Room temperature sensor (optional)"
+            "name": "Group name"
           },
           "sections": {
             "shutters": {
               "name": "Shutters to control",
               "data": {
                 "covers": "Selection"
+              }
+            },
+            "orientation": {
+              "name": "Orientation & exposure",
+              "data": {
+                "orientation": "Facing direction",
+                "arc": "Exposure arc (± degrees)"
+              }
+            },
+            "thresholds": {
+              "name": "Trigger thresholds",
+              "data": {
+                "min_elevation": "Minimum sun elevation (°)",
+                "min_uv": "Minimum UV index (used only when a UV sensor is configured)",
+                "target_position": "Position when sun is facing (% open)"
+              }
+            },
+            "room_sensor": {
+              "name": "Indoor sensor",
+              "data": {
+                "temp_indoor_entity": "Room temperature sensor (optional)"
               }
             }
           }
@@ -149,8 +179,7 @@
           "title": "Add a schedule",
           "description": "Configure deterministic open / close triggers (fixed time, sunrise or sunset) for a group of covers.",
           "data": {
-            "name": "Schedule name",
-            "days": "Active days"
+            "name": "Schedule name"
           },
           "sections": {
             "shutters": {
@@ -173,6 +202,12 @@
                 "close_mode": "Closing trigger",
                 "close_time": "Closing time (used when trigger is fixed)",
                 "close_offset": "Closing offset in minutes (used when trigger is sunrise/sunset)"
+              }
+            },
+            "schedule_days": {
+              "name": "Active days",
+              "data": {
+                "days": "Active days"
               }
             }
           }
@@ -181,8 +216,7 @@
           "title": "Edit schedule",
           "description": "Update the configuration.",
           "data": {
-            "name": "Schedule name",
-            "days": "Active days"
+            "name": "Schedule name"
           },
           "sections": {
             "shutters": {
@@ -205,6 +239,12 @@
                 "close_mode": "Closing trigger",
                 "close_time": "Closing time (used when trigger is fixed)",
                 "close_offset": "Closing offset in minutes (used when trigger is sunrise/sunset)"
+              }
+            },
+            "schedule_days": {
+              "name": "Active days",
+              "data": {
+                "days": "Active days"
               }
             }
           }
@@ -230,12 +270,7 @@
           "title": "Add a presence simulation",
           "description": "Mimic an occupied home: scheduled open/close with random offsets and optional away-only condition.",
           "data": {
-            "name": "Simulation name",
-            "days": "Active days",
-            "randomize": "Randomize times",
-            "random_max_minutes": "Maximum random offset (minutes)",
-            "only_when_away": "Run only when away",
-            "presence_entity": "Presence entity (person or group)"
+            "name": "Simulation name"
           },
           "sections": {
             "shutters": {
@@ -258,6 +293,26 @@
                 "close_mode": "Closing trigger",
                 "close_time": "Closing time (used when trigger is fixed)",
                 "close_offset": "Closing offset in minutes (used when trigger is sunrise/sunset)"
+              }
+            },
+            "schedule_days": {
+              "name": "Active days",
+              "data": {
+                "days": "Active days"
+              }
+            },
+            "randomization": {
+              "name": "Randomization",
+              "data": {
+                "randomize": "Randomize times",
+                "random_max_minutes": "Maximum random offset (minutes)"
+              }
+            },
+            "presence": {
+              "name": "Presence conditions",
+              "data": {
+                "only_when_away": "Run only when away",
+                "presence_entity": "Presence entity (person or group)"
               }
             }
           }
@@ -266,12 +321,7 @@
           "title": "Edit presence simulation",
           "description": "Update the configuration.",
           "data": {
-            "name": "Simulation name",
-            "days": "Active days",
-            "randomize": "Randomize times",
-            "random_max_minutes": "Maximum random offset (minutes)",
-            "only_when_away": "Run only when away",
-            "presence_entity": "Presence entity (person or group)"
+            "name": "Simulation name"
           },
           "sections": {
             "shutters": {
@@ -294,6 +344,26 @@
                 "close_mode": "Closing trigger",
                 "close_time": "Closing time (used when trigger is fixed)",
                 "close_offset": "Closing offset in minutes (used when trigger is sunrise/sunset)"
+              }
+            },
+            "schedule_days": {
+              "name": "Active days",
+              "data": {
+                "days": "Active days"
+              }
+            },
+            "randomization": {
+              "name": "Randomization",
+              "data": {
+                "randomize": "Randomize times",
+                "random_max_minutes": "Maximum random offset (minutes)"
+              }
+            },
+            "presence": {
+              "name": "Presence conditions",
+              "data": {
+                "only_when_away": "Run only when away",
+                "presence_entity": "Presence entity (person or group)"
               }
             }
           }
