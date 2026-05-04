@@ -26,8 +26,8 @@
           "sun_protection_sensors": {
             "name": "Capteurs de protection solaire",
             "data": {
-              "lux_entity": "Capteur de luminosité extérieure (primaire ; laisser vide pour utiliser l'UV ou désactiver)",
-              "uv_entity": "Capteur d'indice UV (alternative ou complément au lux)",
+              "lux_entity": "Capteur de luminosité extérieure (optionnel — laisser vide pour utiliser l'UV seul ou désactiver)",
+              "uv_entity": "Capteur d'indice UV (optionnel — utilisé seul ou en complément du lux)",
               "temp_outdoor_entity": "Capteur de température extérieure (optionnel)"
             }
           }
@@ -62,8 +62,8 @@
           "sun_protection_sensors": {
             "name": "Capteurs de protection solaire",
             "data": {
-              "lux_entity": "Capteur de luminosité extérieure (primaire ; laisser vide pour utiliser l'UV ou désactiver)",
-              "uv_entity": "Capteur d'indice UV (alternative ou complément au lux)",
+              "lux_entity": "Capteur de luminosité extérieure (optionnel — laisser vide pour utiliser l'UV seul ou désactiver)",
+              "uv_entity": "Capteur d'indice UV (optionnel — utilisé seul ou en complément du lux)",
               "temp_outdoor_entity": "Capteur de température extérieure (optionnel)"
             }
           }

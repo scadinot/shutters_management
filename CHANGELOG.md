@@ -6,6 +6,24 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le pr
 
 ## [Non publié]
 
+## [0.6.2] — 2026-05-04
+
+### Corrigé
+
+- Erreur de validation **« Entity is neither a valid entity ID nor a
+  valid UUID »** lors de la soumission du formulaire du hub quand un
+  champ capteur optionnel (lux, UV, température extérieure) est laissé
+  vide. La même correction est appliquée aux champs `temp_indoor_entity`
+  (groupe Protection solaire), `presence_entity` (Simulation de
+  présence) et `tts_engine` (Annonce vocale).
+
+### Modifié
+
+- Libellés des champs **Capteur de luminosité extérieure** et
+  **Capteur d'indice UV** dans les paramètres du hub : formulation
+  plus claire indiquant qu'ils sont optionnels et expliquant leur
+  rôle (utilisé seul, en repli ou en complément).
+
 ## [0.6.1] — 2026-05-04
 
 ### Ajouté — entités de diagnostic pour Sun Protection
