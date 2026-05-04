@@ -360,6 +360,9 @@
     "binary_sensor": {
       "sun_protection_active": {
         "name": "Protection solaire active"
+      },
+      "sun_facing": {
+        "name": "Soleil en face"
       }
     },
     "sensor": {
@@ -368,6 +371,61 @@
       },
       "next_close": {
         "name": "Prochaine fermeture"
+      },
+      "sun_protection_status": {
+        "name": "Statut protection solaire",
+        "state": {
+          "disabled": "Désactivé",
+          "override": "Override manuel",
+          "no_sensor": "Aucun capteur configuré",
+          "below_horizon": "Soleil sous l'horizon",
+          "out_of_arc": "Soleil hors arc",
+          "temp_too_cold": "Trop froid dehors",
+          "lux_too_low": "Lux trop bas",
+          "uv_too_low": "UV trop bas",
+          "room_too_cool": "Pièce trop fraîche",
+          "pending_close": "Fermeture en attente",
+          "active": "Actif"
+        }
+      },
+      "sun_protection_lux_threshold": {
+        "name": "Seuil lux courant"
+      },
+      "sun_protection_pending_seconds": {
+        "name": "Debounce restant"
+      },
+      "sun_protection_override_until": {
+        "name": "Override jusqu'à"
+      },
+      "sun_protection_sun_azimuth": {
+        "name": "Azimut du soleil"
+      },
+      "sun_protection_sun_elevation": {
+        "name": "Élévation du soleil"
+      },
+      "sun_protection_lux": {
+        "name": "Luminosité extérieure"
+      },
+      "sun_protection_uv_index": {
+        "name": "Indice UV"
+      },
+      "sun_protection_temp_outdoor": {
+        "name": "Température extérieure"
+      },
+      "sun_protection_temp_indoor": {
+        "name": "Température de la pièce"
+      },
+      "sun_protection_azimuth_diff": {
+        "name": "Écart azimut/orientation"
+      },
+      "sun_protection_elevation_margin": {
+        "name": "Marge d'élévation"
+      },
+      "sun_protection_lux_margin": {
+        "name": "Marge lux"
+      },
+      "sun_protection_uv_margin": {
+        "name": "Marge UV"
       }
     },
     "switch": {

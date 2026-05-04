@@ -6,6 +6,66 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le pr
 
 ## [Non publié]
 
+## [0.6.1] — 2026-05-04
+
+### Ajouté — entités de diagnostic pour Sun Protection
+
+Chaque groupe **Protection solaire** expose désormais 15 nouvelles
+entités classées sous **Diagnostic** (masquées par défaut sur les
+dashboards, accessibles dans les cards et automatisations) qui
+explicitent le moteur de décision et aident à calibrer les seuils.
+
+**Suivi du calcul (4 sensors)** :
+
+- `sensor.{groupe}_sun_protection_status` — statut traduit (`enum` :
+  Désactivé, Override manuel, Aucun capteur, Soleil sous l'horizon,
+  Hors arc, Trop froid dehors, Lux trop bas, UV trop bas, Pièce trop
+  fraîche, Fermeture en attente, Actif).
+- `sensor.{groupe}_sun_protection_lux_threshold` — seuil lux adaptatif
+  effectif selon la T_ext (35 000 / 50 000 / 70 000 lux), `unknown`
+  quand pas de gate lux.
+- `sensor.{groupe}_sun_protection_pending_seconds` — secondes restantes
+  dans le debounce close (10 min) ou open (20 min). `0` hors fenêtre.
+- `sensor.{groupe}_sun_protection_override_until` (`timestamp`) —
+  prochain reset 04:00 quand l'override manuel est armé.
+
+**Lectures contextualisées par groupe (6 sensors)** :
+
+- `sensor.{groupe}_sun_protection_sun_azimuth` (°) — azimut sun.sun.
+- `sensor.{groupe}_sun_protection_sun_elevation` (°) — élévation sun.sun.
+- `sensor.{groupe}_sun_protection_lux` (lx, `illuminance`) — relais du
+  capteur lux configuré au hub.
+- `sensor.{groupe}_sun_protection_uv_index` — relais UV.
+- `sensor.{groupe}_sun_protection_temp_outdoor` (°C, `temperature`).
+- `sensor.{groupe}_sun_protection_temp_indoor` (°C, `temperature`).
+
+**Écarts dérivés pour calibrer (4 sensors)** :
+
+- `sensor.{groupe}_sun_protection_azimuth_diff` (°) —
+  `|azimuth − orientation|`.
+- `sensor.{groupe}_sun_protection_elevation_margin` (°) —
+  `elevation − min_elevation` (négatif → soleil trop bas).
+- `sensor.{groupe}_sun_protection_lux_margin` (lx) —
+  `lux − seuil_courant`.
+- `sensor.{groupe}_sun_protection_uv_margin` —
+  `uv − min_uv`.
+
+**Indicateur géométrique pur (1 binary_sensor)** :
+
+- `binary_sensor.{groupe}_sun_facing` — `on` quand
+  `azimuth ∈ [orientation ± arc]` ET `elevation ≥ min_elevation`,
+  indépendamment de lux/UV/temp/override/switch. Aide à valider
+  l'arc et le seuil d'élévation.
+
+### Tests
+
+- Nouveau `tests/test_sun_protection_entities.py` (15 cas) couvrant
+  les 6 propriétés diagnostic du manager
+  (`azimuth`, `elevation`, `azimuth_diff`, `is_sun_facing`,
+  `lux_close_threshold`, `pending_seconds`) ainsi que l'état
+  superficiel des 14 sensors + 1 binary_sensor.
+- Suite complète : 179 tests verts.
+
 ## [0.6.0] — 2026-05-04
 
 ### Refonte de la protection solaire
@@ -965,7 +1025,8 @@ Aucun changement de code dans l'intégration. Seules les méta-données (`manife
 - Annulation propre des déclencheurs et des callbacks différés au déchargement / rechargement.
 - Traductions français et anglais.
 
-[Non publié]: https://github.com/scadinot/shutters_management/compare/0.6.0...HEAD
+[Non publié]: https://github.com/scadinot/shutters_management/compare/0.6.1...HEAD
+[0.6.1]: https://github.com/scadinot/shutters_management/compare/0.6.0...0.6.1
 [0.6.0]: https://github.com/scadinot/shutters_management/compare/0.5.8...0.6.0
 [0.5.8]: https://github.com/scadinot/shutters_management/compare/0.5.7...0.5.8
 [0.5.7]: https://github.com/scadinot/shutters_management/compare/0.5.6...0.5.7

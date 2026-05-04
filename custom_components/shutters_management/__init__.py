@@ -665,6 +665,94 @@ class ShuttersSunProtectionManager:
         )
 
     # ------------------------------------------------------------------
+    # Diagnostic readers (no decision impact, surfaced by sensor entities)
+    # ------------------------------------------------------------------
+    @property
+    def azimuth(self) -> float | None:
+        """Sun azimuth in degrees, or ``None`` when sun.sun is missing."""
+        state = self.hass.states.get(SUN_ENTITY)
+        if state is None:
+            return None
+        raw = state.attributes.get("azimuth")
+        try:
+            return float(raw) if raw is not None else None
+        except (ValueError, TypeError):
+            return None
+
+    @property
+    def elevation(self) -> float | None:
+        """Sun elevation in degrees, or ``None`` when sun.sun is missing."""
+        state = self.hass.states.get(SUN_ENTITY)
+        if state is None:
+            return None
+        raw = state.attributes.get("elevation")
+        try:
+            return float(raw) if raw is not None else None
+        except (ValueError, TypeError):
+            return None
+
+    @property
+    def azimuth_diff(self) -> float | None:
+        """Absolute angular distance from configured orientation, or ``None``.
+
+        Positive integer in [0, 180]. Compared against ``CONF_ARC`` to decide
+        whether the sun is in front of the façade.
+        """
+        az = self.azimuth
+        if az is None:
+            return None
+        orientation = self.subentry.data.get(CONF_ORIENTATION, 180)
+        return abs((az - orientation + 180) % 360 - 180)
+
+    @property
+    def is_sun_facing(self) -> bool:
+        """Geometric only: in arc AND above ``min_elevation``.
+
+        Independent of lux / UV / temperature / override / switch — useful
+        as a "would I close *if* it were bright enough?" indicator that
+        helps users calibrate ``arc`` and ``min_elevation``.
+        """
+        diff = self.azimuth_diff
+        elev = self.elevation
+        if diff is None or elev is None:
+            return False
+        arc = self.subentry.data.get(CONF_ARC, DEFAULT_ARC)
+        min_el = self.subentry.data.get(
+            CONF_MIN_ELEVATION, DEFAULT_MIN_ELEVATION
+        )
+        return diff <= arc and elev >= min_el
+
+    @property
+    def lux_close_threshold(self) -> int | None:
+        """Effective adaptive lux threshold for the current ``T_ext``.
+
+        ``None`` when no lux gate applies — either because no lux sensor is
+        configured at the hub or because outdoor is below
+        ``T_OUTDOOR_NO_PROTECT``.
+        """
+        if not (self.hub_entry.data.get(CONF_LUX_ENTITY) or ""):
+            return None
+        return self._close_lux_threshold(self.temp_outdoor)
+
+    @property
+    def pending_seconds(self) -> int:
+        """Remaining seconds in the active debounce, 0 when none.
+
+        Either the close-debounce (lux above threshold, waiting for
+        ``LUX_CLOSE_DEBOUNCE_SEC``) or the open-debounce (lux below
+        ``LUX_REOPEN``, waiting for ``LUX_OPEN_DEBOUNCE_SEC``) — the two
+        cannot be active at the same time so we surface a single value.
+        """
+        now = dt_util.now()
+        if self._lux_above_since is not None:
+            elapsed = (now - self._lux_above_since).total_seconds()
+            return max(0, int(LUX_CLOSE_DEBOUNCE_SEC - elapsed))
+        if self._lux_below_since is not None:
+            elapsed = (now - self._lux_below_since).total_seconds()
+            return max(0, int(LUX_OPEN_DEBOUNCE_SEC - elapsed))
+        return 0
+
+    # ------------------------------------------------------------------
     # Adaptive thresholds (close)
     # ------------------------------------------------------------------
     @staticmethod
