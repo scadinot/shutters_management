@@ -155,10 +155,11 @@ def test_close_lux_threshold_no_outdoor_sensor_falls_back_standard() -> None:
 
 
 def test_close_indoor_min_brackets() -> None:
-    assert ShuttersSunProtectionManager._close_indoor_min(15) is None  # cold
-    assert ShuttersSunProtectionManager._close_indoor_min(22) == 24    # mild
-    assert ShuttersSunProtectionManager._close_indoor_min(26) == 23    # standard
-    assert ShuttersSunProtectionManager._close_indoor_min(32) is None  # heatwave bypass
+    assert ShuttersSunProtectionManager._close_indoor_min(None) is None  # no T_ext bypass
+    assert ShuttersSunProtectionManager._close_indoor_min(15) is None    # cold
+    assert ShuttersSunProtectionManager._close_indoor_min(22) == 24      # mild
+    assert ShuttersSunProtectionManager._close_indoor_min(26) == 23      # standard
+    assert ShuttersSunProtectionManager._close_indoor_min(32) is None    # heatwave bypass
 
 
 # ---------------------------------------------------------------------------

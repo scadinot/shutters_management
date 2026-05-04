@@ -696,12 +696,14 @@ class ShuttersSunProtectionManager:
     def _close_indoor_min(t_ext: float | None) -> int | None:
         """Indoor temperature required to close at this T_ext.
 
-        ``None`` means the indoor check is bypassed (no T_ext sensor or
-        we are in the heatwave bracket where we pre-protect even with a
-        cool room).
+        ``None`` means the indoor check is bypassed:
+
+        * no outdoor sensor → we don't know the temperature bracket,
+          fall back to lux-only gating (no comfort gate).
+        * heatwave bracket → pre-protect even with a cool room.
         """
         if t_ext is None:
-            return T_INDOOR_STANDARD_MIN
+            return None
         if t_ext < T_OUTDOOR_NO_PROTECT:
             return None
         if t_ext < T_OUTDOOR_STANDARD:
@@ -762,9 +764,6 @@ class ShuttersSunProtectionManager:
             await self._async_exit_sun_mode()
 
     async def _async_on_state_change(self, event: Any) -> None:
-        await self.async_evaluate()
-
-    async def _async_evaluate_cb(self, _now: Any) -> None:
         await self.async_evaluate()
 
     async def _async_daily_reset(self, _now: datetime) -> None:
@@ -831,7 +830,13 @@ class ShuttersSunProtectionManager:
 
         sun_state = self.hass.states.get(SUN_ENTITY)
         if sun_state is None:
-            return (self._last_status, False, False)
+            # HA startup race or sun integration absent. Treat as
+            # "no sun": clear debounce timers and request an exit if we
+            # were left in sun mode, so the covers don't stay lowered
+            # indefinitely.
+            self._lux_above_since = None
+            self._lux_below_since = None
+            return ("below_horizon", False, self._in_sun_mode)
 
         elevation = float(sun_state.attributes.get("elevation", 0) or 0)
         azimuth = float(sun_state.attributes.get("azimuth", 0) or 0)

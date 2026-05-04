@@ -26,7 +26,7 @@
           "sun_protection_sensors": {
             "name": "Sun protection sensors",
             "data": {
-              "lux_entity": "Outdoor lux sensor (optional)",
+              "lux_entity": "Outdoor lux sensor (leave empty to disable sun protection)",
               "temp_outdoor_entity": "Outdoor temperature sensor (optional)"
             }
           }
@@ -61,7 +61,7 @@
           "sun_protection_sensors": {
             "name": "Sun protection sensors",
             "data": {
-              "lux_entity": "Outdoor lux sensor (optional)",
+              "lux_entity": "Outdoor lux sensor (leave empty to disable sun protection)",
               "temp_outdoor_entity": "Outdoor temperature sensor (optional)"
             }
           }

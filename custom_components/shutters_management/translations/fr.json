@@ -26,7 +26,7 @@
           "sun_protection_sensors": {
             "name": "Capteurs de protection solaire",
             "data": {
-              "lux_entity": "Capteur de luminosité extérieure (optionnel)",
+              "lux_entity": "Capteur de luminosité extérieure (laisser vide pour désactiver la protection solaire)",
               "temp_outdoor_entity": "Capteur de température extérieure (optionnel)"
             }
           }
@@ -61,7 +61,7 @@
           "sun_protection_sensors": {
             "name": "Capteurs de protection solaire",
             "data": {
-              "lux_entity": "Capteur de luminosité extérieure (optionnel)",
+              "lux_entity": "Capteur de luminosité extérieure (laisser vide pour désactiver la protection solaire)",
               "temp_outdoor_entity": "Capteur de température extérieure (optionnel)"
             }
           }
