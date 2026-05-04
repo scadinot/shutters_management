@@ -101,6 +101,12 @@ from .const import (
 SECTION_OPEN = "open"
 SECTION_CLOSE = "close"
 SECTION_COVERS = "shutters"
+SECTION_SCHEDULE_DAYS = "schedule_days"
+SECTION_RANDOMIZATION = "randomization"
+SECTION_PRESENCE = "presence"
+SECTION_ORIENTATION = "orientation"
+SECTION_THRESHOLDS = "thresholds"
+SECTION_ROOM_SENSOR = "room_sensor"
 SECTION_NOTIFICATIONS = "notifications"
 SECTION_VOICE_ANNOUNCEMENT = "voice_announcement"
 SECTION_SUN_PROTECTION_SENSORS = "sun_protection_sensors"
@@ -180,7 +186,7 @@ def _build_hub_schema(
                 ),
             }
         ),
-        {"collapsed": False},
+        {"collapsed": True},
     )
 
     tts_section = data_entry_flow.section(
@@ -230,7 +236,7 @@ def _build_hub_schema(
                 ),
             }
         ),
-        {"collapsed": False},
+        {"collapsed": True},
     )
 
     sun_protection_sensors_section = data_entry_flow.section(
@@ -405,6 +411,25 @@ def _build_instance_schema(
         {"collapsed": True},
     )
 
+    schedule_days_section = data_entry_flow.section(
+        vol.Schema(
+            {
+                vol.Required(
+                    CONF_DAYS,
+                    default=defaults.get(CONF_DAYS, DEFAULT_DAYS),
+                ): selector.SelectSelector(
+                    selector.SelectSelectorConfig(
+                        options=DAYS,
+                        multiple=True,
+                        mode=selector.SelectSelectorMode.DROPDOWN,
+                        translation_key="days",
+                    )
+                ),
+            }
+        ),
+        {"collapsed": True},
+    )
+
     fields: dict[Any, Any] = {}
     if include_name:
         fields[
@@ -415,57 +440,63 @@ def _build_instance_schema(
             vol.Required(SECTION_COVERS): covers_section,
             vol.Required(SECTION_OPEN): open_section,
             vol.Required(SECTION_CLOSE): close_section,
-            vol.Required(
-                CONF_DAYS,
-                default=defaults.get(CONF_DAYS, DEFAULT_DAYS),
-            ): selector.SelectSelector(
-                selector.SelectSelectorConfig(
-                    options=DAYS,
-                    multiple=True,
-                    mode=selector.SelectSelectorMode.DROPDOWN,
-                    translation_key="days",
-                )
-            ),
+            vol.Required(SECTION_SCHEDULE_DAYS): schedule_days_section,
         }
     )
     if include_simulation:
+        randomization_section = data_entry_flow.section(
+            vol.Schema(
+                {
+                    vol.Required(
+                        CONF_RANDOMIZE,
+                        default=defaults.get(CONF_RANDOMIZE, DEFAULT_RANDOMIZE),
+                    ): selector.BooleanSelector(),
+                    vol.Required(
+                        CONF_RANDOM_MAX_MINUTES,
+                        default=defaults.get(
+                            CONF_RANDOM_MAX_MINUTES, DEFAULT_RANDOM_MAX_MINUTES
+                        ),
+                    ): selector.NumberSelector(
+                        selector.NumberSelectorConfig(
+                            min=0,
+                            max=240,
+                            step=1,
+                            unit_of_measurement="min",
+                            mode=selector.NumberSelectorMode.BOX,
+                        )
+                    ),
+                }
+            ),
+            {"collapsed": True},
+        )
+        presence_section = data_entry_flow.section(
+            vol.Schema(
+                {
+                    vol.Required(
+                        CONF_ONLY_WHEN_AWAY,
+                        default=defaults.get(
+                            CONF_ONLY_WHEN_AWAY, DEFAULT_ONLY_WHEN_AWAY
+                        ),
+                    ): selector.BooleanSelector(),
+                    vol.Optional(
+                        CONF_PRESENCE_ENTITY,
+                        description={
+                            "suggested_value": defaults.get(
+                                CONF_PRESENCE_ENTITY, ""
+                            )
+                            or None
+                        },
+                    ): selector.EntitySelector(
+                        selector.EntitySelectorConfig(domain=["person", "group"])
+                    ),
+                }
+            ),
+            {"collapsed": True},
+        )
         fields.update(
             {
-                vol.Required(
-                    CONF_RANDOMIZE,
-                    default=defaults.get(CONF_RANDOMIZE, DEFAULT_RANDOMIZE),
-                ): selector.BooleanSelector(),
-                vol.Required(
-                    CONF_RANDOM_MAX_MINUTES,
-                    default=defaults.get(
-                        CONF_RANDOM_MAX_MINUTES, DEFAULT_RANDOM_MAX_MINUTES
-                    ),
-                ): selector.NumberSelector(
-                    selector.NumberSelectorConfig(
-                        min=0,
-                        max=240,
-                        step=1,
-                        unit_of_measurement="min",
-                        mode=selector.NumberSelectorMode.BOX,
-                    )
-                ),
-                vol.Required(
-                    CONF_ONLY_WHEN_AWAY,
-                    default=defaults.get(
-                        CONF_ONLY_WHEN_AWAY, DEFAULT_ONLY_WHEN_AWAY
-                    ),
-                ): selector.BooleanSelector(),
-                vol.Optional(
-                    CONF_PRESENCE_ENTITY,
-                    description={
-                        "suggested_value": defaults.get(
-                            CONF_PRESENCE_ENTITY, ""
-                        )
-                        or None
-                    },
-                ): selector.EntitySelector(
-                    selector.EntitySelectorConfig(domain=["person", "group"])
-                ),
+                vol.Required(SECTION_RANDOMIZATION): randomization_section,
+                vol.Required(SECTION_PRESENCE): presence_section,
             }
         )
     return vol.Schema(fields)
@@ -484,7 +515,14 @@ def _normalize_instance(user_input: dict[str, Any]) -> dict[str, Any]:
     """Flatten section sub-dicts, cast types, drop empties."""
     flat: dict[str, Any] = {}
     for key, value in user_input.items():
-        if key in (SECTION_OPEN, SECTION_CLOSE, SECTION_COVERS) and isinstance(value, dict):
+        if key in (
+            SECTION_OPEN,
+            SECTION_CLOSE,
+            SECTION_COVERS,
+            SECTION_SCHEDULE_DAYS,
+            SECTION_RANDOMIZATION,
+            SECTION_PRESENCE,
+        ) and isinstance(value, dict):
             flat.update(value)
         else:
             flat[key] = value
@@ -829,6 +867,98 @@ def _build_sun_protection_schema(defaults: dict[str, Any]) -> vol.Schema:
         {"collapsed": True},
     )
 
+    orientation_section = data_entry_flow.section(
+        vol.Schema(
+            {
+                vol.Required(
+                    CONF_ORIENTATION,
+                    default=current_orientation,
+                ): selector.SelectSelector(
+                    selector.SelectSelectorConfig(
+                        options=list(ORIENTATION_CARDINALS.keys()),
+                        mode=selector.SelectSelectorMode.LIST,
+                        translation_key="orientation",
+                    )
+                ),
+                vol.Required(
+                    CONF_ARC,
+                    default=defaults.get(CONF_ARC, DEFAULT_ARC),
+                ): selector.NumberSelector(
+                    selector.NumberSelectorConfig(
+                        min=10,
+                        max=120,
+                        step=5,
+                        unit_of_measurement="°",
+                        mode=selector.NumberSelectorMode.SLIDER,
+                    )
+                ),
+            }
+        ),
+        {"collapsed": True},
+    )
+
+    thresholds_section = data_entry_flow.section(
+        vol.Schema(
+            {
+                vol.Required(
+                    CONF_MIN_ELEVATION,
+                    default=defaults.get(CONF_MIN_ELEVATION, DEFAULT_MIN_ELEVATION),
+                ): selector.NumberSelector(
+                    selector.NumberSelectorConfig(
+                        min=0,
+                        max=60,
+                        step=1,
+                        unit_of_measurement="°",
+                        mode=selector.NumberSelectorMode.BOX,
+                    )
+                ),
+                vol.Required(
+                    CONF_MIN_UV,
+                    default=defaults.get(CONF_MIN_UV, DEFAULT_MIN_UV),
+                ): selector.NumberSelector(
+                    selector.NumberSelectorConfig(
+                        min=0,
+                        max=11,
+                        step=1,
+                        mode=selector.NumberSelectorMode.BOX,
+                    )
+                ),
+                vol.Required(
+                    CONF_TARGET_POSITION,
+                    default=defaults.get(CONF_TARGET_POSITION, DEFAULT_TARGET_POSITION),
+                ): selector.NumberSelector(
+                    selector.NumberSelectorConfig(
+                        min=0,
+                        max=100,
+                        step=5,
+                        unit_of_measurement="%",
+                        mode=selector.NumberSelectorMode.SLIDER,
+                    )
+                ),
+            }
+        ),
+        {"collapsed": True},
+    )
+
+    room_sensor_section = data_entry_flow.section(
+        vol.Schema(
+            {
+                vol.Optional(
+                    CONF_TEMP_INDOOR_ENTITY,
+                    description={
+                        "suggested_value": defaults.get(
+                            CONF_TEMP_INDOOR_ENTITY, DEFAULT_TEMP_INDOOR_ENTITY
+                        )
+                        or None
+                    },
+                ): selector.EntitySelector(
+                    selector.EntitySelectorConfig(domain="sensor")
+                ),
+            }
+        ),
+        {"collapsed": True},
+    )
+
     return vol.Schema(
         {
             vol.Required(
@@ -836,83 +966,26 @@ def _build_sun_protection_schema(defaults: dict[str, Any]) -> vol.Schema:
                 default=defaults.get(CONF_NAME, ""),
             ): selector.TextSelector(selector.TextSelectorConfig()),
             vol.Required(SECTION_COVERS): sun_covers_section,
-            vol.Required(
-                CONF_ORIENTATION,
-                default=current_orientation,
-            ): selector.SelectSelector(
-                selector.SelectSelectorConfig(
-                    options=list(ORIENTATION_CARDINALS.keys()),
-                    mode=selector.SelectSelectorMode.LIST,
-                    translation_key="orientation",
-                )
-            ),
-            vol.Required(
-                CONF_ARC,
-                default=defaults.get(CONF_ARC, DEFAULT_ARC),
-            ): selector.NumberSelector(
-                selector.NumberSelectorConfig(
-                    min=10,
-                    max=120,
-                    step=5,
-                    unit_of_measurement="°",
-                    mode=selector.NumberSelectorMode.SLIDER,
-                )
-            ),
-            vol.Required(
-                CONF_MIN_ELEVATION,
-                default=defaults.get(CONF_MIN_ELEVATION, DEFAULT_MIN_ELEVATION),
-            ): selector.NumberSelector(
-                selector.NumberSelectorConfig(
-                    min=0,
-                    max=60,
-                    step=1,
-                    unit_of_measurement="°",
-                    mode=selector.NumberSelectorMode.BOX,
-                )
-            ),
-            vol.Required(
-                CONF_MIN_UV,
-                default=defaults.get(CONF_MIN_UV, DEFAULT_MIN_UV),
-            ): selector.NumberSelector(
-                selector.NumberSelectorConfig(
-                    min=0,
-                    max=11,
-                    step=1,
-                    mode=selector.NumberSelectorMode.BOX,
-                )
-            ),
-            vol.Required(
-                CONF_TARGET_POSITION,
-                default=defaults.get(CONF_TARGET_POSITION, DEFAULT_TARGET_POSITION),
-            ): selector.NumberSelector(
-                selector.NumberSelectorConfig(
-                    min=0,
-                    max=100,
-                    step=5,
-                    unit_of_measurement="%",
-                    mode=selector.NumberSelectorMode.SLIDER,
-                )
-            ),
-            vol.Optional(
-                CONF_TEMP_INDOOR_ENTITY,
-                description={
-                    "suggested_value": defaults.get(
-                        CONF_TEMP_INDOOR_ENTITY, DEFAULT_TEMP_INDOOR_ENTITY
-                    )
-                    or None
-                },
-            ): selector.EntitySelector(
-                selector.EntitySelectorConfig(domain="sensor")
-            ),
+            vol.Required(SECTION_ORIENTATION): orientation_section,
+            vol.Required(SECTION_THRESHOLDS): thresholds_section,
+            vol.Required(SECTION_ROOM_SENSOR): room_sensor_section,
         }
     )
 
 
 def _normalize_sun_protection(user_input: dict[str, Any]) -> dict[str, Any]:
     """Cast types and convert cardinal string to degree integer."""
-    flat = dict(user_input)
-    if SECTION_COVERS in flat and isinstance(flat[SECTION_COVERS], dict):
-        flat.update(flat.pop(SECTION_COVERS))
+    flat: dict[str, Any] = {}
+    for key, value in user_input.items():
+        if key in (
+            SECTION_COVERS,
+            SECTION_ORIENTATION,
+            SECTION_THRESHOLDS,
+            SECTION_ROOM_SENSOR,
+        ) and isinstance(value, dict):
+            flat.update(value)
+        else:
+            flat[key] = value
     orientation_str = flat.get(CONF_ORIENTATION, "S")
     flat[CONF_ORIENTATION] = ORIENTATION_CARDINALS.get(
         orientation_str, DEFAULT_ORIENTATION
