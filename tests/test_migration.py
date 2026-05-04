@@ -7,19 +7,25 @@ from homeassistant.helpers import device_registry as dr
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.shutters_management.const import (
+    CONF_ARC,
     CONF_CLOSE_TIME,
     CONF_COVERS,
     CONF_DAYS,
+    CONF_MIN_ELEVATION,
+    CONF_MIN_UV,
     CONF_NOTIFY_MODE,
     CONF_NOTIFY_SERVICES,
     CONF_NOTIFY_WHEN_AWAY_ONLY,
     CONF_ONLY_WHEN_AWAY,
     CONF_OPEN_TIME,
+    CONF_ORIENTATION,
     CONF_PRESENCE_ENTITY,
     CONF_RANDOMIZE,
     CONF_RANDOM_MAX_MINUTES,
+    CONF_TARGET_POSITION,
     CONF_TTS_MODE,
     CONF_TYPE,
+    CONF_UV_ENTITY,
     DAYS,
     DOMAIN,
     HUB_TITLE,
@@ -27,6 +33,7 @@ from custom_components.shutters_management.const import (
     MODE_AWAY_ONLY,
     MODE_DISABLED,
     SUBENTRY_TYPE_INSTANCE,
+    SUBENTRY_TYPE_SUN_PROTECTION,
     TYPE_HUB,
 )
 
@@ -74,7 +81,7 @@ async def test_migration_promotes_single_legacy_entry_to_hub(
     assert len(entries) == 1
     hub = entries[0]
     assert hub.entry_id == "legacy_a"
-    assert hub.version == 5
+    assert hub.version == 6
     assert hub.title == HUB_TITLE
     assert hub.unique_id == HUB_UNIQUE_ID
     assert hub.data[CONF_TYPE] == TYPE_HUB
@@ -117,7 +124,7 @@ async def test_migration_folds_two_legacy_entries_into_one_hub(
         f"Expected exactly one hub, got {[(e.entry_id, e.title) for e in entries]}"
     )
     hub = entries[0]
-    assert hub.version == 5
+    assert hub.version == 6
     assert hub.data[CONF_TYPE] == TYPE_HUB
 
     titles = sorted(s.title for s in hub.subentries.values())
@@ -163,7 +170,7 @@ async def test_migration_v3_to_v4_converts_boolean_flags(
     assert len(entries) == 1
     entry = entries[0]
     assert entry.entry_id == "native_hub"
-    assert entry.version == 5
+    assert entry.version == 6
     assert entry.data[CONF_NOTIFY_SERVICES] == [
         "notify.persistent_notification"
     ]
@@ -221,7 +228,7 @@ async def test_migration_v4_to_v5_strips_simulation_fields_from_instance(
     await hass.async_block_till_done()
 
     entry = hass.config_entries.async_get_entry(hub.entry_id)
-    assert entry.version == 5
+    assert entry.version == 6
 
     subentry = next(iter(entry.subentries.values()))
     assert subentry.subentry_type == SUBENTRY_TYPE_INSTANCE
@@ -231,6 +238,66 @@ async def test_migration_v4_to_v5_strips_simulation_fields_from_instance(
     assert CONF_RANDOM_MAX_MINUTES not in subentry.data
     assert CONF_ONLY_WHEN_AWAY not in subentry.data
     assert CONF_PRESENCE_ENTITY not in subentry.data
+
+
+async def test_migration_v5_to_v6_preserves_uv(hass: HomeAssistant) -> None:
+    """v5 → v6 is purely additive: ``uv_entity`` (hub) and ``min_uv``
+    (sun_protection) survive intact, the new sensor fields stay absent
+    until the user configures them.
+
+    v0.6.0 introduces lux + adaptive temperature alongside the existing
+    UV gate. The user can opt for any combination — lux only, UV only,
+    both, or neither (feature off) — so the migration must NOT erase
+    the legacy UV configuration.
+    """
+    from homeassistant.config_entries import ConfigSubentryData
+
+    hub = MockConfigEntry(
+        domain=DOMAIN,
+        title=HUB_TITLE,
+        data={
+            CONF_TYPE: TYPE_HUB,
+            CONF_NOTIFY_SERVICES: [],
+            CONF_NOTIFY_MODE: MODE_DISABLED,
+            CONF_TTS_MODE: MODE_DISABLED,
+            CONF_UV_ENTITY: "sensor.uv",
+        },
+        options={},
+        entry_id="hub_v5",
+        unique_id=HUB_UNIQUE_ID,
+        version=5,
+        subentries_data=[
+            ConfigSubentryData(
+                subentry_type=SUBENTRY_TYPE_SUN_PROTECTION,
+                title="Salon Sud",
+                unique_id="salon_sud",
+                data={
+                    CONF_COVERS: ["cover.living_room"],
+                    CONF_ORIENTATION: 180,
+                    CONF_ARC: 60,
+                    CONF_MIN_ELEVATION: 15,
+                    CONF_MIN_UV: 4,
+                    CONF_TARGET_POSITION: 50,
+                },
+            )
+        ],
+    )
+    hub.add_to_hass(hass)
+
+    assert await hass.config_entries.async_setup(hub.entry_id)
+    await hass.async_block_till_done()
+
+    entry = hass.config_entries.async_get_entry(hub.entry_id)
+    assert entry.version == 6
+    # UV fields are preserved.
+    assert entry.data[CONF_UV_ENTITY] == "sensor.uv"
+
+    subentry = next(iter(entry.subentries.values()))
+    assert subentry.subentry_type == SUBENTRY_TYPE_SUN_PROTECTION
+    assert subentry.data[CONF_MIN_UV] == 4
+    # Other fields untouched.
+    assert subentry.data[CONF_ORIENTATION] == 180
+    assert subentry.data[CONF_TARGET_POSITION] == 50
 
 
 async def test_migration_reuses_legacy_entry_id_as_subentry_id(

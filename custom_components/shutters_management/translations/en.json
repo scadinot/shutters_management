@@ -5,8 +5,7 @@
         "title": "Shutters Management",
         "description": "Configure shared hub settings. Add shutter schedules afterwards by adding instances on the integration's hub.",
         "data": {
-          "sequential_covers": "Operate covers one at a time in random order",
-          "uv_entity": "UV index sensor (optional)"
+          "sequential_covers": "Operate covers one at a time in random order"
         },
         "sections": {
           "notifications": {
@@ -22,6 +21,14 @@
               "tts_engine": "TTS engine",
               "tts_targets": "Smart speakers (leave empty if none)",
               "tts_mode": "When to announce"
+            }
+          },
+          "sun_protection_sensors": {
+            "name": "Sun protection sensors",
+            "data": {
+              "lux_entity": "Outdoor lux sensor (primary; leave empty to fall back to UV / disable)",
+              "uv_entity": "UV index sensor (alternative or additive to lux)",
+              "temp_outdoor_entity": "Outdoor temperature sensor (optional)"
             }
           }
         }
@@ -34,8 +41,7 @@
         "title": "Hub settings",
         "description": "Update the shared hub settings.",
         "data": {
-          "sequential_covers": "Operate covers one at a time in random order",
-          "uv_entity": "UV index sensor (optional)"
+          "sequential_covers": "Operate covers one at a time in random order"
         },
         "sections": {
           "notifications": {
@@ -51,6 +57,14 @@
               "tts_engine": "TTS engine",
               "tts_targets": "Smart speakers (leave empty if none)",
               "tts_mode": "When to announce"
+            }
+          },
+          "sun_protection_sensors": {
+            "name": "Sun protection sensors",
+            "data": {
+              "lux_entity": "Outdoor lux sensor (primary; leave empty to fall back to UV / disable)",
+              "uv_entity": "UV index sensor (alternative or additive to lux)",
+              "temp_outdoor_entity": "Outdoor temperature sensor (optional)"
             }
           }
         }
@@ -80,8 +94,9 @@
             "orientation": "Facing direction",
             "arc": "Exposure arc (± degrees)",
             "min_elevation": "Minimum sun elevation (°)",
-            "min_uv": "Minimum UV index",
-            "target_position": "Position when sun is facing (% open)"
+            "min_uv": "Minimum UV index (used only when a UV sensor is configured)",
+            "target_position": "Position when sun is facing (% open)",
+            "temp_indoor_entity": "Room temperature sensor (optional)"
           },
           "sections": {
             "shutters": {
@@ -100,8 +115,9 @@
             "orientation": "Facing direction",
             "arc": "Exposure arc (± degrees)",
             "min_elevation": "Minimum sun elevation (°)",
-            "min_uv": "Minimum UV index",
-            "target_position": "Position when sun is facing (% open)"
+            "min_uv": "Minimum UV index (used only when a UV sensor is configured)",
+            "target_position": "Position when sun is facing (% open)",
+            "temp_indoor_entity": "Room temperature sensor (optional)"
           },
           "sections": {
             "shutters": {

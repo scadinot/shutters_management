@@ -102,7 +102,7 @@ def mock_config_entry(base_config: dict[str, Any]) -> MockConfigEntry:
         options={},
         entry_id="test_entry_id",
         unique_id=HUB_UNIQUE_ID,
-        version=5,
+        version=6,
         subentries_data=[
             make_subentry_data(
                 title="Bureau",
@@ -144,7 +144,7 @@ def build_hub_with_instance(
         options={},
         entry_id=entry_id,
         unique_id=HUB_UNIQUE_ID,
-        version=5,
+        version=6,
         subentries_data=[
             make_subentry_data(
                 title=instance_title,

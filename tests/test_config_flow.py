@@ -22,6 +22,8 @@ from custom_components.shutters_management.const import (
     CONF_DAYS,
     CONF_MIN_ELEVATION,
     CONF_MIN_UV,
+    CONF_LUX_ENTITY,
+    CONF_TEMP_OUTDOOR_ENTITY,
     CONF_NOTIFY_MODE,
     CONF_NOTIFY_SERVICES,
     CONF_ONLY_WHEN_AWAY,
@@ -139,6 +141,7 @@ async def test_hub_user_flow_creates_singleton(hass: HomeAssistant) -> None:
                 CONF_TTS_TARGETS: [],
                 CONF_TTS_MODE: MODE_DISABLED,
             },
+            "sun_protection_sensors": {},
         },
     )
     assert result["type"] == FlowResultType.CREATE_ENTRY
@@ -182,6 +185,7 @@ async def test_hub_options_flow_updates_notification_settings(
                 CONF_TTS_TARGETS: [],
                 CONF_TTS_MODE: MODE_DISABLED,
             },
+            "sun_protection_sensors": {},
         },
     )
     assert result["type"] == FlowResultType.CREATE_ENTRY
@@ -688,8 +692,14 @@ async def test_sun_protection_subentry_reconfigure_preloads_covers_in_section(
     assert default == ["cover.south_a", "cover.south_b"]
 
 
-async def test_hub_user_flow_persists_uv_entity(hass: HomeAssistant) -> None:
-    """uv_entity submitted in hub config flow is stored in entry.data."""
+async def test_hub_user_flow_persists_sun_protection_sensors(
+    hass: HomeAssistant,
+) -> None:
+    """``lux_entity``, ``uv_entity`` and ``temp_outdoor_entity`` submitted
+    in the hub config flow are flattened from the
+    ``sun_protection_sensors`` section and stored at the top level of
+    ``entry.data``. UV is included so UV-only and lux+UV configurations
+    are covered alongside the lux-primary path."""
     result = await hass.config_entries.flow.async_init(
         DOMAIN, context={"source": SOURCE_USER}
     )
@@ -699,7 +709,6 @@ async def test_hub_user_flow_persists_uv_entity(hass: HomeAssistant) -> None:
         result["flow_id"],
         user_input={
             CONF_SEQUENTIAL_COVERS: False,
-            CONF_UV_ENTITY: "sensor.uv_index",
             "notifications": {
                 CONF_NOTIFY_SERVICES: [],
                 CONF_NOTIFY_MODE: MODE_ALWAYS,
@@ -708,10 +717,17 @@ async def test_hub_user_flow_persists_uv_entity(hass: HomeAssistant) -> None:
                 CONF_TTS_TARGETS: [],
                 CONF_TTS_MODE: MODE_DISABLED,
             },
+            "sun_protection_sensors": {
+                CONF_LUX_ENTITY: "sensor.outdoor_lux",
+                CONF_UV_ENTITY: "sensor.uv_index",
+                CONF_TEMP_OUTDOOR_ENTITY: "sensor.outdoor_temperature",
+            },
         },
     )
     assert result["type"] == FlowResultType.CREATE_ENTRY
+    assert result["data"][CONF_LUX_ENTITY] == "sensor.outdoor_lux"
     assert result["data"][CONF_UV_ENTITY] == "sensor.uv_index"
+    assert result["data"][CONF_TEMP_OUTDOOR_ENTITY] == "sensor.outdoor_temperature"
 
 
 _TRANSLATION_PATHS = [
