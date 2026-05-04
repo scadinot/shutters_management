@@ -860,9 +860,11 @@ class ShuttersSunProtectionManager:
                 return ("below_horizon", False, True)
             if diff > arc + ARC_HYSTERESIS_DEG:
                 return ("out_of_arc", False, True)
-            # Lux exit (debounced) — only when the lux sensor is wired up.
+            # Lux exit (debounced) — also fires when the configured lux
+            # sensor goes unknown/unavailable, so we don't stay stuck
+            # closed indefinitely with no way to re-evaluate light.
             if lux_entity:
-                if lux is not None and lux < LUX_REOPEN:
+                if lux is None or lux < LUX_REOPEN:
                     if self._lux_below_since is None:
                         self._lux_below_since = now
                     if (
@@ -872,8 +874,10 @@ class ShuttersSunProtectionManager:
                         return ("lux_too_low", False, True)
                 else:
                     self._lux_below_since = None
-            # UV exit — no debounce, UV index changes slowly enough.
-            if uv_entity and uv is not None and uv < min_uv:
+            # UV exit — no debounce, UV index changes slowly enough. A
+            # missing reading (sensor unknown/unavailable) is treated as
+            # a failed gate so we exit rather than freezing closed.
+            if uv_entity and (uv is None or uv < min_uv):
                 return ("uv_too_low", False, True)
             # Comfort exit: room cool AND outdoor cool together.
             if (
@@ -915,15 +919,18 @@ class ShuttersSunProtectionManager:
             self._lux_above_since = None
             return ("uv_too_low", False, False)
 
-        # Indoor comfort gate.
+        # Indoor comfort gate. If the user has wired an indoor sensor
+        # and we are in a temperature bracket where it matters, a
+        # missing reading must block the close — closing despite an
+        # invisible room temperature would defeat the comfort guarantee.
         indoor_min = self._close_indoor_min(t_ext)
-        if (
-            indoor_min is not None
-            and t_indoor is not None
-            and t_indoor < indoor_min
-        ):
-            self._lux_above_since = None
-            return ("room_too_cool", False, False)
+        indoor_entity = (
+            self.subentry.data.get(CONF_TEMP_INDOOR_ENTITY) or ""
+        )
+        if indoor_min is not None and indoor_entity:
+            if t_indoor is None or t_indoor < indoor_min:
+                self._lux_above_since = None
+                return ("room_too_cool", False, False)
 
         # All instantaneous conditions met. Debounce sustained sunshine
         # only when lux is the gating signal — UV moves slowly enough on

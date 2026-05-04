@@ -417,6 +417,126 @@ async def test_uv_drop_during_sun_mode_triggers_exit(hass: HomeAssistant) -> Non
 
 
 # ---------------------------------------------------------------------------
+# Unavailable sensor robustness
+# ---------------------------------------------------------------------------
+
+
+async def test_lux_unavailable_blocks_close(hass: HomeAssistant) -> None:
+    """If the lux sensor is configured but unknown/unavailable, the close
+    path must not fire — lux is the gating signal we cannot evaluate."""
+    cover_calls = async_mock_service(hass, "cover", "set_cover_position")
+    _set_sun(hass, azimuth=180, elevation=30)
+    hass.states.async_set("sensor.lux", "unavailable")
+    _set_temp(hass, 26, "sensor.t_ext")
+
+    entry = _build_hub_with_sun_protection(covers=["cover.living_room"])
+    subentry_id = await _setup(hass, entry)
+    manager = hass.data[DOMAIN][subentry_id]
+
+    assert manager.status == "lux_too_low"
+    assert cover_calls == []
+
+
+async def test_lux_unavailable_during_sun_mode_triggers_exit(
+    hass: HomeAssistant,
+) -> None:
+    """In sun mode, if the lux sensor goes unavailable for the open
+    debounce window, the manager exits rather than staying stuck."""
+    async_mock_service(hass, "cover", "set_cover_position")
+
+    base = datetime(2026, 6, 15, 14, 0, tzinfo=dt_util.UTC)
+    with freeze_time(base) as frozen:
+        manager, _ = await _enter_sun_mode(hass)
+        frozen.tick(timedelta(seconds=LUX_CLOSE_DEBOUNCE_SEC + 1))
+        await manager.async_evaluate()
+        assert manager.is_active
+
+        hass.states.async_set(
+            "cover.living_room", "open", {"current_position": 50}
+        )
+        # Sensor goes unknown — lux read returns None.
+        hass.states.async_set("sensor.lux", "unknown")
+        await manager.async_evaluate()
+        assert manager.is_active  # debounce arming, not yet exit
+
+        frozen.tick(timedelta(seconds=LUX_OPEN_DEBOUNCE_SEC + 1))
+        await manager.async_evaluate()
+
+    assert not manager.is_active
+
+
+async def test_uv_unavailable_blocks_close(hass: HomeAssistant) -> None:
+    """If the UV sensor is configured but unknown/unavailable, the close
+    path must not fire."""
+    cover_calls = async_mock_service(hass, "cover", "set_cover_position")
+    _set_sun(hass, azimuth=180, elevation=30)
+    hass.states.async_set("sensor.uv", "unavailable")
+
+    entry = _build_hub_with_sun_protection(
+        covers=["cover.living_room"],
+        lux_entity="",
+        uv_entity="sensor.uv",
+        temp_outdoor_entity="",
+        min_uv=3,
+    )
+    subentry_id = await _setup(hass, entry)
+    manager = hass.data[DOMAIN][subentry_id]
+
+    assert manager.status == "uv_too_low"
+    assert cover_calls == []
+
+
+async def test_uv_unavailable_during_sun_mode_triggers_exit(
+    hass: HomeAssistant,
+) -> None:
+    """If the UV sensor disappears while in sun mode, exit immediately
+    (UV has no debounce — a lost reading is treated as a failed gate)."""
+    async_mock_service(hass, "cover", "set_cover_position")
+    hass.states.async_set("cover.living_room", "open", {"current_position": 80})
+    _set_sun(hass, azimuth=180, elevation=30)
+    hass.states.async_set("sensor.uv", "5")
+
+    entry = _build_hub_with_sun_protection(
+        covers=["cover.living_room"],
+        lux_entity="",
+        uv_entity="sensor.uv",
+        temp_outdoor_entity="",
+        min_uv=3,
+        target_position=50,
+    )
+    subentry_id = await _setup(hass, entry)
+    manager = hass.data[DOMAIN][subentry_id]
+    assert manager.is_active
+
+    hass.states.async_set("cover.living_room", "open", {"current_position": 50})
+    hass.states.async_set("sensor.uv", "unavailable")
+    await manager.async_evaluate()
+
+    assert not manager.is_active
+
+
+async def test_indoor_unavailable_blocks_close(hass: HomeAssistant) -> None:
+    """If the user wired an indoor sensor but it is unknown/unavailable,
+    the close path must not fire — closing without that comfort signal
+    would defeat the configured guarantee."""
+    cover_calls = async_mock_service(hass, "cover", "set_cover_position")
+    _set_sun(hass, azimuth=180, elevation=30)
+    _set_lux(hass, 80000)
+    _set_temp(hass, 26, "sensor.t_ext")
+    hass.states.async_set("sensor.t_indoor", "unavailable")
+
+    entry = _build_hub_with_sun_protection(
+        covers=["cover.living_room"],
+        temp_indoor_entity="sensor.t_indoor",
+    )
+    subentry_id = await _setup(hass, entry)
+    manager = hass.data[DOMAIN][subentry_id]
+
+    assert manager.status == "room_too_cool"
+    assert cover_calls == []
+
+
+# ---------------------------------------------------------------------------
 # Activation + restoration
 # ---------------------------------------------------------------------------
 

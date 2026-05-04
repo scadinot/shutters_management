@@ -38,6 +38,7 @@ from custom_components.shutters_management.const import (
     CONF_TTS_MODE,
     CONF_TTS_TARGETS,
     CONF_TYPE,
+    CONF_UV_ENTITY,
     DAYS,
     DEFAULT_ARC,
     DEFAULT_CLOSE_MODE,
@@ -694,9 +695,11 @@ async def test_sun_protection_subentry_reconfigure_preloads_covers_in_section(
 async def test_hub_user_flow_persists_sun_protection_sensors(
     hass: HomeAssistant,
 ) -> None:
-    """``lux_entity`` and ``temp_outdoor_entity`` submitted in the hub
-    config flow are flattened from the ``sun_protection_sensors`` section
-    and stored at the top level of ``entry.data``."""
+    """``lux_entity``, ``uv_entity`` and ``temp_outdoor_entity`` submitted
+    in the hub config flow are flattened from the
+    ``sun_protection_sensors`` section and stored at the top level of
+    ``entry.data``. UV is included so UV-only and lux+UV configurations
+    are covered alongside the lux-primary path."""
     result = await hass.config_entries.flow.async_init(
         DOMAIN, context={"source": SOURCE_USER}
     )
@@ -716,12 +719,14 @@ async def test_hub_user_flow_persists_sun_protection_sensors(
             },
             "sun_protection_sensors": {
                 CONF_LUX_ENTITY: "sensor.outdoor_lux",
+                CONF_UV_ENTITY: "sensor.uv_index",
                 CONF_TEMP_OUTDOOR_ENTITY: "sensor.outdoor_temperature",
             },
         },
     )
     assert result["type"] == FlowResultType.CREATE_ENTRY
     assert result["data"][CONF_LUX_ENTITY] == "sensor.outdoor_lux"
+    assert result["data"][CONF_UV_ENTITY] == "sensor.uv_index"
     assert result["data"][CONF_TEMP_OUTDOOR_ENTITY] == "sensor.outdoor_temperature"
 
 
