@@ -35,6 +35,7 @@ from custom_components.shutters_management.const import (
     CONF_RANDOM_MAX_MINUTES,
     CONF_SEQUENTIAL_COVERS,
     CONF_TARGET_POSITION,
+    CONF_TTS_ENGINE,
     CONF_TTS_MODE,
     CONF_TTS_TARGETS,
     CONF_TYPE,
@@ -635,6 +636,21 @@ def _section_field_default(schema: vol.Schema, section_key: str, field_key: str)
     )
 
 
+def _section_field_suggested_value(
+    schema: vol.Schema, section_key: str, field_key: str
+):
+    """Walk a vol.Schema to read description.suggested_value of a nested field."""
+    for marker, value in schema.schema.items():
+        if marker.schema == section_key and isinstance(value, data_entry_flow.section):
+            for inner_marker in value.schema.schema:
+                if inner_marker.schema == field_key:
+                    description = getattr(inner_marker, "description", None) or {}
+                    return description.get("suggested_value")
+    raise AssertionError(
+        f"Field {field_key!r} not found in section {section_key!r}"
+    )
+
+
 async def test_subentry_reconfigure_preloads_covers_in_section(
     hass: HomeAssistant, setup_integration, mock_config_entry: MockConfigEntry
 ) -> None:
@@ -728,6 +744,108 @@ async def test_hub_user_flow_persists_sun_protection_sensors(
     assert result["data"][CONF_LUX_ENTITY] == "sensor.outdoor_lux"
     assert result["data"][CONF_UV_ENTITY] == "sensor.uv_index"
     assert result["data"][CONF_TEMP_OUTDOOR_ENTITY] == "sensor.outdoor_temperature"
+
+
+async def test_hub_user_flow_optional_entity_selectors_have_no_empty_suggestion(
+    hass: HomeAssistant,
+) -> None:
+    """Regression: optional EntitySelector fields must not pre-fill ``""``.
+
+    Before v0.6.2 the user-step form rendered ``lux_entity``, ``uv_entity``,
+    ``temp_outdoor_entity`` and ``tts_engine`` with ``suggested_value=""``,
+    which the HA frontend submitted as an empty string. The EntitySelector
+    validator then rejected it with
+    "Entity is neither a valid entity ID nor a valid UUID".
+
+    The fix coerces empty defaults to ``None`` so the field renders
+    unpopulated and is omitted (or null) on submit.
+    """
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": SOURCE_USER}
+    )
+    assert result["type"] == FlowResultType.FORM
+    schema = result["data_schema"]
+    for field in (CONF_LUX_ENTITY, CONF_UV_ENTITY, CONF_TEMP_OUTDOOR_ENTITY):
+        assert (
+            _section_field_suggested_value(
+                schema, "sun_protection_sensors", field
+            )
+            is None
+        ), f"{field} suggested_value must be None when default is empty"
+    assert (
+        _section_field_suggested_value(
+            schema, "voice_announcement", CONF_TTS_ENGINE
+        )
+        is None
+    )
+
+
+async def test_hub_options_flow_with_legacy_empty_string_entries(
+    hass: HomeAssistant,
+) -> None:
+    """Regression: an entry that stored ``""`` for optional entity fields
+    must reopen and resubmit through the options flow without raising
+    "Entity is neither a valid entity ID nor a valid UUID".
+
+    Entries created on v0.6.1 normalised missing entity fields to ``""``
+    via ``_normalize_hub``. The previous schema then re-injected those
+    values as ``suggested_value`` on the EntitySelector, breaking the
+    options form for every existing user.
+    """
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title=HUB_TITLE,
+        data={
+            CONF_TYPE: TYPE_HUB,
+            CONF_NOTIFY_SERVICES: [],
+            CONF_NOTIFY_MODE: MODE_DISABLED,
+            CONF_TTS_ENGINE: "",
+            CONF_TTS_TARGETS: [],
+            CONF_TTS_MODE: MODE_DISABLED,
+            CONF_LUX_ENTITY: "",
+            CONF_UV_ENTITY: "",
+            CONF_TEMP_OUTDOOR_ENTITY: "",
+        },
+        options={},
+        entry_id="legacy_empty_strings",
+        unique_id="shutters_management_hub",
+        version=6,
+    )
+    entry.add_to_hass(hass)
+
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    assert result["type"] == FlowResultType.FORM
+    schema = result["data_schema"]
+    for field in (CONF_LUX_ENTITY, CONF_UV_ENTITY, CONF_TEMP_OUTDOOR_ENTITY):
+        assert (
+            _section_field_suggested_value(
+                schema, "sun_protection_sensors", field
+            )
+            is None
+        )
+    assert (
+        _section_field_suggested_value(
+            schema, "voice_announcement", CONF_TTS_ENGINE
+        )
+        is None
+    )
+
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"],
+        user_input={
+            CONF_SEQUENTIAL_COVERS: False,
+            "notifications": {
+                CONF_NOTIFY_SERVICES: [],
+                CONF_NOTIFY_MODE: MODE_DISABLED,
+            },
+            "voice_announcement": {
+                CONF_TTS_TARGETS: [],
+                CONF_TTS_MODE: MODE_DISABLED,
+            },
+            "sun_protection_sensors": {},
+        },
+    )
+    assert result["type"] == FlowResultType.CREATE_ENTRY
 
 
 _TRANSLATION_PATHS = [
