@@ -85,6 +85,9 @@ from .const import (
     MODE_ALWAYS,
     MODE_AWAY_ONLY,
     MODE_DISABLED,
+    MODE_HOME_ONLY,
+    NOTIFY_MODES,
+    TTS_MODES,
     DOMAIN,
     HUB_TITLE,
     HUB_UNIQUE_ID,
@@ -110,11 +113,13 @@ SECTION_ROOM_SENSOR = "room_sensor"
 SECTION_NOTIFICATIONS = "notifications"
 SECTION_VOICE_ANNOUNCEMENT = "voice_announcement"
 SECTION_SUN_PROTECTION_SENSORS = "sun_protection_sensors"
+SECTION_PRESENCE_HUB = "presence_hub"
 
 _HUB_SECTIONS = (
     SECTION_NOTIFICATIONS,
     SECTION_VOICE_ANNOUNCEMENT,
     SECTION_SUN_PROTECTION_SENSORS,
+    SECTION_PRESENCE_HUB,
 )
 
 
@@ -129,20 +134,17 @@ def _available_notify_services(hass: HomeAssistant | None) -> list[str]:
 def _build_hub_schema(
     hass: HomeAssistant | None, defaults: dict[str, Any]
 ) -> vol.Schema:
-    """Schema for the hub: scheduler option + 2 self-contained channel sections.
+    """Schema for the hub: scheduler option + shared channels + presence.
 
     Layout (top → bottom):
 
     1. ``sequential_covers`` (top-level toggle, scheduler behaviour).
-    2. Section ``notifications`` — push services + their own three-state
-       mode selector (disabled / always / away_only).
-    3. Section ``voice_announcement`` — TTS engine + speakers + their own
-       three-state mode selector.
-
-    Each channel section is **self-contained**: its mode selector sits
-    next to the fields it gates. There used to be a third ``away_only``
-    section grouping both toggles together, but it required users to
-    cross-reference the other sections — confusing in practice.
+    2. Section ``notifications`` — push services only. The per-action
+       mode (disabled / always / away_only) lives on each subentry.
+    3. Section ``voice_announcement`` — TTS engine + speakers only.
+    4. Section ``sun_protection_sensors`` — shared environmental sensors.
+    5. Section ``presence_hub`` — shared presence entity used by every
+       subentry's mode evaluation and by the presence-simulation gate.
 
     The ``defaults`` dict can be **either** flat (e.g. fresh ``user_input``
     from a previous validation pass) **or** already nested under the
@@ -167,21 +169,6 @@ def _build_hub_schema(
                         multiple=True,
                         custom_value=True,
                         mode=selector.SelectSelectorMode.DROPDOWN,
-                    )
-                ),
-                vol.Required(
-                    CONF_NOTIFY_MODE,
-                    default=_section_default(
-                        defaults,
-                        SECTION_NOTIFICATIONS,
-                        CONF_NOTIFY_MODE,
-                        DEFAULT_NOTIFY_MODE,
-                    ),
-                ): selector.SelectSelector(
-                    selector.SelectSelectorConfig(
-                        options=[MODE_DISABLED, MODE_ALWAYS, MODE_AWAY_ONLY],
-                        mode=selector.SelectSelectorMode.LIST,
-                        translation_key="notification_mode",
                     )
                 ),
             }
@@ -219,19 +206,28 @@ def _build_hub_schema(
                         domain="media_player", multiple=True
                     )
                 ),
-                vol.Required(
-                    CONF_TTS_MODE,
-                    default=_section_default(
-                        defaults,
-                        SECTION_VOICE_ANNOUNCEMENT,
-                        CONF_TTS_MODE,
-                        DEFAULT_TTS_MODE,
-                    ),
-                ): selector.SelectSelector(
-                    selector.SelectSelectorConfig(
-                        options=[MODE_DISABLED, MODE_ALWAYS, MODE_AWAY_ONLY],
-                        mode=selector.SelectSelectorMode.LIST,
-                        translation_key="notification_mode",
+            }
+        ),
+        {"collapsed": True},
+    )
+
+    presence_hub_section = data_entry_flow.section(
+        vol.Schema(
+            {
+                vol.Optional(
+                    CONF_PRESENCE_ENTITY,
+                    description={
+                        "suggested_value": _section_default(
+                            defaults,
+                            SECTION_PRESENCE_HUB,
+                            CONF_PRESENCE_ENTITY,
+                            "",
+                        )
+                        or None
+                    },
+                ): selector.EntitySelector(
+                    selector.EntitySelectorConfig(
+                        domain=["person", "group"]
                     )
                 ),
             }
@@ -302,6 +298,7 @@ def _build_hub_schema(
             vol.Required(
                 SECTION_SUN_PROTECTION_SENSORS
             ): sun_protection_sensors_section,
+            vol.Required(SECTION_PRESENCE_HUB): presence_hub_section,
         }
     )
 
@@ -430,6 +427,9 @@ def _build_instance_schema(
         {"collapsed": True},
     )
 
+    notifications_section = _build_notifications_section(defaults)
+    voice_announcement_section = _build_voice_announcement_section(defaults)
+
     fields: dict[Any, Any] = {}
     if include_name:
         fields[
@@ -478,17 +478,6 @@ def _build_instance_schema(
                             CONF_ONLY_WHEN_AWAY, DEFAULT_ONLY_WHEN_AWAY
                         ),
                     ): selector.BooleanSelector(),
-                    vol.Optional(
-                        CONF_PRESENCE_ENTITY,
-                        description={
-                            "suggested_value": defaults.get(
-                                CONF_PRESENCE_ENTITY, ""
-                            )
-                            or None
-                        },
-                    ): selector.EntitySelector(
-                        selector.EntitySelectorConfig(domain=["person", "group"])
-                    ),
                 }
             ),
             {"collapsed": True},
@@ -499,7 +488,65 @@ def _build_instance_schema(
                 vol.Required(SECTION_PRESENCE): presence_section,
             }
         )
+    fields.update(
+        {
+            vol.Required(SECTION_NOTIFICATIONS): notifications_section,
+            vol.Required(SECTION_VOICE_ANNOUNCEMENT): voice_announcement_section,
+        }
+    )
     return vol.Schema(fields)
+
+
+def _build_notifications_section(defaults: dict[str, Any]):
+    """Subentry-level notifications section with the notify_mode selector."""
+    return data_entry_flow.section(
+        vol.Schema(
+            {
+                vol.Required(
+                    CONF_NOTIFY_MODE,
+                    default=_section_default(
+                        defaults,
+                        SECTION_NOTIFICATIONS,
+                        CONF_NOTIFY_MODE,
+                        DEFAULT_NOTIFY_MODE,
+                    ),
+                ): selector.SelectSelector(
+                    selector.SelectSelectorConfig(
+                        options=list(NOTIFY_MODES),
+                        mode=selector.SelectSelectorMode.LIST,
+                        translation_key="notification_mode",
+                    )
+                ),
+            }
+        ),
+        {"collapsed": True},
+    )
+
+
+def _build_voice_announcement_section(defaults: dict[str, Any]):
+    """Subentry-level voice announcement section with the tts_mode selector."""
+    return data_entry_flow.section(
+        vol.Schema(
+            {
+                vol.Required(
+                    CONF_TTS_MODE,
+                    default=_section_default(
+                        defaults,
+                        SECTION_VOICE_ANNOUNCEMENT,
+                        CONF_TTS_MODE,
+                        DEFAULT_TTS_MODE,
+                    ),
+                ): selector.SelectSelector(
+                    selector.SelectSelectorConfig(
+                        options=list(TTS_MODES),
+                        mode=selector.SelectSelectorMode.LIST,
+                        translation_key="voice_mode",
+                    )
+                ),
+            }
+        ),
+        {"collapsed": True},
+    )
 
 
 def _strip_name(data: dict[str, Any]) -> dict[str, Any]:
@@ -522,14 +569,18 @@ def _normalize_instance(user_input: dict[str, Any]) -> dict[str, Any]:
             SECTION_SCHEDULE_DAYS,
             SECTION_RANDOMIZATION,
             SECTION_PRESENCE,
+            SECTION_NOTIFICATIONS,
+            SECTION_VOICE_ANNOUNCEMENT,
         ) and isinstance(value, dict):
             flat.update(value)
         else:
             flat[key] = value
     if CONF_RANDOM_MAX_MINUTES in flat:
         flat[CONF_RANDOM_MAX_MINUTES] = int(flat[CONF_RANDOM_MAX_MINUTES])
-    if not flat.get(CONF_PRESENCE_ENTITY):
-        flat.pop(CONF_PRESENCE_ENTITY, None)
+    # presence_entity now lives at the hub level — drop any stale value.
+    flat.pop(CONF_PRESENCE_ENTITY, None)
+    flat.setdefault(CONF_NOTIFY_MODE, DEFAULT_NOTIFY_MODE)
+    flat.setdefault(CONF_TTS_MODE, DEFAULT_TTS_MODE)
     return flat
 
 
@@ -563,7 +614,6 @@ def _normalize_hub(user_input: dict[str, Any]) -> dict[str, Any]:
         flat[CONF_NOTIFY_SERVICES] = [services]
     else:
         flat[CONF_NOTIFY_SERVICES] = list(services)
-    flat.setdefault(CONF_NOTIFY_MODE, DEFAULT_NOTIFY_MODE)
     flat.setdefault(CONF_SEQUENTIAL_COVERS, DEFAULT_SEQUENTIAL_COVERS)
 
     tts_engine = flat.get(CONF_TTS_ENGINE)
@@ -575,19 +625,31 @@ def _normalize_hub(user_input: dict[str, Any]) -> dict[str, Any]:
         flat[CONF_TTS_TARGETS] = [targets]
     else:
         flat[CONF_TTS_TARGETS] = list(targets)
-    flat.setdefault(CONF_TTS_MODE, DEFAULT_TTS_MODE)
 
     flat[CONF_LUX_ENTITY] = flat.get(CONF_LUX_ENTITY) or ""
     flat[CONF_TEMP_OUTDOOR_ENTITY] = flat.get(CONF_TEMP_OUTDOOR_ENTITY) or ""
     flat[CONF_UV_ENTITY] = flat.get(CONF_UV_ENTITY) or ""
+    flat[CONF_PRESENCE_ENTITY] = flat.get(CONF_PRESENCE_ENTITY) or ""
+    # Mode keys are no longer hub-wide as of v0.7.0; drop any stale value.
+    flat.pop(CONF_NOTIFY_MODE, None)
+    flat.pop(CONF_TTS_MODE, None)
     return flat
 
 
-def _needs_presence_warning(hass: HomeAssistant, data: dict[str, Any]) -> bool:
-    """Return True when only_when_away has no presence source available."""
+def _needs_presence_warning(
+    hass: HomeAssistant,
+    data: dict[str, Any],
+    hub_entry: ConfigEntry,
+) -> bool:
+    """Return True when only_when_away has no presence source available.
+
+    Since v0.7.0 the presence entity lives on the hub, so the warning is
+    triggered when the hub has no presence entity configured AND no
+    ``person.*`` entity exists to fall back on.
+    """
     if not data.get(CONF_ONLY_WHEN_AWAY):
         return False
-    if data.get(CONF_PRESENCE_ENTITY):
+    if hub_entry.data.get(CONF_PRESENCE_ENTITY):
         return False
     return not hass.states.async_all("person")
 
@@ -601,7 +663,7 @@ class ShuttersManagementConfigFlow(ConfigFlow, domain=DOMAIN):
     :class:`ShuttersInstanceSubentryFlow`.
     """
 
-    VERSION = 6
+    VERSION = 7
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
@@ -733,7 +795,7 @@ class ShuttersInstanceSubentryFlow(ConfigSubentryFlow):
             else:
                 data[CONF_NAME] = name
                 if self.INCLUDE_SIMULATION and _needs_presence_warning(
-                    self.hass, data
+                    self.hass, data, entry
                 ):
                     self._pending_data = data
                     self._pending_name = name
@@ -959,6 +1021,9 @@ def _build_sun_protection_schema(defaults: dict[str, Any]) -> vol.Schema:
         {"collapsed": True},
     )
 
+    notifications_section = _build_notifications_section(defaults)
+    voice_announcement_section = _build_voice_announcement_section(defaults)
+
     return vol.Schema(
         {
             vol.Required(
@@ -969,6 +1034,8 @@ def _build_sun_protection_schema(defaults: dict[str, Any]) -> vol.Schema:
             vol.Required(SECTION_ORIENTATION): orientation_section,
             vol.Required(SECTION_THRESHOLDS): thresholds_section,
             vol.Required(SECTION_ROOM_SENSOR): room_sensor_section,
+            vol.Required(SECTION_NOTIFICATIONS): notifications_section,
+            vol.Required(SECTION_VOICE_ANNOUNCEMENT): voice_announcement_section,
         }
     )
 
@@ -982,10 +1049,14 @@ def _normalize_sun_protection(user_input: dict[str, Any]) -> dict[str, Any]:
             SECTION_ORIENTATION,
             SECTION_THRESHOLDS,
             SECTION_ROOM_SENSOR,
+            SECTION_NOTIFICATIONS,
+            SECTION_VOICE_ANNOUNCEMENT,
         ) and isinstance(value, dict):
             flat.update(value)
         else:
             flat[key] = value
+    flat.setdefault(CONF_NOTIFY_MODE, DEFAULT_NOTIFY_MODE)
+    flat.setdefault(CONF_TTS_MODE, DEFAULT_TTS_MODE)
     orientation_str = flat.get(CONF_ORIENTATION, "S")
     flat[CONF_ORIENTATION] = ORIENTATION_CARDINALS.get(
         orientation_str, DEFAULT_ORIENTATION

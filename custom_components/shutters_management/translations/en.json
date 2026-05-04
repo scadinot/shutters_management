@@ -11,16 +11,14 @@
           "notifications": {
             "name": "Push notifications",
             "data": {
-              "notify_services": "Notification services (leave empty if none)",
-              "notify_mode": "When to send"
+              "notify_services": "Notification services (leave empty if none)"
             }
           },
           "voice_announcement": {
             "name": "Voice announcement",
             "data": {
               "tts_engine": "TTS engine",
-              "tts_targets": "Smart speakers (leave empty if none)",
-              "tts_mode": "When to announce"
+              "tts_targets": "Smart speakers (leave empty if none)"
             }
           },
           "sun_protection_sensors": {
@@ -29,6 +27,12 @@
               "lux_entity": "Outdoor lux sensor (optional — leave empty to use UV only or disable)",
               "uv_entity": "UV index sensor (optional — used as fallback or alongside lux)",
               "temp_outdoor_entity": "Outdoor temperature sensor (optional)"
+            }
+          },
+          "presence_hub": {
+            "name": "Presence (shared across the integration)",
+            "data": {
+              "presence_entity": "Presence entity (person or group)"
             }
           }
         }
@@ -47,16 +51,14 @@
           "notifications": {
             "name": "Push notifications",
             "data": {
-              "notify_services": "Notification services (leave empty if none)",
-              "notify_mode": "When to send"
+              "notify_services": "Notification services (leave empty if none)"
             }
           },
           "voice_announcement": {
             "name": "Voice announcement",
             "data": {
               "tts_engine": "TTS engine",
-              "tts_targets": "Smart speakers (leave empty if none)",
-              "tts_mode": "When to announce"
+              "tts_targets": "Smart speakers (leave empty if none)"
             }
           },
           "sun_protection_sensors": {
@@ -65,6 +67,12 @@
               "lux_entity": "Outdoor lux sensor (optional — leave empty to use UV only or disable)",
               "uv_entity": "UV index sensor (optional — used as fallback or alongside lux)",
               "temp_outdoor_entity": "Outdoor temperature sensor (optional)"
+            }
+          },
+          "presence_hub": {
+            "name": "Presence (shared across the integration)",
+            "data": {
+              "presence_entity": "Presence entity (person or group)"
             }
           }
         }
@@ -119,6 +127,18 @@
               "data": {
                 "temp_indoor_entity": "Room temperature sensor (optional)"
               }
+            },
+            "notifications": {
+              "name": "Push notifications",
+              "data": {
+                "notify_mode": "When to send"
+              }
+            },
+            "voice_announcement": {
+              "name": "Voice announcement",
+              "data": {
+                "tts_mode": "When to announce"
+              }
             }
           }
         },
@@ -154,6 +174,18 @@
               "name": "Indoor sensor",
               "data": {
                 "temp_indoor_entity": "Room temperature sensor (optional)"
+              }
+            },
+            "notifications": {
+              "name": "Push notifications",
+              "data": {
+                "notify_mode": "When to send"
+              }
+            },
+            "voice_announcement": {
+              "name": "Voice announcement",
+              "data": {
+                "tts_mode": "When to announce"
               }
             }
           }
@@ -209,6 +241,18 @@
               "data": {
                 "days": "Active days"
               }
+            },
+            "notifications": {
+              "name": "Push notifications",
+              "data": {
+                "notify_mode": "When to send"
+              }
+            },
+            "voice_announcement": {
+              "name": "Voice announcement",
+              "data": {
+                "tts_mode": "When to announce"
+              }
             }
           }
         },
@@ -245,6 +289,18 @@
               "name": "Active days",
               "data": {
                 "days": "Active days"
+              }
+            },
+            "notifications": {
+              "name": "Push notifications",
+              "data": {
+                "notify_mode": "When to send"
+              }
+            },
+            "voice_announcement": {
+              "name": "Voice announcement",
+              "data": {
+                "tts_mode": "When to announce"
               }
             }
           }
@@ -311,8 +367,19 @@
             "presence": {
               "name": "Presence conditions",
               "data": {
-                "only_when_away": "Run only when away",
-                "presence_entity": "Presence entity (person or group)"
+                "only_when_away": "Run only when away"
+              }
+            },
+            "notifications": {
+              "name": "Push notifications",
+              "data": {
+                "notify_mode": "When to send"
+              }
+            },
+            "voice_announcement": {
+              "name": "Voice announcement",
+              "data": {
+                "tts_mode": "When to announce"
               }
             }
           }
@@ -362,8 +429,19 @@
             "presence": {
               "name": "Presence conditions",
               "data": {
-                "only_when_away": "Run only when away",
-                "presence_entity": "Presence entity (person or group)"
+                "only_when_away": "Run only when away"
+              }
+            },
+            "notifications": {
+              "name": "Push notifications",
+              "data": {
+                "notify_mode": "When to send"
+              }
+            },
+            "voice_announcement": {
+              "name": "Voice announcement",
+              "data": {
+                "tts_mode": "When to announce"
               }
             }
           }
@@ -393,6 +471,13 @@
         "disabled": "Disabled",
         "always": "Always",
         "away_only": "Only when away"
+      }
+    },
+    "voice_mode": {
+      "options": {
+        "disabled": "Disabled",
+        "always": "Always",
+        "home_only": "Only when home"
       }
     },
     "days": {

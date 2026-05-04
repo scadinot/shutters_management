@@ -35,12 +35,17 @@ async def _setup_hub(
     notify_mode: str = MODE_ALWAYS,
     presence_entity: str | None = None,
 ) -> tuple[MockConfigEntry, ShuttersScheduler]:
-    """Build, register and set up a hub with the requested notify settings."""
-    if presence_entity is not None:
-        base_config[CONF_PRESENCE_ENTITY] = presence_entity
-    hub_overrides: dict = {CONF_NOTIFY_MODE: notify_mode}
+    """Build, register and set up a hub with the requested notify settings.
+
+    Since v0.7.0 the ``notify_mode`` lives on each subentry and the
+    ``presence_entity`` on the hub.
+    """
+    base_config[CONF_NOTIFY_MODE] = notify_mode
+    hub_overrides: dict = {}
     if notify_services is not None:
         hub_overrides[CONF_NOTIFY_SERVICES] = notify_services
+    if presence_entity is not None:
+        hub_overrides[CONF_PRESENCE_ENTITY] = presence_entity
 
     entry = build_hub_with_instance(
         instance_data=base_config, hub_data=hub_overrides
@@ -136,7 +141,6 @@ async def test_notification_lists_covers_in_processing_order(
         instance_data=base_config,
         hub_data={
             CONF_NOTIFY_SERVICES: ["notify.iphone"],
-            CONF_NOTIFY_MODE: MODE_ALWAYS,
             CONF_SEQUENTIAL_COVERS: True,
         },
     )
@@ -186,7 +190,6 @@ async def test_no_notification_if_scheduler_unloaded_mid_call(
         instance_data=base_config,
         hub_data={
             CONF_NOTIFY_SERVICES: ["notify.iphone"],
-            CONF_NOTIFY_MODE: MODE_ALWAYS,
             CONF_SEQUENTIAL_COVERS: True,
         },
     )

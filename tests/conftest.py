@@ -23,6 +23,7 @@ from custom_components.shutters_management.const import (
     CONF_OPEN_TIME,
     CONF_RANDOMIZE,
     CONF_RANDOM_MAX_MINUTES,
+    CONF_TTS_MODE,
     CONF_TYPE,
     DAYS,
     DEFAULT_CLOSE_MODE,
@@ -30,6 +31,7 @@ from custom_components.shutters_management.const import (
     DEFAULT_NOTIFY_MODE,
     DEFAULT_OPEN_MODE,
     DEFAULT_OPEN_OFFSET,
+    DEFAULT_TTS_MODE,
     DOMAIN,
     HUB_TITLE,
     HUB_UNIQUE_ID,
@@ -62,15 +64,16 @@ def base_config() -> dict[str, Any]:
         CONF_RANDOMIZE: False,
         CONF_RANDOM_MAX_MINUTES: 30,
         CONF_ONLY_WHEN_AWAY: False,
+        CONF_NOTIFY_MODE: DEFAULT_NOTIFY_MODE,
+        CONF_TTS_MODE: DEFAULT_TTS_MODE,
     }
 
 
 def _hub_data(**overrides: Any) -> dict[str, Any]:
-    """Default hub entry data (notification settings)."""
+    """Default hub entry data (shared channels + presence entity)."""
     data = {
         CONF_TYPE: TYPE_HUB,
         CONF_NOTIFY_SERVICES: [],
-        CONF_NOTIFY_MODE: DEFAULT_NOTIFY_MODE,
     }
     data.update(overrides)
     return data
@@ -102,7 +105,7 @@ def mock_config_entry(base_config: dict[str, Any]) -> MockConfigEntry:
         options={},
         entry_id="test_entry_id",
         unique_id=HUB_UNIQUE_ID,
-        version=6,
+        version=7,
         subentries_data=[
             make_subentry_data(
                 title="Bureau",
@@ -144,7 +147,7 @@ def build_hub_with_instance(
         options={},
         entry_id=entry_id,
         unique_id=HUB_UNIQUE_ID,
-        version=6,
+        version=7,
         subentries_data=[
             make_subentry_data(
                 title=instance_title,

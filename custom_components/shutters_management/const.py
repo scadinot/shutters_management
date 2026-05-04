@@ -98,6 +98,10 @@ CONF_TTS_MODE = "tts_mode"
 MODE_DISABLED = "disabled"   # channel never fires
 MODE_ALWAYS = "always"       # channel fires on every action
 MODE_AWAY_ONLY = "away_only" # channel fires only when presence is detected away
+MODE_HOME_ONLY = "home_only" # channel fires only when at least one person is home
+
+NOTIFY_MODES = (MODE_DISABLED, MODE_ALWAYS, MODE_AWAY_ONLY)
+TTS_MODES = (MODE_DISABLED, MODE_ALWAYS, MODE_HOME_ONLY)
 
 DEFAULT_OPEN_TIME = "08:00:00"
 DEFAULT_CLOSE_TIME = "21:00:00"

@@ -82,6 +82,8 @@ def _valid_instance_input(**overrides):
             CONF_CLOSE_OFFSET: 0,
         },
         "schedule_days": {CONF_DAYS: list(DAYS)},
+        "notifications": {CONF_NOTIFY_MODE: MODE_ALWAYS},
+        "voice_announcement": {CONF_TTS_MODE: MODE_DISABLED},
     }
     open_keys = {CONF_OPEN_MODE, CONF_OPEN_TIME, CONF_OPEN_OFFSET}
     close_keys = {CONF_CLOSE_MODE, CONF_CLOSE_TIME, CONF_CLOSE_OFFSET}
@@ -94,6 +96,10 @@ def _valid_instance_input(**overrides):
             data["shutters"][CONF_COVERS] = value
         elif key == CONF_DAYS:
             data["schedule_days"][CONF_DAYS] = value
+        elif key == CONF_NOTIFY_MODE:
+            data["notifications"][CONF_NOTIFY_MODE] = value
+        elif key == CONF_TTS_MODE:
+            data["voice_announcement"][CONF_TTS_MODE] = value
         else:
             data[key] = value
     return data
@@ -103,7 +109,9 @@ def _valid_presence_sim_input(**overrides):
     """Subentry user input matching the presence-simulation schema.
 
     Same shape as Planification plus the randomization and presence
-    sections specific to presence simulation.
+    sections specific to presence simulation. Since v0.7.0 the presence
+    entity lives at the hub level — set it on ``hub_entry.data`` rather
+    than passing it here.
     """
     data = _valid_instance_input(
         **{
@@ -115,7 +123,6 @@ def _valid_presence_sim_input(**overrides):
                 CONF_RANDOMIZE,
                 CONF_RANDOM_MAX_MINUTES,
                 CONF_ONLY_WHEN_AWAY,
-                CONF_PRESENCE_ENTITY,
             )
         }
     )
@@ -124,12 +131,9 @@ def _valid_presence_sim_input(**overrides):
         CONF_RANDOMIZE: overrides.get(CONF_RANDOMIZE, False),
         CONF_RANDOM_MAX_MINUTES: overrides.get(CONF_RANDOM_MAX_MINUTES, 30),
     }
-    presence: dict[str, object] = {
+    data["presence"] = {
         CONF_ONLY_WHEN_AWAY: overrides.get(CONF_ONLY_WHEN_AWAY, False),
     }
-    if CONF_PRESENCE_ENTITY in overrides:
-        presence[CONF_PRESENCE_ENTITY] = overrides[CONF_PRESENCE_ENTITY]
-    data["presence"] = presence
     return data
 
 
@@ -137,12 +141,13 @@ def _valid_presence_sim_input(**overrides):
 
 
 async def test_hub_user_flow_creates_singleton(hass: HomeAssistant) -> None:
-    """The hub flow creates one entry with shared notification settings.
+    """The hub flow creates one entry with shared notification channels.
 
-    The form is laid out in 2 collapsible HA sections (``notifications``
-    and ``voice_announcement``) plus the top-level ``sequential_covers``
-    toggle. Each section embeds its own three-state mode selector
-    (disabled / always / away_only), so user_input must mirror that shape.
+    The hub form ships shared channels (notify services, TTS engine
+    + speakers, sun-protection sensors) and the shared presence entity.
+    Per-action modes (disabled / always / away_only / home_only) live
+    on each subentry instead, so the hub user_input must NOT include
+    notify_mode or tts_mode.
     """
     result = await hass.config_entries.flow.async_init(
         DOMAIN, context={"source": SOURCE_USER}
@@ -156,13 +161,12 @@ async def test_hub_user_flow_creates_singleton(hass: HomeAssistant) -> None:
             CONF_SEQUENTIAL_COVERS: False,
             "notifications": {
                 CONF_NOTIFY_SERVICES: [],
-                CONF_NOTIFY_MODE: MODE_ALWAYS,
             },
             "voice_announcement": {
                 CONF_TTS_TARGETS: [],
-                CONF_TTS_MODE: MODE_DISABLED,
             },
             "sun_protection_sensors": {},
+            "presence_hub": {},
         },
     )
     assert result["type"] == FlowResultType.CREATE_ENTRY
@@ -170,7 +174,8 @@ async def test_hub_user_flow_creates_singleton(hass: HomeAssistant) -> None:
     assert result["data"][CONF_TYPE] == TYPE_HUB
     # _normalize_hub flattens the sections back into a flat dict.
     assert result["data"][CONF_NOTIFY_SERVICES] == []
-    assert result["data"][CONF_NOTIFY_MODE] == MODE_ALWAYS
+    assert CONF_NOTIFY_MODE not in result["data"]
+    assert CONF_TTS_MODE not in result["data"]
 
 
 async def test_hub_user_flow_aborts_when_already_configured(
@@ -200,20 +205,19 @@ async def test_hub_options_flow_updates_notification_settings(
             CONF_SEQUENTIAL_COVERS: False,
             "notifications": {
                 CONF_NOTIFY_SERVICES: ["notify.persistent_notification"],
-                CONF_NOTIFY_MODE: MODE_AWAY_ONLY,
             },
             "voice_announcement": {
                 CONF_TTS_TARGETS: [],
-                CONF_TTS_MODE: MODE_DISABLED,
             },
             "sun_protection_sensors": {},
+            "presence_hub": {},
         },
     )
     assert result["type"] == FlowResultType.CREATE_ENTRY
     assert mock_config_entry.data[CONF_NOTIFY_SERVICES] == [
         "notify.persistent_notification"
     ]
-    assert mock_config_entry.data[CONF_NOTIFY_MODE] == MODE_AWAY_ONLY
+    assert CONF_NOTIFY_MODE not in mock_config_entry.data
 
 
 # ---- Instance subentry flow --------------------------------------------------
@@ -525,6 +529,8 @@ def _valid_sun_protection_input(**overrides):
             CONF_TARGET_POSITION: DEFAULT_TARGET_POSITION,
         },
         "room_sensor": {},
+        "notifications": {CONF_NOTIFY_MODE: MODE_ALWAYS},
+        "voice_announcement": {CONF_TTS_MODE: MODE_DISABLED},
     }
     orientation_keys = {CONF_ORIENTATION, CONF_ARC}
     threshold_keys = {CONF_MIN_ELEVATION, CONF_MIN_UV, CONF_TARGET_POSITION}
@@ -537,6 +543,10 @@ def _valid_sun_protection_input(**overrides):
             data["thresholds"][key] = value
         elif key == CONF_TEMP_INDOOR_ENTITY:
             data["room_sensor"][CONF_TEMP_INDOOR_ENTITY] = value
+        elif key == CONF_NOTIFY_MODE:
+            data["notifications"][CONF_NOTIFY_MODE] = value
+        elif key == CONF_TTS_MODE:
+            data["voice_announcement"][CONF_TTS_MODE] = value
         else:
             data[key] = value
     return data
@@ -762,19 +772,14 @@ async def test_hub_user_flow_persists_sun_protection_sensors(
         result["flow_id"],
         user_input={
             CONF_SEQUENTIAL_COVERS: False,
-            "notifications": {
-                CONF_NOTIFY_SERVICES: [],
-                CONF_NOTIFY_MODE: MODE_ALWAYS,
-            },
-            "voice_announcement": {
-                CONF_TTS_TARGETS: [],
-                CONF_TTS_MODE: MODE_DISABLED,
-            },
+            "notifications": {CONF_NOTIFY_SERVICES: []},
+            "voice_announcement": {CONF_TTS_TARGETS: []},
             "sun_protection_sensors": {
                 CONF_LUX_ENTITY: "sensor.outdoor_lux",
                 CONF_UV_ENTITY: "sensor.uv_index",
                 CONF_TEMP_OUTDOOR_ENTITY: "sensor.outdoor_temperature",
             },
+            "presence_hub": {},
         },
     )
     assert result["type"] == FlowResultType.CREATE_ENTRY
@@ -846,7 +851,7 @@ async def test_hub_options_flow_with_legacy_empty_string_entries(
         options={},
         entry_id="legacy_empty_strings",
         unique_id="shutters_management_hub",
-        version=6,
+        version=7,
     )
     entry.add_to_hass(hass)
 
@@ -871,15 +876,10 @@ async def test_hub_options_flow_with_legacy_empty_string_entries(
         result["flow_id"],
         user_input={
             CONF_SEQUENTIAL_COVERS: False,
-            "notifications": {
-                CONF_NOTIFY_SERVICES: [],
-                CONF_NOTIFY_MODE: MODE_DISABLED,
-            },
-            "voice_announcement": {
-                CONF_TTS_TARGETS: [],
-                CONF_TTS_MODE: MODE_DISABLED,
-            },
+            "notifications": {CONF_NOTIFY_SERVICES: []},
+            "voice_announcement": {CONF_TTS_TARGETS: []},
             "sun_protection_sensors": {},
+            "presence_hub": {},
         },
     )
     assert result["type"] == FlowResultType.CREATE_ENTRY

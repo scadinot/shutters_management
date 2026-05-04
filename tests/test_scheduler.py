@@ -98,17 +98,20 @@ async def _setup_with_open_at_noon(
 ):
     """Configure and set up a presence-simulation subentry that fires at 12:00 UTC.
 
-    The deterministic ``instance`` schedule ignores ``only_when_away`` and
-    ``presence_entity``; those fields only have an effect on the
-    ``presence_simulation`` type, so the test uses that subentry type.
+    The deterministic ``instance`` schedule ignores ``only_when_away``;
+    that gate only matters for the ``presence_simulation`` type. Since
+    v0.7.0 ``presence_entity`` lives on the hub and is shared by every
+    subentry's mode evaluation.
     """
     await hass.config.async_set_time_zone("UTC")
     base_config[CONF_OPEN_TIME] = "12:00:00"
     base_config[CONF_ONLY_WHEN_AWAY] = only_when_away
+    hub_overrides: dict = {}
     if presence_entity is not None:
-        base_config[CONF_PRESENCE_ENTITY] = presence_entity
+        hub_overrides[CONF_PRESENCE_ENTITY] = presence_entity
     entry = build_hub_with_instance(
         instance_data=base_config,
+        hub_data=hub_overrides,
         subentry_type=SUBENTRY_TYPE_PRESENCE_SIM,
     )
     entry.add_to_hass(hass)
@@ -174,11 +177,13 @@ async def test_instance_ignores_only_when_away_even_when_set(
     await hass.config.async_set_time_zone("UTC")
     base_config[CONF_OPEN_TIME] = "12:00:00"
     base_config[CONF_ONLY_WHEN_AWAY] = True
-    base_config[CONF_PRESENCE_ENTITY] = "person.someone"
 
     fake_now = datetime(2026, 4, 27, 11, 59, 0, tzinfo=timezone.utc)
     with freeze_time(fake_now):
-        entry = build_hub_with_instance(instance_data=base_config)
+        entry = build_hub_with_instance(
+            instance_data=base_config,
+            hub_data={CONF_PRESENCE_ENTITY: "person.someone"},
+        )
         entry.add_to_hass(hass)
         assert await hass.config_entries.async_setup(entry.entry_id)
         await hass.async_block_till_done()

@@ -6,6 +6,38 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le pr
 
 ## [Non publié]
 
+## [0.7.0] — 2026-05-04
+
+### Modifié — modes de notification par sous-entrée
+
+Les modes **Notifications push** et **Annonces vocales** sont
+désormais réglés **par sous-entrée** (planification, simulation de
+présence, protection solaire) au lieu d'être globaux au hub. Le hub
+ne porte plus que les **canaux** : services notify, moteur TTS,
+enceintes — plus l'entité de présence partagée.
+
+### Ajouté
+
+- **Mode « Présence uniquement »** pour les annonces vocales : le
+  TTS se déclenche uniquement quand au moins une personne est à la
+  maison (symétrique de « Absence uniquement » côté notifications).
+- **Entité de présence au hub** : un seul réglage partagé par toute
+  l'intégration (anciennement par simulation de présence). Les modes
+  « Absence uniquement » / « Présence uniquement » l'utilisent comme
+  source unique, avec repli sur les entités `person.*`.
+- **Notifications côté Protection solaire** : les groupes émettent
+  maintenant des notifications/TTS sur leurs propres ouvertures et
+  fermetures automatiques (auparavant silencieux).
+
+### Migration automatique v6 → v7
+
+- Les modes `notify_mode` / `tts_mode` du hub sont copiés vers chaque
+  sous-entrée existante.
+- `tts_mode=away_only` est remappé à `disabled` (l'option n'existe
+  plus dans la nouvelle UI ; reconfigurer manuellement si besoin).
+- `presence_entity` est lifté depuis la première simulation de
+  présence non vide vers le hub.
+
 ## [0.6.3] — 2026-05-04
 
 ### Modifié — UX des formulaires
