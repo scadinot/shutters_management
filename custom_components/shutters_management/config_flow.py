@@ -35,14 +35,16 @@ from .const import (
     CONF_CLOSE_TIME,
     CONF_COVERS,
     CONF_DAYS,
+    CONF_LUX_ENTITY,
     CONF_MIN_ELEVATION,
-    CONF_MIN_UV,
     CONF_NOTIFY_MODE,
     CONF_NOTIFY_SERVICES,
     CONF_ONLY_WHEN_AWAY,
     CONF_ORIENTATION,
     CONF_SEQUENTIAL_COVERS,
     CONF_TARGET_POSITION,
+    CONF_TEMP_INDOOR_ENTITY,
+    CONF_TEMP_OUTDOOR_ENTITY,
     CONF_TTS_ENGINE,
     CONF_TTS_MODE,
     CONF_TTS_TARGETS,
@@ -53,21 +55,22 @@ from .const import (
     CONF_RANDOMIZE,
     CONF_RANDOM_MAX_MINUTES,
     CONF_TYPE,
-    CONF_UV_ENTITY,
     DAYS,
     DEFAULT_ARC,
     DEFAULT_CLOSE_MODE,
     DEFAULT_CLOSE_OFFSET,
     DEFAULT_CLOSE_TIME,
     DEFAULT_DAYS,
+    DEFAULT_LUX_ENTITY,
     DEFAULT_MIN_ELEVATION,
-    DEFAULT_MIN_UV,
     DEFAULT_NOTIFY_MODE,
     DEFAULT_NOTIFY_SERVICES,
     DEFAULT_ONLY_WHEN_AWAY,
     DEFAULT_ORIENTATION,
     DEFAULT_SEQUENTIAL_COVERS,
     DEFAULT_TARGET_POSITION,
+    DEFAULT_TEMP_INDOOR_ENTITY,
+    DEFAULT_TEMP_OUTDOOR_ENTITY,
     DEFAULT_TTS_MODE,
     DEFAULT_TTS_TARGETS,
     DEFAULT_OPEN_MODE,
@@ -75,7 +78,6 @@ from .const import (
     DEFAULT_OPEN_TIME,
     DEFAULT_RANDOMIZE,
     DEFAULT_RANDOM_MAX_MINUTES,
-    DEFAULT_UV_ENTITY,
     MODE_ALWAYS,
     MODE_AWAY_ONLY,
     MODE_DISABLED,
@@ -97,8 +99,13 @@ SECTION_CLOSE = "close"
 SECTION_COVERS = "shutters"
 SECTION_NOTIFICATIONS = "notifications"
 SECTION_VOICE_ANNOUNCEMENT = "voice_announcement"
+SECTION_SUN_PROTECTION_SENSORS = "sun_protection_sensors"
 
-_HUB_SECTIONS = (SECTION_NOTIFICATIONS, SECTION_VOICE_ANNOUNCEMENT)
+_HUB_SECTIONS = (
+    SECTION_NOTIFICATIONS,
+    SECTION_VOICE_ANNOUNCEMENT,
+    SECTION_SUN_PROTECTION_SENSORS,
+)
 
 
 def _available_notify_services(hass: HomeAssistant | None) -> list[str]:
@@ -221,6 +228,40 @@ def _build_hub_schema(
         {"collapsed": False},
     )
 
+    sun_protection_sensors_section = data_entry_flow.section(
+        vol.Schema(
+            {
+                vol.Optional(
+                    CONF_LUX_ENTITY,
+                    description={
+                        "suggested_value": _section_default(
+                            defaults,
+                            SECTION_SUN_PROTECTION_SENSORS,
+                            CONF_LUX_ENTITY,
+                            DEFAULT_LUX_ENTITY,
+                        )
+                    },
+                ): selector.EntitySelector(
+                    selector.EntitySelectorConfig(domain="sensor")
+                ),
+                vol.Optional(
+                    CONF_TEMP_OUTDOOR_ENTITY,
+                    description={
+                        "suggested_value": _section_default(
+                            defaults,
+                            SECTION_SUN_PROTECTION_SENSORS,
+                            CONF_TEMP_OUTDOOR_ENTITY,
+                            DEFAULT_TEMP_OUTDOOR_ENTITY,
+                        )
+                    },
+                ): selector.EntitySelector(
+                    selector.EntitySelectorConfig(domain="sensor")
+                ),
+            }
+        ),
+        {"collapsed": True},
+    )
+
     return vol.Schema(
         {
             vol.Required(
@@ -229,16 +270,11 @@ def _build_hub_schema(
                     CONF_SEQUENTIAL_COVERS, DEFAULT_SEQUENTIAL_COVERS
                 ),
             ): selector.BooleanSelector(),
-            vol.Optional(
-                CONF_UV_ENTITY,
-                description={
-                    "suggested_value": defaults.get(CONF_UV_ENTITY, DEFAULT_UV_ENTITY)
-                },
-            ): selector.EntitySelector(
-                selector.EntitySelectorConfig(domain="sensor")
-            ),
             vol.Required(SECTION_NOTIFICATIONS): notifications_section,
             vol.Required(SECTION_VOICE_ANNOUNCEMENT): tts_section,
+            vol.Required(
+                SECTION_SUN_PROTECTION_SENSORS
+            ): sun_protection_sensors_section,
         }
     )
 
@@ -481,8 +517,8 @@ def _normalize_hub(user_input: dict[str, Any]) -> dict[str, Any]:
         flat[CONF_TTS_TARGETS] = list(targets)
     flat.setdefault(CONF_TTS_MODE, DEFAULT_TTS_MODE)
 
-    uv_entity = flat.get(CONF_UV_ENTITY)
-    flat[CONF_UV_ENTITY] = uv_entity or ""
+    flat[CONF_LUX_ENTITY] = flat.get(CONF_LUX_ENTITY) or ""
+    flat[CONF_TEMP_OUTDOOR_ENTITY] = flat.get(CONF_TEMP_OUTDOOR_ENTITY) or ""
     return flat
 
 
@@ -504,7 +540,7 @@ class ShuttersManagementConfigFlow(ConfigFlow, domain=DOMAIN):
     :class:`ShuttersInstanceSubentryFlow`.
     """
 
-    VERSION = 5
+    VERSION = 6
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
@@ -572,8 +608,11 @@ class ShuttersHubOptionsFlow(OptionsFlow):
             CONF_TTS_MODE: self.config_entry.data.get(
                 CONF_TTS_MODE, DEFAULT_TTS_MODE
             ),
-            CONF_UV_ENTITY: self.config_entry.data.get(
-                CONF_UV_ENTITY, DEFAULT_UV_ENTITY
+            CONF_LUX_ENTITY: self.config_entry.data.get(
+                CONF_LUX_ENTITY, DEFAULT_LUX_ENTITY
+            ),
+            CONF_TEMP_OUTDOOR_ENTITY: self.config_entry.data.get(
+                CONF_TEMP_OUTDOOR_ENTITY, DEFAULT_TEMP_OUTDOOR_ENTITY
             ),
         }
         return self.async_show_form(
@@ -806,17 +845,6 @@ def _build_sun_protection_schema(defaults: dict[str, Any]) -> vol.Schema:
                 )
             ),
             vol.Required(
-                CONF_MIN_UV,
-                default=defaults.get(CONF_MIN_UV, DEFAULT_MIN_UV),
-            ): selector.NumberSelector(
-                selector.NumberSelectorConfig(
-                    min=0,
-                    max=11,
-                    step=1,
-                    mode=selector.NumberSelectorMode.BOX,
-                )
-            ),
-            vol.Required(
                 CONF_TARGET_POSITION,
                 default=defaults.get(CONF_TARGET_POSITION, DEFAULT_TARGET_POSITION),
             ): selector.NumberSelector(
@@ -827,6 +855,16 @@ def _build_sun_protection_schema(defaults: dict[str, Any]) -> vol.Schema:
                     unit_of_measurement="%",
                     mode=selector.NumberSelectorMode.SLIDER,
                 )
+            ),
+            vol.Optional(
+                CONF_TEMP_INDOOR_ENTITY,
+                description={
+                    "suggested_value": defaults.get(
+                        CONF_TEMP_INDOOR_ENTITY, DEFAULT_TEMP_INDOOR_ENTITY
+                    )
+                },
+            ): selector.EntitySelector(
+                selector.EntitySelectorConfig(domain="sensor")
             ),
         }
     )
@@ -841,7 +879,7 @@ def _normalize_sun_protection(user_input: dict[str, Any]) -> dict[str, Any]:
     flat[CONF_ORIENTATION] = ORIENTATION_CARDINALS.get(
         orientation_str, DEFAULT_ORIENTATION
     )
-    for key in (CONF_ARC, CONF_MIN_ELEVATION, CONF_MIN_UV, CONF_TARGET_POSITION):
+    for key in (CONF_ARC, CONF_MIN_ELEVATION, CONF_TARGET_POSITION):
         if key in flat:
             flat[key] = int(flat[key])
     return flat

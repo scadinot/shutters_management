@@ -29,25 +29,59 @@ CONF_RANDOM_MAX_MINUTES = "random_max_minutes"
 CONF_ONLY_WHEN_AWAY = "only_when_away"
 CONF_PRESENCE_ENTITY = "presence_entity"
 
-# Sun protection (v0.4.6)
-CONF_UV_ENTITY = "uv_entity"
+# Sun protection (v0.4.6, redesigned in v0.6.0)
+CONF_LUX_ENTITY = "lux_entity"
+CONF_TEMP_OUTDOOR_ENTITY = "temp_outdoor_entity"
+CONF_TEMP_INDOOR_ENTITY = "temp_indoor_entity"
 CONF_ORIENTATION = "orientation"
 CONF_ARC = "arc"
 CONF_MIN_ELEVATION = "min_elevation"
-CONF_MIN_UV = "min_uv"
 CONF_TARGET_POSITION = "target_position"
+
+# Deprecated v0.5.x keys, kept only so async_migrate_entry can purge them.
+CONF_UV_ENTITY = "uv_entity"
+CONF_MIN_UV = "min_uv"
 
 ORIENTATION_CARDINALS: dict[str, int] = {
     "n": 0, "ne": 45, "e": 90, "se": 135,
     "s": 180, "sw": 225, "w": 270, "nw": 315,
 }
 
-DEFAULT_UV_ENTITY: str = ""
+DEFAULT_LUX_ENTITY: str = ""
+DEFAULT_TEMP_OUTDOOR_ENTITY: str = ""
+DEFAULT_TEMP_INDOOR_ENTITY: str = ""
 DEFAULT_ORIENTATION = 180  # South
 DEFAULT_ARC = 60
 DEFAULT_MIN_ELEVATION = 15
-DEFAULT_MIN_UV = 3
 DEFAULT_TARGET_POSITION = 50
+
+# --- Sun protection: adaptive close thresholds (°C / lux) ---
+# When outdoor temperature is below T_OUTDOOR_NO_PROTECT, never close
+# (solar gain is welcome). The lux threshold tightens as outdoor gets
+# warmer: less light is enough to justify protection in a heatwave.
+T_OUTDOOR_NO_PROTECT = 20
+T_OUTDOOR_STANDARD = 24
+T_OUTDOOR_HEATWAVE = 30
+LUX_MILD = 70000      # 20 ≤ T_ext < 24
+LUX_STANDARD = 50000  # 24 ≤ T_ext < 30
+LUX_HEATWAVE = 35000  # T_ext ≥ 30
+T_INDOOR_MILD_MIN = 24
+T_INDOOR_STANDARD_MIN = 23
+
+# --- Hysteresis: reopen thresholds wider than close thresholds ---
+# Avoids yo-yoing at the boundaries of every condition.
+ARC_HYSTERESIS_DEG = 15
+ELEVATION_HYSTERESIS_DEG = 5
+LUX_REOPEN = 25000
+T_INDOOR_REOPEN = 21
+T_OUTDOOR_REOPEN = 22
+
+# --- Debouncing (absorb passing clouds / brief sun bursts) ---
+LUX_CLOSE_DEBOUNCE_SEC = 10 * 60  # 10 min sustained high lux to close
+LUX_OPEN_DEBOUNCE_SEC = 20 * 60   # 20 min sustained low lux to reopen
+
+# --- Override (manual move pauses the façade until next morning) ---
+OVERRIDE_RESET_HOUR = 4  # daily reset at 04:00 local time
 
 SUN_ENTITY = "sun.sun"
 

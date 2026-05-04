@@ -5,8 +5,7 @@
         "title": "Shutters Management",
         "description": "Configurer les paramètres partagés du hub. Vous ajouterez ensuite des plannings de volets en créant des instances sur le hub de l'intégration.",
         "data": {
-          "sequential_covers": "Actionner les volets successivement dans un ordre aléatoire",
-          "uv_entity": "Capteur d'indice UV (optionnel)"
+          "sequential_covers": "Actionner les volets successivement dans un ordre aléatoire"
         },
         "sections": {
           "notifications": {
@@ -22,6 +21,13 @@
               "tts_engine": "Moteur TTS",
               "tts_targets": "Enceintes connectées (laisser vide si aucune)",
               "tts_mode": "Quand annoncer"
+            }
+          },
+          "sun_protection_sensors": {
+            "name": "Capteurs de protection solaire",
+            "data": {
+              "lux_entity": "Capteur de luminosité extérieure (optionnel)",
+              "temp_outdoor_entity": "Capteur de température extérieure (optionnel)"
             }
           }
         }
@@ -34,8 +40,7 @@
         "title": "Paramètres du hub",
         "description": "Mettre à jour les paramètres partagés du hub.",
         "data": {
-          "sequential_covers": "Actionner les volets successivement dans un ordre aléatoire",
-          "uv_entity": "Capteur d'indice UV (optionnel)"
+          "sequential_covers": "Actionner les volets successivement dans un ordre aléatoire"
         },
         "sections": {
           "notifications": {
@@ -51,6 +56,13 @@
               "tts_engine": "Moteur TTS",
               "tts_targets": "Enceintes connectées (laisser vide si aucune)",
               "tts_mode": "Quand annoncer"
+            }
+          },
+          "sun_protection_sensors": {
+            "name": "Capteurs de protection solaire",
+            "data": {
+              "lux_entity": "Capteur de luminosité extérieure (optionnel)",
+              "temp_outdoor_entity": "Capteur de température extérieure (optionnel)"
             }
           }
         }
@@ -80,8 +92,8 @@
             "orientation": "Orientation",
             "arc": "Arc d'exposition (± degrés)",
             "min_elevation": "Élévation solaire minimale (°)",
-            "min_uv": "Indice UV minimum",
-            "target_position": "Position quand le soleil est en face (% ouvert)"
+            "target_position": "Position quand le soleil est en face (% ouvert)",
+            "temp_indoor_entity": "Capteur de température de la pièce (optionnel)"
           },
           "sections": {
             "shutters": {
@@ -100,8 +112,8 @@
             "orientation": "Orientation",
             "arc": "Arc d'exposition (± degrés)",
             "min_elevation": "Élévation solaire minimale (°)",
-            "min_uv": "Indice UV minimum",
-            "target_position": "Position quand le soleil est en face (% ouvert)"
+            "target_position": "Position quand le soleil est en face (% ouvert)",
+            "temp_indoor_entity": "Capteur de température de la pièce (optionnel)"
           },
           "sections": {
             "shutters": {
