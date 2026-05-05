@@ -25,8 +25,11 @@ import math
 from typing import Any
 
 from homeassistant.components import frontend
+from homeassistant.components.lovelace.const import MODE_YAML
+from homeassistant.components.lovelace.dashboard import LovelaceConfig
 from homeassistant.config_entries import ConfigEntry, ConfigSubentry
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers.json import json_bytes, json_fragment
 from homeassistant.util import slugify
 
 from .const import (
@@ -747,14 +750,73 @@ def build_dashboard_config(
     return {"title": PANEL_TITLE, "views": views}
 
 
+_LOVELACE_DOMAIN = "lovelace"
+
+
+class _GeneratedDashboard(LovelaceConfig):
+    """In-memory Lovelace dashboard rebuilt from the hub entry on demand.
+
+    The frontend's ``<ha-panel-lovelace>`` web component fetches the
+    actual dashboard YAML through a websocket call which dispatches to
+    ``hass.data['lovelace'].dashboards[url_path].async_load(...)``.
+    Registering only the sidebar panel without populating this dict
+    leaves the panel page blank — hence this thin ``LovelaceConfig``
+    subclass that returns the freshly built config on every call.
+    """
+
+    def __init__(self, hass: HomeAssistant, entry: ConfigEntry) -> None:
+        super().__init__(hass, PANEL_URL_PATH, None)
+        self._entry = entry
+
+    @property
+    def mode(self) -> str:
+        return MODE_YAML
+
+    async def async_get_info(self) -> dict[str, Any]:
+        config = await self.async_load(False)
+        return {"mode": self.mode, "views": len(config.get("views", []))}
+
+    async def async_load(self, force: bool) -> dict[str, Any]:
+        return build_dashboard_config(self.hass, self._entry)
+
+    async def async_json(self, force: bool) -> json_fragment:
+        config = await self.async_load(force)
+        return json_fragment(json_bytes(config))
+
+    @callback
+    def fire_config_updated(self) -> None:
+        """Notify the frontend to refresh the open dashboard."""
+        self._config_updated()
+
+
 def async_register_panel(hass: HomeAssistant, entry: ConfigEntry) -> None:
     """Register (or refresh) the sidebar panel for the hub entry.
 
     Idempotent: any previous registration is removed first so the call
     is safe to issue from both initial setup and an update listener
     that fires without a full reload.
+
+    Two pieces are wired up: the sidebar entry (via
+    ``frontend.async_register_built_in_panel``) and the actual Lovelace
+    dashboard (registered in the ``lovelace`` domain's dashboards
+    dict). The frontend would otherwise display an empty page.
     """
-    dashboard = build_dashboard_config(hass, entry)
+    lovelace_data = hass.data.get(_LOVELACE_DOMAIN)
+    if lovelace_data is None:
+        # Lovelace is set up at HA bootstrap; if it is missing here we
+        # cannot serve the dashboard. The manifest declares lovelace as
+        # a dependency, so this is a defensive guard for headless tests.
+        return
+
+    existing = lovelace_data.dashboards.get(PANEL_URL_PATH)
+    if isinstance(existing, _GeneratedDashboard):
+        existing._entry = entry
+        existing.fire_config_updated()
+    else:
+        lovelace_data.dashboards[PANEL_URL_PATH] = _GeneratedDashboard(
+            hass, entry
+        )
+
     frontend.async_remove_panel(
         hass, PANEL_URL_PATH, warn_if_unknown=False
     )
@@ -764,13 +826,16 @@ def async_register_panel(hass: HomeAssistant, entry: ConfigEntry) -> None:
         sidebar_title=PANEL_TITLE,
         sidebar_icon=PANEL_ICON,
         frontend_url_path=PANEL_URL_PATH,
-        config={"mode": "yaml", "config": dashboard},
+        config={"mode": MODE_YAML},
         require_admin=False,
     )
 
 
 def async_unregister_panel(hass: HomeAssistant) -> None:
-    """Remove the sidebar panel if registered."""
+    """Remove the sidebar panel and the in-memory dashboard."""
     frontend.async_remove_panel(
         hass, PANEL_URL_PATH, warn_if_unknown=False
     )
+    lovelace_data = hass.data.get(_LOVELACE_DOMAIN)
+    if lovelace_data is not None:
+        lovelace_data.dashboards.pop(PANEL_URL_PATH, None)

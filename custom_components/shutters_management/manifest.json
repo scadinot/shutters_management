@@ -3,12 +3,12 @@
   "name": "Shutters Management",
   "codeowners": ["@scadinot"],
   "config_flow": true,
-  "dependencies": [],
+  "dependencies": ["lovelace"],
   "documentation": "https://github.com/scadinot/shutters_management",
   "integration_type": "hub",
   "iot_class": "calculated",
   "issue_tracker": "https://github.com/scadinot/shutters_management/issues",
   "requirements": [],
   "single_config_entry": true,
-  "version": "0.8.0"
+  "version": "0.8.1"
 }

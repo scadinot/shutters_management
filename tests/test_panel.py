@@ -261,7 +261,7 @@ async def test_scheduler_view_links_back_to_cockpit(
 async def test_panel_registered_on_setup(
     hass: HomeAssistant, mock_config_entry: MockConfigEntry
 ) -> None:
-    """Setting up the hub entry registers the sidebar panel."""
+    """Setup must register both the sidebar panel and the Lovelace dashboard."""
     mock_config_entry.add_to_hass(hass)
     assert await hass.config_entries.async_setup(mock_config_entry.entry_id)
     await hass.async_block_till_done()
@@ -272,26 +272,30 @@ async def test_panel_registered_on_setup(
     assert panel.sidebar_title == PANEL_TITLE
     assert panel.sidebar_icon == PANEL_ICON
     assert panel.component_name == "lovelace"
-    config = panel.config
-    assert config["mode"] == "yaml"
-    assert config["config"]["title"] == PANEL_TITLE
-    assert any(
-        v["path"] == "cockpit" for v in config["config"]["views"]
-    )
+    # The frontend panel only carries the mode marker; the dashboard
+    # YAML lives in lovelace's dashboards dict.
+    assert panel.config == {"mode": "yaml"}
+
+    dashboard = hass.data["lovelace"].dashboards[PANEL_URL_PATH]
+    loaded = await dashboard.async_load(False)
+    assert loaded["title"] == PANEL_TITLE
+    assert any(v["path"] == "cockpit" for v in loaded["views"])
 
 
 async def test_panel_unregistered_on_unload(
     hass: HomeAssistant, mock_config_entry: MockConfigEntry
 ) -> None:
-    """Unloading the hub entry removes the panel."""
+    """Unloading must remove both the sidebar panel and the dashboard."""
     mock_config_entry.add_to_hass(hass)
     assert await hass.config_entries.async_setup(mock_config_entry.entry_id)
     await hass.async_block_till_done()
     assert PANEL_URL_PATH in hass.data[frontend.DATA_PANELS]
+    assert PANEL_URL_PATH in hass.data["lovelace"].dashboards
 
     assert await hass.config_entries.async_unload(mock_config_entry.entry_id)
     await hass.async_block_till_done()
     assert PANEL_URL_PATH not in hass.data.get(frontend.DATA_PANELS, {})
+    assert PANEL_URL_PATH not in hass.data["lovelace"].dashboards
 
 
 def test_view_path_uses_subentry_unique_id_slug() -> None:

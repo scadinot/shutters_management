@@ -6,6 +6,18 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le pr
 
 ## [Non publié]
 
+## [0.8.1] — 2026-05-05
+
+### Corrigé
+
+- **Panneau « Shutters Management » vide.** L'enregistrement v0.8.0
+  ne créait que l'entrée de barre latérale ; le `<ha-panel-lovelace>`
+  charge ensuite le dashboard via `hass.data["lovelace"].dashboards`,
+  qui n'était pas peuplé — d'où une page blanche. La v0.8.1 ajoute
+  un `LovelaceConfig` en mémoire qui rebuild la configuration depuis
+  l'entrée du hub à chaque appel `async_load`. `lovelace` est ajouté
+  aux dépendances du manifest pour garantir l'ordre de setup.
+
 ## [0.8.0] — 2026-05-05
 
 ### Ajouté — Tableau de bord intégré
