@@ -20,7 +20,10 @@ Avant tout commit ou push :
 
 ## Conventions de développement
 
-- Branche de développement : `claude/shutters-management-integration-FJUT4`.
+- Toute modification se fait sur une branche dédiée, jamais sur
+  `main` directement. Convention : `claude/<slug>` pour les sessions
+  Claude Code, `feat/<slug>` pour les nouvelles fonctionnalités,
+  `fix/<slug>` pour les corrections.
 - Ne JAMAIS pousser directement sur `main` — toujours via une pull
   request.
 - Sujet de commit court à l'impératif ; le corps explique le **pourquoi**

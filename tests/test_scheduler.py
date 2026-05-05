@@ -4,10 +4,12 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 
 from freezegun import freeze_time
+from homeassistant.config_entries import ConfigSubentryData
 from homeassistant.const import SERVICE_CLOSE_COVER, SERVICE_OPEN_COVER
 from homeassistant.core import HomeAssistant
 from homeassistant.util import dt as dt_util
 from pytest_homeassistant_custom_component.common import (
+    MockConfigEntry,
     async_fire_time_changed,
     async_mock_service,
 )
@@ -16,13 +18,30 @@ from custom_components.shutters_management import ShuttersScheduler
 from custom_components.shutters_management.const import (
     ACTION_CLOSE,
     ACTION_OPEN,
+    CONF_ARC,
     CONF_COVERS,
     CONF_DAYS,
+    CONF_LUX_ENTITY,
+    CONF_MIN_ELEVATION,
+    CONF_MIN_UV,
     CONF_ONLY_WHEN_AWAY,
     CONF_OPEN_TIME,
+    CONF_ORIENTATION,
     CONF_PRESENCE_ENTITY,
+    CONF_TARGET_POSITION,
+    CONF_TYPE,
+    DEFAULT_ARC,
+    DEFAULT_MIN_ELEVATION,
+    DEFAULT_MIN_UV,
+    DEFAULT_TARGET_POSITION,
     DOMAIN,
+    HUB_TITLE,
+    HUB_UNIQUE_ID,
+    SERVICE_RUN_NOW,
+    SUBENTRY_TYPE_INSTANCE,
     SUBENTRY_TYPE_PRESENCE_SIM,
+    SUBENTRY_TYPE_SUN_PROTECTION,
+    TYPE_HUB,
 )
 
 from .conftest import build_hub_with_instance, get_only_subentry_id
@@ -210,3 +229,60 @@ async def test_no_covers_skips_call(
     await scheduler.async_run_now(ACTION_OPEN)
     await hass.async_block_till_done()
     assert calls == []
+
+
+async def test_run_now_service_skips_sun_protection_subentries(
+    hass: HomeAssistant, base_config
+) -> None:
+    """The run_now service must not crash when a sun_protection subentry exists.
+
+    Both ShuttersScheduler and ShuttersSunProtectionManager are stored
+    under hass.data[DOMAIN], but only the scheduler implements
+    ``async_run_now``. The service handler must filter by type so the
+    call still works for mixed installs.
+    """
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title=HUB_TITLE,
+        data={
+            CONF_TYPE: TYPE_HUB,
+            "notify_services": [],
+            CONF_LUX_ENTITY: "",
+        },
+        unique_id=HUB_UNIQUE_ID,
+        version=8,
+        subentries_data=[
+            ConfigSubentryData(
+                subentry_type=SUBENTRY_TYPE_INSTANCE,
+                title="Bureau",
+                unique_id="bureau",
+                data=dict(base_config),
+            ),
+            ConfigSubentryData(
+                subentry_type=SUBENTRY_TYPE_SUN_PROTECTION,
+                title="Salon Sud",
+                unique_id="salon_sud",
+                data={
+                    CONF_COVERS: ["cover.salon_sud"],
+                    CONF_ORIENTATION: 180,
+                    CONF_ARC: DEFAULT_ARC,
+                    CONF_MIN_ELEVATION: DEFAULT_MIN_ELEVATION,
+                    CONF_MIN_UV: DEFAULT_MIN_UV,
+                    CONF_TARGET_POSITION: DEFAULT_TARGET_POSITION,
+                },
+            ),
+        ],
+    )
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    cover_calls = async_mock_service(hass, "cover", SERVICE_OPEN_COVER)
+
+    await hass.services.async_call(
+        DOMAIN, SERVICE_RUN_NOW, {"action": ACTION_OPEN}, blocking=True
+    )
+    await hass.async_block_till_done()
+
+    assert len(cover_calls) == 1
+    assert cover_calls[0].data["entity_id"] == ["cover.living_room"]

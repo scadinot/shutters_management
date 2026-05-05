@@ -138,7 +138,7 @@ depuis v0.4.3. Notifications côté Sun Protection depuis v0.7.0
 (ouvertures et fermetures automatiques). Messages localisés FR/EN,
 une notification cassée ne bloque jamais l'action sur les volets.
 Voir les CHANGELOG [v0.4.0](CHANGELOG.md#040--2026-05-01),
-[v0.4.3](CHANGELOG.md#043--2026-05-02) et
+[v0.4.3](CHANGELOG.md#043--2026-05-01) et
 [v0.7.0](CHANGELOG.md#070--2026-05-04).
 
 L'architecture **hub + sous-entrées** introduite en v0.4.0 (pattern

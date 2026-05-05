@@ -768,18 +768,25 @@ def _async_register_services(hass: HomeAssistant) -> None:
     if hass.services.has_service(DOMAIN, SERVICE_RUN_NOW):
         return
 
+    def _schedulers() -> list[ShuttersScheduler]:
+        return [
+            m
+            for m in hass.data.get(DOMAIN, {}).values()
+            if isinstance(m, ShuttersScheduler)
+        ]
+
     async def _handle_run_now(call: ServiceCall) -> None:
         action = call.data[ATTR_ACTION]
-        for manager in list(hass.data.get(DOMAIN, {}).values()):
-            await manager.async_run_now(action)
+        for scheduler in _schedulers():
+            await scheduler.async_run_now(action)
 
     async def _handle_pause(call: ServiceCall) -> None:
-        for manager in list(hass.data.get(DOMAIN, {}).values()):
-            await manager.async_set_paused(True)
+        for scheduler in _schedulers():
+            await scheduler.async_set_paused(True)
 
     async def _handle_resume(call: ServiceCall) -> None:
-        for manager in list(hass.data.get(DOMAIN, {}).values()):
-            await manager.async_set_paused(False)
+        for scheduler in _schedulers():
+            await scheduler.async_set_paused(False)
 
     hass.services.async_register(
         DOMAIN, SERVICE_RUN_NOW, _handle_run_now, schema=RUN_NOW_SCHEMA
