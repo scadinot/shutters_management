@@ -249,18 +249,21 @@ def _strip_name(data: dict[str, Any]) -> dict[str, Any]:
 def _is_away_for(hass: HomeAssistant, hub_data: Mapping[str, Any]) -> bool:
     """Return True when the hub-level presence entity reports away.
 
-    Falls back to scanning ``person.*`` entities when no presence
-    entity is configured at the hub. If neither source exists the
-    function assumes away — that's the safest default for callers like
-    the presence simulation, where running is preferred to skipping.
+    Falls back to scanning ``person.*`` entities when no presence entity
+    is configured at the hub, or when the configured entity's state is
+    unavailable. If neither source exists the function assumes away —
+    that's the safest default for callers like the presence simulation,
+    where running is preferred to skipping.
     """
     entity_id = hub_data.get(CONF_PRESENCE_ENTITY) or None
     if entity_id:
         state = hass.states.get(entity_id)
-        if state is None:
-            _LOGGER.warning("Presence entity %s is unavailable", entity_id)
-            return False
-        return state.state in AWAY_STATES
+        if state is not None:
+            return state.state in AWAY_STATES
+        _LOGGER.warning(
+            "Presence entity %s is unavailable; falling back to person.* scan",
+            entity_id,
+        )
     persons = hass.states.async_all("person")
     if not persons:
         _LOGGER.warning(
