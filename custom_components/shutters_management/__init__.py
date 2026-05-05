@@ -81,6 +81,7 @@ from .const import (
     MODE_AWAY_ONLY,
     MODE_DISABLED,
     MODE_FIXED,
+    MODE_HOME_ONLY,
     MODE_NONE,
     MODE_SUNRISE,
     MODE_SUNSET,
@@ -243,6 +244,155 @@ def _next_datetime_for(
 def _strip_name(data: dict[str, Any]) -> dict[str, Any]:
     """Drop CONF_NAME from a payload destined to ``ConfigSubentry.data``."""
     return {k: v for k, v in data.items() if k != CONF_NAME}
+
+
+def _is_away_for(hass: HomeAssistant, hub_data: Mapping[str, Any]) -> bool:
+    """Return True when the hub-level presence entity reports away.
+
+    Falls back to scanning ``person.*`` entities when no presence entity
+    is configured at the hub, or when the configured entity's state is
+    unavailable. If neither source exists the function assumes away —
+    that's the safest default for callers like the presence simulation,
+    where running is preferred to skipping.
+    """
+    entity_id = hub_data.get(CONF_PRESENCE_ENTITY) or None
+    if entity_id:
+        state = hass.states.get(entity_id)
+        if state is not None:
+            return state.state in AWAY_STATES
+        _LOGGER.warning(
+            "Presence entity %s is unavailable; falling back to person.* scan",
+            entity_id,
+        )
+    persons = hass.states.async_all("person")
+    if not persons:
+        _LOGGER.warning(
+            "Presence-aware mode requested but no presence entity is "
+            "configured and no person.* exists; assuming away"
+        )
+        return True
+    return all(p.state in AWAY_STATES for p in persons)
+
+
+async def _async_dispatch_notifications(
+    hass: HomeAssistant,
+    hub_entry: ConfigEntry,
+    subentry: ConfigSubentry,
+    action: str,
+    processed_covers: list[str],
+) -> None:
+    """Dispatch a cover action to push + TTS channels.
+
+    Channels (notify services, TTS engine, speakers) and the presence
+    entity live on the hub. Each subentry carries its own ``notify_mode``
+    and ``tts_mode``: callers don't need to gate themselves — this
+    helper consults both modes and short-circuits when the relevant
+    channel is disabled or out of scope (e.g. ``home_only`` while away).
+
+    Push and TTS are independent branches; a failure in one never
+    silences the other.
+    """
+    hub_data = hub_entry.data
+    sub_data = subentry.data
+    is_away = _is_away_for(hass, hub_data)
+    language = hass.config.language
+
+    await _async_send_push(
+        hass, hub_data, sub_data, subentry, action, language, is_away,
+        processed_covers,
+    )
+    await _async_send_tts(
+        hass, hub_data, sub_data, action, language, is_away,
+        processed_covers,
+    )
+
+
+async def _async_send_push(
+    hass: HomeAssistant,
+    hub_data: Mapping[str, Any],
+    sub_data: Mapping[str, Any],
+    subentry: ConfigSubentry,
+    action: str,
+    language: str,
+    is_away: bool,
+    processed_covers: list[str],
+) -> None:
+    """Send a push notification through every configured ``notify.*`` service."""
+    notify_mode = sub_data.get(CONF_NOTIFY_MODE, DEFAULT_NOTIFY_MODE)
+    if notify_mode == MODE_DISABLED:
+        return
+    if notify_mode == MODE_AWAY_ONLY and not is_away:
+        return
+    targets: list[str] = list(
+        hub_data.get(CONF_NOTIFY_SERVICES, DEFAULT_NOTIFY_SERVICES)
+    )
+    if not targets:
+        return
+
+    title = subentry.title
+    message = _notify_message(hass, language, action, processed_covers)
+
+    for target in targets:
+        if "." not in target:
+            _LOGGER.warning("Invalid notify target: %s", target)
+            continue
+        domain, service_name = target.split(".", 1)
+        if domain != "notify":
+            _LOGGER.warning(
+                "Notify target not in notify domain: %s", target
+            )
+            continue
+        try:
+            await hass.services.async_call(
+                "notify",
+                service_name,
+                {"title": title, "message": message},
+                blocking=False,
+            )
+        except Exception:  # noqa: BLE001 — never break the cover action
+            _LOGGER.exception(
+                "Failed to send notification via %s", target
+            )
+
+
+async def _async_send_tts(
+    hass: HomeAssistant,
+    hub_data: Mapping[str, Any],
+    sub_data: Mapping[str, Any],
+    action: str,
+    language: str,
+    is_away: bool,
+    processed_covers: list[str],
+) -> None:
+    """Speak the action on every configured ``media_player.*`` via ``tts.speak``."""
+    tts_mode = sub_data.get(CONF_TTS_MODE, DEFAULT_TTS_MODE)
+    if tts_mode == MODE_DISABLED:
+        return
+    if tts_mode == MODE_HOME_ONLY and is_away:
+        return
+    engine = hub_data.get(CONF_TTS_ENGINE)
+    targets: list[str] = list(
+        hub_data.get(CONF_TTS_TARGETS, DEFAULT_TTS_TARGETS)
+    )
+    if not engine or not targets:
+        return
+
+    message = _tts_message(hass, language, action, processed_covers)
+    try:
+        await hass.services.async_call(
+            "tts",
+            "speak",
+            {
+                "entity_id": engine,
+                "media_player_entity_id": targets,
+                "message": message,
+            },
+            blocking=False,
+        )
+    except Exception:  # noqa: BLE001 — never break the cover action
+        _LOGGER.exception(
+            "Failed to broadcast TTS announcement via %s", engine
+        )
 
 
 async def async_setup(hass: HomeAssistant, config: dict) -> bool:
@@ -524,6 +674,49 @@ async def async_migrate_entry(
         hass.config_entries.async_update_entry(entry, version=6)
         _LOGGER.info(
             "Migrated entry %s from version 5 to 6 (sun-protection v2)",
+            entry.entry_id,
+        )
+
+    if entry.version < 7:
+        # v6 → v7: per-subentry notify/TTS modes, presence_entity at hub.
+        #
+        # The hub-wide ``notify_mode`` / ``tts_mode`` are removed: each
+        # subentry now carries its own copy. ``tts_mode=away_only`` has
+        # no equivalent in the new UI (replaced by ``home_only``) and is
+        # forced to ``disabled`` so the user explicitly opts back in.
+        # ``presence_entity`` migrates from the first non-empty
+        # presence_simulation subentry up to the hub, where it is shared
+        # by every subentry's away/home mode evaluation.
+        hub_data = dict(entry.data)
+        hub_notify_mode = hub_data.pop(CONF_NOTIFY_MODE, DEFAULT_NOTIFY_MODE)
+        hub_tts_mode = hub_data.pop(CONF_TTS_MODE, DEFAULT_TTS_MODE)
+        if hub_tts_mode == MODE_AWAY_ONLY:
+            hub_tts_mode = MODE_DISABLED
+
+        presence_entity = hub_data.get(CONF_PRESENCE_ENTITY) or ""
+        for subentry in entry.subentries.values():
+            if presence_entity:
+                break
+            sub_presence = subentry.data.get(CONF_PRESENCE_ENTITY)
+            if sub_presence:
+                presence_entity = sub_presence
+        hub_data[CONF_PRESENCE_ENTITY] = presence_entity
+
+        for subentry in entry.subentries.values():
+            sd = dict(subentry.data)
+            sd.setdefault(CONF_NOTIFY_MODE, hub_notify_mode)
+            sd.setdefault(CONF_TTS_MODE, hub_tts_mode)
+            sd.pop(CONF_PRESENCE_ENTITY, None)
+            if sd != dict(subentry.data):
+                hass.config_entries.async_update_subentry(
+                    entry, subentry, data=sd
+                )
+
+        hass.config_entries.async_update_entry(
+            entry, data=hub_data, version=7
+        )
+        _LOGGER.info(
+            "Migrated entry %s from version 6 to 7 (per-subentry notify/TTS modes)",
             entry.entry_id,
         )
 
@@ -1063,6 +1256,7 @@ class ShuttersSunProtectionManager:
             CONF_TARGET_POSITION, DEFAULT_TARGET_POSITION
         )
 
+        processed: list[str] = []
         for cover_id in covers:
             state = self.hass.states.get(cover_id)
             if state is not None:
@@ -1075,6 +1269,7 @@ class ShuttersSunProtectionManager:
                 {"entity_id": cover_id, "position": target},
             )
             self._applied_positions[cover_id] = target
+            processed.append(cover_id)
 
         self._in_sun_mode = True
         _LOGGER.debug(
@@ -1083,10 +1278,20 @@ class ShuttersSunProtectionManager:
             target,
         )
 
+        if processed:
+            await _async_dispatch_notifications(
+                self.hass,
+                self.hub_entry,
+                self.subentry,
+                ACTION_CLOSE,
+                processed,
+            )
+
     async def _async_exit_sun_mode(self) -> None:
         """Restore cover positions, skipping any that were manually moved."""
         covers = list(self.subentry.data.get(CONF_COVERS, []))
 
+        processed: list[str] = []
         for cover_id in covers:
             applied = self._applied_positions.get(cover_id)
             snapshot = self._snapshots.get(cover_id)
@@ -1104,11 +1309,21 @@ class ShuttersSunProtectionManager:
                     "set_cover_position",
                     {"entity_id": cover_id, "position": snapshot},
                 )
+                processed.append(cover_id)
 
         self._in_sun_mode = False
         self._snapshots.clear()
         self._applied_positions.clear()
         _LOGGER.debug("Sun protection %s: exited sun mode", self.subentry_id)
+
+        if processed:
+            await _async_dispatch_notifications(
+                self.hass,
+                self.hub_entry,
+                self.subentry,
+                ACTION_OPEN,
+                processed,
+            )
 
     async def _async_on_cover_state_change(self, event: Any) -> None:
         """Detect external cover moves and arm the manual override.
@@ -1388,7 +1603,9 @@ class ShuttersScheduler:
         if weekday_key not in active_days:
             _LOGGER.debug("Skipping %s: %s not in active days", service, weekday_key)
             return False
-        if settings.get(CONF_ONLY_WHEN_AWAY) and not self._is_away(settings):
+        if settings.get(CONF_ONLY_WHEN_AWAY) and not _is_away_for(
+            self.hass, self.hub_entry.data
+        ):
             _LOGGER.debug("Skipping %s: presence detected at home", service)
             return False
         return True
@@ -1531,140 +1748,15 @@ class ShuttersScheduler:
     async def _async_send_notifications(
         self, cover_service: str, processed_covers: list[str]
     ) -> None:
-        """Dispatch the action to push notifiers and to TTS speakers.
-
-        ``processed_covers`` is the list of covers in the order the
-        scheduler actually fired them — that's the order the user sees
-        in the notification body and hears spoken on the smart speaker.
-
-        Push and TTS are two independent branches:
-
-        * Each is gated by its own ``*_when_away_only`` toggle.
-        * Each is wrapped in its own try/except so a failure in one
-          channel never silences the other (and never propagates back
-          up to break the cover action that already succeeded).
-
-        Settings are read from the hub entry on every call (not cached)
-        so the hub options flow takes effect without a reload.
-        """
-        hub_data = self.hub_entry.data
-        is_away = self._is_away(self._settings)
+        """Dispatch the action to push notifiers and to TTS speakers."""
         action = ACTION_OPEN if cover_service == SERVICE_OPEN_COVER else ACTION_CLOSE
-        language = self.hass.config.language
-
-        await self._async_send_push_notifications(
-            hub_data, action, language, is_away, processed_covers
+        await _async_dispatch_notifications(
+            self.hass,
+            self.hub_entry,
+            self.subentry,
+            action,
+            processed_covers,
         )
-        await self._async_send_tts_announcements(
-            hub_data, action, language, is_away, processed_covers
-        )
-
-    async def _async_send_push_notifications(
-        self,
-        hub_data: Mapping[str, Any],
-        action: str,
-        language: str,
-        is_away: bool,
-        processed_covers: list[str],
-    ) -> None:
-        """Send a push notification through every configured ``notify.*`` service."""
-        notify_mode = hub_data.get(CONF_NOTIFY_MODE, DEFAULT_NOTIFY_MODE)
-        if notify_mode == MODE_DISABLED:
-            return
-        if notify_mode == MODE_AWAY_ONLY and not is_away:
-            return
-        targets: list[str] = list(
-            hub_data.get(CONF_NOTIFY_SERVICES, DEFAULT_NOTIFY_SERVICES)
-        )
-        if not targets:
-            return
-
-        title = self.subentry.title
-        message = _notify_message(self.hass, language, action, processed_covers)
-
-        for target in targets:
-            if "." not in target:
-                _LOGGER.warning("Invalid notify target: %s", target)
-                continue
-            domain, service_name = target.split(".", 1)
-            if domain != "notify":
-                _LOGGER.warning(
-                    "Notify target not in notify domain: %s", target
-                )
-                continue
-            try:
-                await self.hass.services.async_call(
-                    "notify",
-                    service_name,
-                    {"title": title, "message": message},
-                    blocking=False,
-                )
-            except Exception:  # noqa: BLE001 — never break the cover action
-                _LOGGER.exception(
-                    "Failed to send notification via %s", target
-                )
-
-    async def _async_send_tts_announcements(
-        self,
-        hub_data: Mapping[str, Any],
-        action: str,
-        language: str,
-        is_away: bool,
-        processed_covers: list[str],
-    ) -> None:
-        """Speak the action on every configured ``media_player.*`` via ``tts.speak``."""
-        tts_mode = hub_data.get(CONF_TTS_MODE, DEFAULT_TTS_MODE)
-        if tts_mode == MODE_DISABLED:
-            return
-        if tts_mode == MODE_AWAY_ONLY and not is_away:
-            return
-        engine = hub_data.get(CONF_TTS_ENGINE)
-        targets: list[str] = list(
-            hub_data.get(CONF_TTS_TARGETS, DEFAULT_TTS_TARGETS)
-        )
-        if not engine or not targets:
-            return
-
-        message = _tts_message(self.hass, language, action, processed_covers)
-        try:
-            await self.hass.services.async_call(
-                "tts",
-                "speak",
-                {
-                    "entity_id": engine,
-                    "media_player_entity_id": targets,
-                    "message": message,
-                },
-                blocking=False,
-            )
-        except Exception:  # noqa: BLE001 — never break the cover action
-            _LOGGER.exception(
-                "Failed to broadcast TTS announcement via %s", engine
-            )
-
-    def _is_away(self, settings: dict[str, Any]) -> bool:
-        """Return True when the configured presence entity reports away."""
-        entity_id = settings.get(CONF_PRESENCE_ENTITY)
-        if not entity_id:
-            return self._all_persons_away()
-
-        state = self.hass.states.get(entity_id)
-        if state is None:
-            _LOGGER.warning("Presence entity %s is unavailable", entity_id)
-            return False
-        return state.state in AWAY_STATES
-
-    def _all_persons_away(self) -> bool:
-        """Fallback presence check across all person entities."""
-        persons = self.hass.states.async_all("person")
-        if not persons:
-            _LOGGER.warning(
-                "only_when_away is enabled but no presence entity is "
-                "configured and no person.* exists; assuming away so the "
-                "simulation can run"
-            )
-            return True
-        return all(p.state in AWAY_STATES for p in persons)
 
     def next_open(self) -> datetime | None:
         """Return the next scheduled opening as a UTC datetime."""

@@ -25,6 +25,7 @@ from custom_components.shutters_management.const import (
     MODE_ALWAYS,
     MODE_AWAY_ONLY,
     MODE_DISABLED,
+    MODE_HOME_ONLY,
 )
 
 from .conftest import build_hub_with_instance, get_only_subentry_id
@@ -41,18 +42,23 @@ async def _setup_tts_hub(
     notify_mode: str = MODE_ALWAYS,
     presence_entity: str | None = None,
 ) -> tuple[MockConfigEntry, ShuttersScheduler]:
-    """Build, register and set up a hub with TTS settings of interest."""
-    if presence_entity is not None:
-        base_config[CONF_PRESENCE_ENTITY] = presence_entity
+    """Build, register and set up a hub with TTS settings of interest.
 
-    hub_overrides: dict = {CONF_TTS_MODE: tts_mode}
+    Since v0.7.0 ``tts_mode`` and ``notify_mode`` live on each subentry
+    while ``presence_entity`` lives on the hub.
+    """
+    base_config[CONF_TTS_MODE] = tts_mode
+    base_config[CONF_NOTIFY_MODE] = notify_mode
+
+    hub_overrides: dict = {}
     if engine is not None:
         hub_overrides[CONF_TTS_ENGINE] = engine
     hub_overrides[CONF_TTS_TARGETS] = targets if targets is not None else [
         "media_player.kitchen"
     ]
     hub_overrides[CONF_NOTIFY_SERVICES] = notify_services if notify_services is not None else []
-    hub_overrides[CONF_NOTIFY_MODE] = notify_mode
+    if presence_entity is not None:
+        hub_overrides[CONF_PRESENCE_ENTITY] = presence_entity
 
     entry = build_hub_with_instance(
         instance_data=base_config, hub_data=hub_overrides
@@ -196,31 +202,10 @@ async def test_tts_uses_comma_separator_not_newline(
     assert "Salon, Cuisine, Chambre" in message
 
 
-async def test_tts_when_away_only_skips_at_home(
+async def test_tts_when_home_only_skips_when_away(
     hass: HomeAssistant, base_config
 ) -> None:
-    """tts_mode=away_only + presence detected at home → no announcement."""
-    hass.states.async_set("person.someone", "home")
-    async_mock_service(hass, "cover", SERVICE_OPEN_COVER)
-    tts_calls = async_mock_service(hass, "tts", "speak")
-
-    _, scheduler = await _setup_tts_hub(
-        hass,
-        base_config,
-        engine="tts.cloud",
-        tts_mode=MODE_AWAY_ONLY,
-        presence_entity="person.someone",
-    )
-    await scheduler.async_run_now(ACTION_OPEN)
-    await hass.async_block_till_done()
-
-    assert tts_calls == []
-
-
-async def test_tts_when_away_only_runs_when_away(
-    hass: HomeAssistant, base_config
-) -> None:
-    """tts_mode=away_only + presence away → announcement fires."""
+    """tts_mode=home_only + presence reports away → no announcement."""
     hass.states.async_set("person.someone", "not_home")
     async_mock_service(hass, "cover", SERVICE_OPEN_COVER)
     tts_calls = async_mock_service(hass, "tts", "speak")
@@ -229,7 +214,28 @@ async def test_tts_when_away_only_runs_when_away(
         hass,
         base_config,
         engine="tts.cloud",
-        tts_mode=MODE_AWAY_ONLY,
+        tts_mode=MODE_HOME_ONLY,
+        presence_entity="person.someone",
+    )
+    await scheduler.async_run_now(ACTION_OPEN)
+    await hass.async_block_till_done()
+
+    assert tts_calls == []
+
+
+async def test_tts_when_home_only_runs_at_home(
+    hass: HomeAssistant, base_config
+) -> None:
+    """tts_mode=home_only + presence at home → announcement fires."""
+    hass.states.async_set("person.someone", "home")
+    async_mock_service(hass, "cover", SERVICE_OPEN_COVER)
+    tts_calls = async_mock_service(hass, "tts", "speak")
+
+    _, scheduler = await _setup_tts_hub(
+        hass,
+        base_config,
+        engine="tts.cloud",
+        tts_mode=MODE_HOME_ONLY,
         presence_entity="person.someone",
     )
     await scheduler.async_run_now(ACTION_OPEN)
@@ -306,12 +312,12 @@ async def test_no_tts_if_scheduler_unloaded_mid_call(
     tts_calls = async_mock_service(hass, "tts", "speak")
 
     base_config[CONF_COVERS] = ["cover.a"]
+    base_config[CONF_TTS_MODE] = MODE_ALWAYS
     entry = build_hub_with_instance(
         instance_data=base_config,
         hub_data={
             CONF_TTS_ENGINE: "tts.cloud",
             CONF_TTS_TARGETS: ["media_player.kitchen"],
-            CONF_TTS_MODE: MODE_ALWAYS,
             CONF_SEQUENTIAL_COVERS: True,
         },
     )

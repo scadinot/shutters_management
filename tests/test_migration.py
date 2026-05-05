@@ -81,14 +81,16 @@ async def test_migration_promotes_single_legacy_entry_to_hub(
     assert len(entries) == 1
     hub = entries[0]
     assert hub.entry_id == "legacy_a"
-    assert hub.version == 6
+    assert hub.version == 7
     assert hub.title == HUB_TITLE
     assert hub.unique_id == HUB_UNIQUE_ID
     assert hub.data[CONF_TYPE] == TYPE_HUB
     assert hub.data[CONF_NOTIFY_SERVICES] == []
     # v3→v4: empty services → mode=disabled; CONF_NOTIFY_WHEN_AWAY_ONLY removed.
-    assert hub.data[CONF_NOTIFY_MODE] == MODE_DISABLED
+    # v6→v7: notify_mode is no longer hub-wide — it's copied onto each
+    # subentry. The hub's mode key must be absent.
     assert CONF_NOTIFY_WHEN_AWAY_ONLY not in hub.data
+    assert CONF_NOTIFY_MODE not in hub.data
 
     # The instance lives on as the hub's first subentry.
     assert len(hub.subentries) == 1
@@ -99,6 +101,9 @@ async def test_migration_promotes_single_legacy_entry_to_hub(
     assert subentry.data[CONF_OPEN_TIME] == "08:00:00"
     # CONF_NAME is dropped from subentry.data (lives in title).
     assert CONF_NAME not in subentry.data
+    # v6→v7: the hub's notify_mode (here MODE_DISABLED, derived from the
+    # empty services list at v3→v4) is copied onto every subentry.
+    assert subentry.data[CONF_NOTIFY_MODE] == MODE_DISABLED
 
 
 async def test_migration_folds_two_legacy_entries_into_one_hub(
@@ -124,7 +129,7 @@ async def test_migration_folds_two_legacy_entries_into_one_hub(
         f"Expected exactly one hub, got {[(e.entry_id, e.title) for e in entries]}"
     )
     hub = entries[0]
-    assert hub.version == 6
+    assert hub.version == 7
     assert hub.data[CONF_TYPE] == TYPE_HUB
 
     titles = sorted(s.title for s in hub.subentries.values())
@@ -170,13 +175,16 @@ async def test_migration_v3_to_v4_converts_boolean_flags(
     assert len(entries) == 1
     entry = entries[0]
     assert entry.entry_id == "native_hub"
-    assert entry.version == 6
+    assert entry.version == 7
     assert entry.data[CONF_NOTIFY_SERVICES] == [
         "notify.persistent_notification"
     ]
-    assert entry.data[CONF_NOTIFY_MODE] == MODE_AWAY_ONLY
+    # v6→v7 strips notify_mode/tts_mode from hub (no subentry to copy
+    # to in this fixture). The intermediate v3→v4 result was
+    # ``away_only`` — we just verify the legacy boolean is gone.
     assert CONF_NOTIFY_WHEN_AWAY_ONLY not in entry.data
-    assert entry.data[CONF_TTS_MODE] == MODE_DISABLED
+    assert CONF_NOTIFY_MODE not in entry.data
+    assert CONF_TTS_MODE not in entry.data
 
 
 async def test_migration_v4_to_v5_strips_simulation_fields_from_instance(
@@ -228,7 +236,7 @@ async def test_migration_v4_to_v5_strips_simulation_fields_from_instance(
     await hass.async_block_till_done()
 
     entry = hass.config_entries.async_get_entry(hub.entry_id)
-    assert entry.version == 6
+    assert entry.version == 7
 
     subentry = next(iter(entry.subentries.values()))
     assert subentry.subentry_type == SUBENTRY_TYPE_INSTANCE
@@ -288,7 +296,7 @@ async def test_migration_v5_to_v6_preserves_uv(hass: HomeAssistant) -> None:
     await hass.async_block_till_done()
 
     entry = hass.config_entries.async_get_entry(hub.entry_id)
-    assert entry.version == 6
+    assert entry.version == 7
     # UV fields are preserved.
     assert entry.data[CONF_UV_ENTITY] == "sensor.uv"
 
@@ -352,6 +360,91 @@ async def test_migration_preserves_unique_id_for_entity_id_stability(
     hub = hass.config_entries.async_entries(DOMAIN)[0]
     subentry = next(iter(hub.subentries.values()))
     assert subentry.unique_id == "bureau"
+
+
+async def test_migration_v6_to_v7_distributes_modes_and_lifts_presence(
+    hass: HomeAssistant,
+) -> None:
+    """v6 → v7: hub-wide modes are copied onto each subentry, presence_entity
+    is lifted from the first non-empty presence_simulation up to the hub,
+    and ``tts_mode=away_only`` is forced to ``disabled`` (no UI equivalent).
+    """
+    from homeassistant.config_entries import ConfigSubentryData
+    from custom_components.shutters_management.const import (
+        SUBENTRY_TYPE_PRESENCE_SIM,
+    )
+
+    hub = MockConfigEntry(
+        domain=DOMAIN,
+        title=HUB_TITLE,
+        data={
+            CONF_TYPE: TYPE_HUB,
+            CONF_NOTIFY_SERVICES: ["notify.iphone"],
+            CONF_NOTIFY_MODE: MODE_AWAY_ONLY,
+            CONF_TTS_MODE: MODE_AWAY_ONLY,
+        },
+        options={},
+        entry_id="hub_v6",
+        unique_id=HUB_UNIQUE_ID,
+        version=6,
+        subentries_data=[
+            ConfigSubentryData(
+                subentry_type=SUBENTRY_TYPE_INSTANCE,
+                title="Bureau",
+                unique_id="bureau",
+                data={
+                    CONF_COVERS: ["cover.bureau"],
+                    CONF_OPEN_TIME: "08:00:00",
+                    CONF_CLOSE_TIME: "20:00:00",
+                    CONF_DAYS: list(DAYS),
+                },
+            ),
+            ConfigSubentryData(
+                subentry_type=SUBENTRY_TYPE_PRESENCE_SIM,
+                title="Présence",
+                unique_id="presence",
+                data={
+                    CONF_COVERS: ["cover.living_room"],
+                    CONF_OPEN_TIME: "08:00:00",
+                    CONF_CLOSE_TIME: "20:00:00",
+                    CONF_DAYS: list(DAYS),
+                    CONF_RANDOMIZE: True,
+                    CONF_RANDOM_MAX_MINUTES: 30,
+                    CONF_ONLY_WHEN_AWAY: True,
+                    CONF_PRESENCE_ENTITY: "person.someone",
+                },
+            ),
+        ],
+    )
+    hub.add_to_hass(hass)
+
+    assert await hass.config_entries.async_setup(hub.entry_id)
+    await hass.async_block_till_done()
+
+    entry = hass.config_entries.async_get_entry(hub.entry_id)
+    assert entry.version == 7
+
+    # presence_entity is lifted to the hub.
+    assert entry.data[CONF_PRESENCE_ENTITY] == "person.someone"
+
+    # hub-wide mode keys are stripped.
+    assert CONF_NOTIFY_MODE not in entry.data
+    assert CONF_TTS_MODE not in entry.data
+
+    by_title = {s.title: s for s in entry.subentries.values()}
+    bureau = by_title["Bureau"]
+    presence = by_title["Présence"]
+
+    # notify_mode copied as-is.
+    assert bureau.data[CONF_NOTIFY_MODE] == MODE_AWAY_ONLY
+    assert presence.data[CONF_NOTIFY_MODE] == MODE_AWAY_ONLY
+
+    # tts_mode=away_only → disabled (no equivalent in the new UI).
+    assert bureau.data[CONF_TTS_MODE] == MODE_DISABLED
+    assert presence.data[CONF_TTS_MODE] == MODE_DISABLED
+
+    # presence_entity is removed from the presence_simulation subentry.
+    assert CONF_PRESENCE_ENTITY not in presence.data
 
 
 # ---- v0.4.11 residual `model` cleanup ---------------------------------------

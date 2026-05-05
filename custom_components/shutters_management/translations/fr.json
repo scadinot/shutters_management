@@ -11,16 +11,14 @@
           "notifications": {
             "name": "Notifications push",
             "data": {
-              "notify_services": "Services de notification (laisser vide si aucun)",
-              "notify_mode": "Quand envoyer"
+              "notify_services": "Services de notification (laisser vide si aucun)"
             }
           },
           "voice_announcement": {
             "name": "Annonce vocale",
             "data": {
               "tts_engine": "Moteur TTS",
-              "tts_targets": "Enceintes connectées (laisser vide si aucune)",
-              "tts_mode": "Quand annoncer"
+              "tts_targets": "Enceintes connectées (laisser vide si aucune)"
             }
           },
           "sun_protection_sensors": {
@@ -29,6 +27,12 @@
               "lux_entity": "Capteur de luminosité extérieure (optionnel — laisser vide pour utiliser l'UV seul ou désactiver)",
               "uv_entity": "Capteur d'indice UV (optionnel — utilisé seul ou en complément du lux)",
               "temp_outdoor_entity": "Capteur de température extérieure (optionnel)"
+            }
+          },
+          "presence_hub": {
+            "name": "Présence (commune à toute l'intégration)",
+            "data": {
+              "presence_entity": "Entité de présence (personne ou groupe)"
             }
           }
         }
@@ -47,16 +51,14 @@
           "notifications": {
             "name": "Notifications push",
             "data": {
-              "notify_services": "Services de notification (laisser vide si aucun)",
-              "notify_mode": "Quand envoyer"
+              "notify_services": "Services de notification (laisser vide si aucun)"
             }
           },
           "voice_announcement": {
             "name": "Annonce vocale",
             "data": {
               "tts_engine": "Moteur TTS",
-              "tts_targets": "Enceintes connectées (laisser vide si aucune)",
-              "tts_mode": "Quand annoncer"
+              "tts_targets": "Enceintes connectées (laisser vide si aucune)"
             }
           },
           "sun_protection_sensors": {
@@ -65,6 +67,12 @@
               "lux_entity": "Capteur de luminosité extérieure (optionnel — laisser vide pour utiliser l'UV seul ou désactiver)",
               "uv_entity": "Capteur d'indice UV (optionnel — utilisé seul ou en complément du lux)",
               "temp_outdoor_entity": "Capteur de température extérieure (optionnel)"
+            }
+          },
+          "presence_hub": {
+            "name": "Présence (commune à toute l'intégration)",
+            "data": {
+              "presence_entity": "Entité de présence (personne ou groupe)"
             }
           }
         }
@@ -119,6 +127,18 @@
               "data": {
                 "temp_indoor_entity": "Capteur de température de la pièce (optionnel)"
               }
+            },
+            "notifications": {
+              "name": "Notifications push",
+              "data": {
+                "notify_mode": "Quand envoyer"
+              }
+            },
+            "voice_announcement": {
+              "name": "Annonce vocale",
+              "data": {
+                "tts_mode": "Quand annoncer"
+              }
             }
           }
         },
@@ -154,6 +174,18 @@
               "name": "Capteur intérieur",
               "data": {
                 "temp_indoor_entity": "Capteur de température de la pièce (optionnel)"
+              }
+            },
+            "notifications": {
+              "name": "Notifications push",
+              "data": {
+                "notify_mode": "Quand envoyer"
+              }
+            },
+            "voice_announcement": {
+              "name": "Annonce vocale",
+              "data": {
+                "tts_mode": "Quand annoncer"
               }
             }
           }
@@ -209,6 +241,18 @@
               "data": {
                 "days": "Jours actifs"
               }
+            },
+            "notifications": {
+              "name": "Notifications push",
+              "data": {
+                "notify_mode": "Quand envoyer"
+              }
+            },
+            "voice_announcement": {
+              "name": "Annonce vocale",
+              "data": {
+                "tts_mode": "Quand annoncer"
+              }
             }
           }
         },
@@ -245,6 +289,18 @@
               "name": "Jours actifs",
               "data": {
                 "days": "Jours actifs"
+              }
+            },
+            "notifications": {
+              "name": "Notifications push",
+              "data": {
+                "notify_mode": "Quand envoyer"
+              }
+            },
+            "voice_announcement": {
+              "name": "Annonce vocale",
+              "data": {
+                "tts_mode": "Quand annoncer"
               }
             }
           }
@@ -311,8 +367,19 @@
             "presence": {
               "name": "Conditions de présence",
               "data": {
-                "only_when_away": "Exécuter uniquement en absence",
-                "presence_entity": "Entité de présence (personne ou groupe)"
+                "only_when_away": "Exécuter uniquement en absence"
+              }
+            },
+            "notifications": {
+              "name": "Notifications push",
+              "data": {
+                "notify_mode": "Quand envoyer"
+              }
+            },
+            "voice_announcement": {
+              "name": "Annonce vocale",
+              "data": {
+                "tts_mode": "Quand annoncer"
               }
             }
           }
@@ -362,8 +429,19 @@
             "presence": {
               "name": "Conditions de présence",
               "data": {
-                "only_when_away": "Exécuter uniquement en absence",
-                "presence_entity": "Entité de présence (personne ou groupe)"
+                "only_when_away": "Exécuter uniquement en absence"
+              }
+            },
+            "notifications": {
+              "name": "Notifications push",
+              "data": {
+                "notify_mode": "Quand envoyer"
+              }
+            },
+            "voice_announcement": {
+              "name": "Annonce vocale",
+              "data": {
+                "tts_mode": "Quand annoncer"
               }
             }
           }
@@ -393,6 +471,13 @@
         "disabled": "Sans",
         "always": "Toujours",
         "away_only": "Absence uniquement"
+      }
+    },
+    "voice_mode": {
+      "options": {
+        "disabled": "Sans",
+        "always": "Toujours",
+        "home_only": "Présence uniquement"
       }
     },
     "days": {
