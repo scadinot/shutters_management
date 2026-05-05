@@ -19,6 +19,8 @@ from homeassistant.const import (
     SERVICE_OPEN_COVER,
     STATE_CLOSED,
     STATE_OPEN,
+    STATE_UNAVAILABLE,
+    STATE_UNKNOWN,
     SUN_EVENT_SUNRISE,
     SUN_EVENT_SUNSET,
 )
@@ -262,17 +264,20 @@ def _is_away_for(hass: HomeAssistant, hub_data: Mapping[str, Any]) -> bool:
     entity_ids = [raw] if isinstance(raw, str) else list(raw)
     entity_ids = [e for e in entity_ids if e]
     if entity_ids:
-        states = []
+        usable_states = []
         for entity_id in entity_ids:
             state = hass.states.get(entity_id)
-            if state is None:
+            if state is None or state.state in (
+                STATE_UNAVAILABLE,
+                STATE_UNKNOWN,
+            ):
                 _LOGGER.warning(
                     "Presence entity %s is unavailable", entity_id
                 )
                 continue
-            states.append(state)
-        if states:
-            return all(s.state in AWAY_STATES for s in states)
+            usable_states.append(state)
+        if usable_states:
+            return all(s.state in AWAY_STATES for s in usable_states)
         _LOGGER.warning(
             "All configured presence entities are unavailable; "
             "falling back to person.* scan"
