@@ -32,34 +32,32 @@ from homeassistant.util import slugify
 from .const import (
     CONF_ARC,
     CONF_COVERS,
-    CONF_LUX_ENTITY,
     CONF_MIN_ELEVATION,
     CONF_MIN_UV,
-    CONF_NOTIFY_SERVICES,
     CONF_ORIENTATION,
     CONF_PRESENCE_ENTITY,
     CONF_TARGET_POSITION,
     CONF_TEMP_INDOOR_ENTITY,
-    CONF_TTS_ENGINE,
-    CONF_TTS_TARGETS,
-    CONF_UV_ENTITY,
     DEFAULT_ARC,
     DEFAULT_MIN_ELEVATION,
     DEFAULT_MIN_UV,
     DEFAULT_TARGET_POSITION,
     DOMAIN,
+    HUB_TITLE,
     LUX_STANDARD,
     SERVICE_PAUSE,
     SERVICE_RESUME,
     SUBENTRY_TYPE_INSTANCE,
     SUBENTRY_TYPE_PRESENCE_SIM,
     SUBENTRY_TYPE_SUN_PROTECTION,
-    T_INDOOR_STANDARD_MIN,
 )
 
 
 PANEL_URL_PATH = "shutters-management"
-PANEL_TITLE = "Shutters Management"
+# Reuse HUB_TITLE so the sidebar entry and the hub device share a single
+# source of truth. The title is the integration's brand name and is left
+# untranslated on purpose; only the view labels are localized via _labels().
+PANEL_TITLE = HUB_TITLE
 PANEL_ICON = "mdi:blinds"
 
 
@@ -70,7 +68,6 @@ _LABELS_FR: dict[str, str] = {
     "simulations": "Simulations de présence",
     "sun_protections": "Protections solaires",
     "household_presence": "Présence du foyer",
-    "channels": "Canaux de notification",
     "pause_all": "Tout en pause",
     "resume_all": "Tout reprendre",
     "next_open": "Prochaine ouverture",
@@ -90,7 +87,6 @@ _LABELS_FR: dict[str, str] = {
     "lux_margin": "Marge lux",
     "elevation_margin": "Marge élévation",
     "uv_margin": "Marge UV",
-    "indoor_temp_margin": "Marge T° intérieure",
     "azimuth_diff": "Écart d'azimuth",
     "status": "Statut",
     "override": "Override",
@@ -108,7 +104,6 @@ _LABELS_EN: dict[str, str] = {
     "simulations": "Presence simulations",
     "sun_protections": "Sun protections",
     "household_presence": "Household presence",
-    "channels": "Notification channels",
     "pause_all": "Pause all",
     "resume_all": "Resume all",
     "next_open": "Next open",
@@ -127,7 +122,6 @@ _LABELS_EN: dict[str, str] = {
     "lux_margin": "Lux margin",
     "elevation_margin": "Elevation margin",
     "uv_margin": "UV margin",
-    "indoor_temp_margin": "Indoor temp. margin",
     "azimuth_diff": "Azimuth diff",
     "status": "Status",
     "override": "Override",
@@ -269,9 +263,7 @@ def _sun_map_markdown(subentry: ConfigSubentry) -> str:
 # ---------------------------------------------------------------------------
 
 
-def _scheduler_tile(
-    subentry: ConfigSubentry, labels: dict[str, str]
-) -> dict[str, Any]:
+def _scheduler_tile(subentry: ConfigSubentry) -> dict[str, Any]:
     prefix = _entity_prefix(subentry)
     return {
         "type": "tile",
@@ -286,9 +278,7 @@ def _scheduler_tile(
     }
 
 
-def _sun_tile(
-    subentry: ConfigSubentry, labels: dict[str, str]
-) -> dict[str, Any]:
+def _sun_tile(subentry: ConfigSubentry) -> dict[str, Any]:
     prefix = _entity_prefix(subentry)
     return {
         "type": "tile",
@@ -352,7 +342,7 @@ def _build_cockpit_view(
                 "columns": 1,
                 "square": False,
                 "cards": [
-                    _scheduler_tile(sub, labels) for sub in schedules
+                    _scheduler_tile(sub) for sub in schedules
                 ],
             }
         )
@@ -368,7 +358,7 @@ def _build_cockpit_view(
                 "type": "grid",
                 "columns": 1,
                 "square": False,
-                "cards": [_scheduler_tile(sub, labels) for sub in sims],
+                "cards": [_scheduler_tile(sub) for sub in sims],
             }
         )
     if suns:
@@ -383,7 +373,7 @@ def _build_cockpit_view(
                 "type": "grid",
                 "columns": 1,
                 "square": False,
-                "cards": [_sun_tile(sub, labels) for sub in suns],
+                "cards": [_sun_tile(sub) for sub in suns],
             }
         )
 
