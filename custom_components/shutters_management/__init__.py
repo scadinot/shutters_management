@@ -38,6 +38,7 @@ from homeassistant.helpers.event import (
 from homeassistant.helpers.sun import get_astral_event_next
 from homeassistant.util import dt as dt_util
 
+from .panel import async_register_panel, async_unregister_panel
 from .const import (
     ACTION_CLOSE,
     ACTION_OPEN,
@@ -545,6 +546,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     _async_register_services(hass)
+    async_register_panel(hass, entry)
 
     entry.async_on_unload(entry.add_update_listener(_async_update_listener))
 
@@ -565,6 +567,8 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             manager.async_unschedule()
         elif isinstance(manager, ShuttersSunProtectionManager):
             await manager.async_unload()
+
+    async_unregister_panel(hass)
 
     if not hass.data.get(DOMAIN):
         _async_unregister_services(hass)
@@ -600,6 +604,10 @@ async def _async_update_listener(hass: HomeAssistant, entry: ConfigEntry) -> Non
         if mgr.hub_entry is entry
     }
     if current == loaded:
+        # Hub-only change (e.g. presence_entity edited from the options
+        # flow): no scheduler / manager respawn needed, but the panel
+        # references the hub data and must be rebuilt to reflect it.
+        async_register_panel(hass, entry)
         return
     await hass.config_entries.async_reload(entry.entry_id)
 

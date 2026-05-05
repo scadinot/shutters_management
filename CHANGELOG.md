@@ -6,6 +6,37 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le pr
 
 ## [Non publié]
 
+## [0.8.0] — 2026-05-05
+
+### Ajouté — Tableau de bord intégré
+
+- **Panneau « Shutters Management » dans la barre latérale.** Une icône
+  permanente ouvre un tableau de bord Lovelace généré automatiquement,
+  qui visualise toutes les sous-entrées en un coup d'œil.
+- **Vue cockpit.** Liste tous les groupes par type (planifications,
+  simulations de présence, protections solaires) sous forme de tuiles
+  cliquables. Inclut le bandeau présence du foyer et deux boutons
+  globaux *Tout en pause* / *Tout reprendre*.
+- **Vue drill-down par sous-entrée.** Chaque tuile navigue vers une
+  sous-vue dédiée :
+  - Pour les planifications et simulations : prochaines ouvertures /
+    fermetures, liste des volets pilotés, boutons de test.
+  - Pour les protections solaires : carte du soleil avec arc configuré
+    et position courante (SVG inline animé via templates Jinja),
+    quatre jauges pour les marges (lux, élévation, UV, écart
+    d'azimuth), graphique d'évolution des dernières 60 minutes
+    (lux + température intérieure) et récapitulatif de la
+    configuration.
+- **Aucune dépendance HACS.** Le panneau utilise uniquement des cartes
+  natives (`tile`, `entities`, `gauge`, `markdown`, `history-graph`,
+  `grid`, `button`).
+- **Multilingue.** Les libellés du panneau sont automatiquement en
+  français ou en anglais selon la langue de Home Assistant.
+- **Reconstruction automatique.** Le panneau est mis à jour
+  immédiatement lorsqu'on ajoute, supprime ou reconfigure une
+  sous-entrée (ou que l'on modifie la liste de présence du hub) ;
+  aucun redémarrage n'est requis.
+
 ## [0.7.1] — 2026-05-05
 
 ### Modifié
