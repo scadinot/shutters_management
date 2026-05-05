@@ -21,6 +21,7 @@ fall back to a direct re-register.
 """
 from __future__ import annotations
 
+import logging
 import math
 from typing import Any
 
@@ -750,7 +751,24 @@ def build_dashboard_config(
     return {"title": PANEL_TITLE, "views": views}
 
 
+_LOGGER = logging.getLogger(__name__)
 _LOVELACE_DOMAIN = "lovelace"
+
+# Subentry types that yield a drill-down view in the dashboard.
+_VIEW_SUBENTRY_TYPES = (
+    SUBENTRY_TYPE_INSTANCE,
+    SUBENTRY_TYPE_PRESENCE_SIM,
+    SUBENTRY_TYPE_SUN_PROTECTION,
+)
+
+
+def _expected_view_count(entry: ConfigEntry) -> int:
+    """Cockpit + one drill-down view per supported subentry."""
+    return 1 + sum(
+        1
+        for sub in entry.subentries.values()
+        if sub.subentry_type in _VIEW_SUBENTRY_TYPES
+    )
 
 
 class _GeneratedDashboard(LovelaceConfig):
@@ -773,8 +791,10 @@ class _GeneratedDashboard(LovelaceConfig):
         return MODE_YAML
 
     async def async_get_info(self) -> dict[str, Any]:
-        config = await self.async_load(False)
-        return {"mode": self.mode, "views": len(config.get("views", []))}
+        # Counted from the entry's subentries directly: rebuilding the
+        # full dashboard (cards, inline SVG, ...) just to count views
+        # would be wasteful and HA may call this often.
+        return {"mode": self.mode, "views": _expected_view_count(self._entry)}
 
     async def async_load(self, force: bool) -> dict[str, Any]:
         return build_dashboard_config(self.hass, self._entry)
@@ -784,8 +804,9 @@ class _GeneratedDashboard(LovelaceConfig):
         return json_fragment(json_bytes(config))
 
     @callback
-    def fire_config_updated(self) -> None:
-        """Notify the frontend to refresh the open dashboard."""
+    def update_entry(self, entry: ConfigEntry) -> None:
+        """Re-bind the dashboard to ``entry`` and notify the frontend."""
+        self._entry = entry
         self._config_updated()
 
 
@@ -803,15 +824,23 @@ def async_register_panel(hass: HomeAssistant, entry: ConfigEntry) -> None:
     """
     lovelace_data = hass.data.get(_LOVELACE_DOMAIN)
     if lovelace_data is None:
-        # Lovelace is set up at HA bootstrap; if it is missing here we
-        # cannot serve the dashboard. The manifest declares lovelace as
-        # a dependency, so this is a defensive guard for headless tests.
+        # Lovelace is set up at HA bootstrap and is also declared as a
+        # manifest dependency; missing here means a misconfigured test
+        # harness or a bootstrap error. Tear down any stale sidebar
+        # entry so we don't leave a broken icon pointing at nothing,
+        # then warn the user.
+        frontend.async_remove_panel(
+            hass, PANEL_URL_PATH, warn_if_unknown=False
+        )
+        _LOGGER.warning(
+            "Cannot register %s panel: lovelace data not available",
+            PANEL_URL_PATH,
+        )
         return
 
     existing = lovelace_data.dashboards.get(PANEL_URL_PATH)
     if isinstance(existing, _GeneratedDashboard):
-        existing._entry = entry
-        existing.fire_config_updated()
+        existing.update_entry(entry)
     else:
         lovelace_data.dashboards[PANEL_URL_PATH] = _GeneratedDashboard(
             hass, entry
