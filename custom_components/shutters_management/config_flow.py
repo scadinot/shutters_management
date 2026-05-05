@@ -718,18 +718,12 @@ class ShuttersHubOptionsFlow(OptionsFlow):
             CONF_NOTIFY_SERVICES: self.config_entry.data.get(
                 CONF_NOTIFY_SERVICES, DEFAULT_NOTIFY_SERVICES
             ),
-            CONF_NOTIFY_MODE: self.config_entry.data.get(
-                CONF_NOTIFY_MODE, DEFAULT_NOTIFY_MODE
-            ),
             CONF_SEQUENTIAL_COVERS: self.config_entry.data.get(
                 CONF_SEQUENTIAL_COVERS, DEFAULT_SEQUENTIAL_COVERS
             ),
             CONF_TTS_ENGINE: self.config_entry.data.get(CONF_TTS_ENGINE) or "",
             CONF_TTS_TARGETS: self.config_entry.data.get(
                 CONF_TTS_TARGETS, DEFAULT_TTS_TARGETS
-            ),
-            CONF_TTS_MODE: self.config_entry.data.get(
-                CONF_TTS_MODE, DEFAULT_TTS_MODE
             ),
             CONF_LUX_ENTITY: self.config_entry.data.get(
                 CONF_LUX_ENTITY, DEFAULT_LUX_ENTITY
@@ -739,6 +733,9 @@ class ShuttersHubOptionsFlow(OptionsFlow):
             ),
             CONF_UV_ENTITY: self.config_entry.data.get(
                 CONF_UV_ENTITY, DEFAULT_UV_ENTITY
+            ),
+            CONF_PRESENCE_ENTITY: self.config_entry.data.get(
+                CONF_PRESENCE_ENTITY, ""
             ),
         }
         return self.async_show_form(
