@@ -15,25 +15,35 @@ utilisateurs.
 
 | Horizon | Objectif principal | Effort estimé |
 |---|---|---|
-| [Statut actuel](#statut-actuel) | Version courante v0.5.0 — voir CHANGELOG pour l'historique | livré |
-| [Moyen terme](#moyen-terme--fonctionnalités-v030) | Profils horaires, déclencheurs solaires, multi-instance | quelques jours par lot |
-| [Long terme](#long-terme--stabilisation-v10) | Templates, notifications, statistiques, API publique stabilisée | plusieurs semaines |
-| [Pistes exploratoires](#pistes-exploratoires) | Météo, luminosité, jours fériés, ouverture partielle | à évaluer au cas par cas |
+| [Statut actuel](#statut-actuel) | Version courante v0.7.1 — voir CHANGELOG pour l'historique | livré |
+| [Moyen terme](#moyen-terme--prochaines-versions) | Profils horaires, réglages avancés du décalage aléatoire | quelques jours par lot |
+| [Long terme](#long-terme--stabilisation-v10) | Templates Jinja, statistiques d'exécution, carte Lovelace dédiée, API publique stabilisée | plusieurs semaines |
+| [Pistes exploratoires](#pistes-exploratoires) | Météo, jours fériés, ouverture partielle, ciblage des services par sous-entrée | à évaluer au cas par cas |
 
 ---
 
 ## Statut actuel
 
-La version courante est **v0.5.0**. Pour la liste des fonctionnalités
+La version courante est **v0.7.1**. Pour la liste des fonctionnalités
 déjà disponibles, voir la section [Fonctionnalités](README.md#fonctionnalités)
 du README. Pour l'historique détaillé des versions livrées, voir le
 [CHANGELOG.md](CHANGELOG.md).
+
+Faits marquants depuis v0.5.0 :
+
+- **v0.6.0** — refonte de la protection solaire (lux + UV + T_ext +
+  T_pièce, avec hystérésis, debounce et override 04:00).
+- **v0.6.1** — 15 entités diagnostic par groupe Sun Protection.
+- **v0.7.0** — modes `notify_mode` / `tts_mode` par sous-entrée,
+  entité de présence partagée au hub, notifications côté Sun
+  Protection.
+- **v0.7.1** — sélecteur de présence multi-entités au hub.
 
 Le présent document décrit uniquement les évolutions **à venir**.
 
 ---
 
-## Moyen terme — fonctionnalités v0.3.0
+## Moyen terme — prochaines versions
 
 ### 1. Déclencheurs solaires — ✅ livré en v0.3.1
 
@@ -116,25 +126,30 @@ l'évaluer via `Template(...).async_render()` à chaque calcul de
 `cv.template`. Garder la rétro-compatibilité : une valeur sans
 `{{` reste interprétée comme un littéral `HH:MM:SS`.
 
-### 7. Notifications optionnelles — ✅ livré en v0.4.0
+### 7. Notifications optionnelles — ✅ livré en v0.4.0, étendu en v0.7.0
 
-Multi-select des services `notify.*` au niveau du **hub** (donc
-partagé par toutes les instances) + toggle « seulement en absence ».
-Messages localisés FR/EN, envoyés après chaque action open/close
-(test buttons et service `run_now` inclus). Une notification cassée
-ne bloque jamais l'action sur les volets. Voir le
-[CHANGELOG](CHANGELOG.md#040--2026-05-01).
+Multi-select des services `notify.*` au niveau du **hub**, plus deux
+modes par **sous-entrée** depuis v0.7.0 :
+- `notify_mode` : `disabled` / `always` / `away_only`.
+- `tts_mode` : `disabled` / `always` / `home_only`.
 
-Le bump v0.4.0 a aussi introduit l'**architecture hub + subentries**
-(pattern `ConfigSubentryFlow` de HA 2025.3+) : une seule config entry
-hub regroupe toutes les instances Bureau / RDC / etc. sous forme de
-subentries, avec une migration automatique et conservatrice des
-entries v0.3.x existantes (les `entity_id` et `unique_id` sont
-préservés).
+Annonces vocales TTS sur les `media_player.*` configurés au hub
+depuis v0.4.3. Notifications côté Sun Protection depuis v0.7.0
+(ouvertures et fermetures automatiques). Messages localisés FR/EN,
+une notification cassée ne bloque jamais l'action sur les volets.
+Voir les CHANGELOG [v0.4.0](CHANGELOG.md#040--2026-05-01),
+[v0.4.3](CHANGELOG.md#043--2026-05-02) et
+[v0.7.0](CHANGELOG.md#070--2026-05-04).
 
-Pas couvert par cette version (reportés) : personnalisation Jinja du
-message, notification avant l'action, notification sur pause/resume,
-ciblage des services notify par instance.
+L'architecture **hub + sous-entrées** introduite en v0.4.0 (pattern
+`ConfigSubentryFlow` de HA 2025.3+) est désormais le format
+canonique. La chaîne de migration automatique va de v2 (legacy
+mono-entry) à v8 (présence multi-entités), chaque étape
+préservant les `entity_id` et `unique_id` existants.
+
+Pas couvert (reportés) : personnalisation Jinja du message,
+notification avant l'action, notification sur pause/resume, ciblage
+des services notify par sous-entrée.
 
 ### 8. Statistiques d'exécution
 
@@ -175,7 +190,10 @@ qui a remplacé `binary_sensor` par `switch`).
 chaque entité dans le README ; figer les `unique_id` (déjà fait
 depuis v0.2.1) et les noms de services. Politique stricte de
 breaking changes : pas sans bump de version majeure et, lorsque
-possible, migration automatique via `async_migrate_entry`.
+possible, migration automatique via `async_migrate_entry`. La
+chaîne actuelle va jusqu'à `ENTRY_VERSION = 8` (cf. v0.7.1) et
+chaque palier est couvert par un test dédié dans
+`tests/test_migration.py`.
 
 ---
 
@@ -208,6 +226,18 @@ Idées à évaluer au cas par cas, sans priorité ferme.
   par pays via [`python-holidays`](https://pypi.org/project/holidays/)) :
   le profil semaine ne s'applique pas les jours fériés. À combiner
   avec les profils horaires de l'item 2.
+
+### Notifications avancées
+
+- **Notification sur pause / resume** d'une sous-entrée (aujourd'hui
+  uniquement sur open / close).
+- **Personnalisation Jinja** du titre et du corps de la notification
+  / annonce vocale, avec accès à `subentry.title`, `action`, liste
+  des covers, état de présence.
+- **Ciblage par sous-entrée** des services `run_now` / `pause` /
+  `resume` (aujourd'hui broadcast). Permettrait de mettre en pause
+  uniquement la simulation de présence sans toucher à la
+  planification ni à la protection solaire.
 
 ---
 
