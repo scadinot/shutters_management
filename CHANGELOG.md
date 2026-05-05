@@ -32,6 +32,11 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le pr
 
 ## [0.7.0] — 2026-05-04
 
+> Premier remaniement du **stockage** des modes de notification depuis
+> leur introduction en v0.4.0 : les clés `notify_mode` et `tts_mode`
+> changent de niveau (hub → sous-entrée). Une migration automatique
+> v6 → v7 préserve les valeurs existantes.
+
 ### Modifié — modes de notification par sous-entrée
 
 Les modes **Notifications push** et **Annonces vocales** sont
