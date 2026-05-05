@@ -45,7 +45,7 @@ async def _setup_hub(
     if notify_services is not None:
         hub_overrides[CONF_NOTIFY_SERVICES] = notify_services
     if presence_entity is not None:
-        hub_overrides[CONF_PRESENCE_ENTITY] = presence_entity
+        hub_overrides[CONF_PRESENCE_ENTITY] = [presence_entity]
 
     entry = build_hub_with_instance(
         instance_data=base_config, hub_data=hub_overrides

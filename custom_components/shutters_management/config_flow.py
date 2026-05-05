@@ -221,13 +221,13 @@ def _build_hub_schema(
                             defaults,
                             SECTION_PRESENCE_HUB,
                             CONF_PRESENCE_ENTITY,
-                            "",
+                            [],
                         )
                         or None
                     },
                 ): selector.EntitySelector(
                     selector.EntitySelectorConfig(
-                        domain=["person", "group"]
+                        domain=["person", "group"], multiple=True
                     )
                 ),
             }
@@ -629,7 +629,13 @@ def _normalize_hub(user_input: dict[str, Any]) -> dict[str, Any]:
     flat[CONF_LUX_ENTITY] = flat.get(CONF_LUX_ENTITY) or ""
     flat[CONF_TEMP_OUTDOOR_ENTITY] = flat.get(CONF_TEMP_OUTDOOR_ENTITY) or ""
     flat[CONF_UV_ENTITY] = flat.get(CONF_UV_ENTITY) or ""
-    flat[CONF_PRESENCE_ENTITY] = flat.get(CONF_PRESENCE_ENTITY) or ""
+    presence = flat.get(CONF_PRESENCE_ENTITY)
+    if not presence:
+        flat[CONF_PRESENCE_ENTITY] = []
+    elif isinstance(presence, str):
+        flat[CONF_PRESENCE_ENTITY] = [presence]
+    else:
+        flat[CONF_PRESENCE_ENTITY] = list(presence)
     # Mode keys are no longer hub-wide as of v0.7.0; drop any stale value.
     flat.pop(CONF_NOTIFY_MODE, None)
     flat.pop(CONF_TTS_MODE, None)
@@ -663,7 +669,7 @@ class ShuttersManagementConfigFlow(ConfigFlow, domain=DOMAIN):
     :class:`ShuttersInstanceSubentryFlow`.
     """
 
-    VERSION = 7
+    VERSION = 8
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
@@ -735,7 +741,7 @@ class ShuttersHubOptionsFlow(OptionsFlow):
                 CONF_UV_ENTITY, DEFAULT_UV_ENTITY
             ),
             CONF_PRESENCE_ENTITY: self.config_entry.data.get(
-                CONF_PRESENCE_ENTITY, ""
+                CONF_PRESENCE_ENTITY, []
             ),
         }
         return self.async_show_form(

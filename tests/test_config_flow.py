@@ -851,7 +851,7 @@ async def test_hub_options_flow_with_legacy_empty_string_entries(
         options={},
         entry_id="legacy_empty_strings",
         unique_id="shutters_management_hub",
-        version=7,
+        version=8,
     )
     entry.add_to_hass(hass)
 

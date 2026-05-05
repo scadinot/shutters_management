@@ -81,7 +81,7 @@ async def test_migration_promotes_single_legacy_entry_to_hub(
     assert len(entries) == 1
     hub = entries[0]
     assert hub.entry_id == "legacy_a"
-    assert hub.version == 7
+    assert hub.version == 8
     assert hub.title == HUB_TITLE
     assert hub.unique_id == HUB_UNIQUE_ID
     assert hub.data[CONF_TYPE] == TYPE_HUB
@@ -129,7 +129,7 @@ async def test_migration_folds_two_legacy_entries_into_one_hub(
         f"Expected exactly one hub, got {[(e.entry_id, e.title) for e in entries]}"
     )
     hub = entries[0]
-    assert hub.version == 7
+    assert hub.version == 8
     assert hub.data[CONF_TYPE] == TYPE_HUB
 
     titles = sorted(s.title for s in hub.subentries.values())
@@ -175,7 +175,7 @@ async def test_migration_v3_to_v4_converts_boolean_flags(
     assert len(entries) == 1
     entry = entries[0]
     assert entry.entry_id == "native_hub"
-    assert entry.version == 7
+    assert entry.version == 8
     assert entry.data[CONF_NOTIFY_SERVICES] == [
         "notify.persistent_notification"
     ]
@@ -236,7 +236,7 @@ async def test_migration_v4_to_v5_strips_simulation_fields_from_instance(
     await hass.async_block_till_done()
 
     entry = hass.config_entries.async_get_entry(hub.entry_id)
-    assert entry.version == 7
+    assert entry.version == 8
 
     subentry = next(iter(entry.subentries.values()))
     assert subentry.subentry_type == SUBENTRY_TYPE_INSTANCE
@@ -296,7 +296,7 @@ async def test_migration_v5_to_v6_preserves_uv(hass: HomeAssistant) -> None:
     await hass.async_block_till_done()
 
     entry = hass.config_entries.async_get_entry(hub.entry_id)
-    assert entry.version == 7
+    assert entry.version == 8
     # UV fields are preserved.
     assert entry.data[CONF_UV_ENTITY] == "sensor.uv"
 
@@ -422,10 +422,11 @@ async def test_migration_v6_to_v7_distributes_modes_and_lifts_presence(
     await hass.async_block_till_done()
 
     entry = hass.config_entries.async_get_entry(hub.entry_id)
-    assert entry.version == 7
+    assert entry.version == 8
 
-    # presence_entity is lifted to the hub.
-    assert entry.data[CONF_PRESENCE_ENTITY] == "person.someone"
+    # presence_entity is lifted to the hub and wrapped into a list by
+    # the chained v7 → v8 migration.
+    assert entry.data[CONF_PRESENCE_ENTITY] == ["person.someone"]
 
     # hub-wide mode keys are stripped.
     assert CONF_NOTIFY_MODE not in entry.data
@@ -445,6 +446,52 @@ async def test_migration_v6_to_v7_distributes_modes_and_lifts_presence(
 
     # presence_entity is removed from the presence_simulation subentry.
     assert CONF_PRESENCE_ENTITY not in presence.data
+
+
+async def test_migration_v7_to_v8_wraps_presence_entity_in_list(
+    hass: HomeAssistant,
+) -> None:
+    """v7 → v8: a string presence_entity at the hub is wrapped in a list."""
+    hub = MockConfigEntry(
+        domain=DOMAIN,
+        title=HUB_TITLE,
+        data={
+            CONF_TYPE: TYPE_HUB,
+            CONF_NOTIFY_SERVICES: [],
+            CONF_PRESENCE_ENTITY: "person.alice",
+        },
+        unique_id=HUB_UNIQUE_ID,
+        version=7,
+    )
+    hub.add_to_hass(hass)
+
+    assert await hass.config_entries.async_setup(hub.entry_id)
+    await hass.async_block_till_done()
+
+    entry = hass.config_entries.async_get_entry(hub.entry_id)
+    assert entry.version == 8
+    assert entry.data[CONF_PRESENCE_ENTITY] == ["person.alice"]
+
+
+async def test_migration_v7_to_v8_normalizes_missing_presence_entity(
+    hass: HomeAssistant,
+) -> None:
+    """v7 → v8: an entry without presence_entity gets an empty list."""
+    hub = MockConfigEntry(
+        domain=DOMAIN,
+        title=HUB_TITLE,
+        data={CONF_TYPE: TYPE_HUB, CONF_NOTIFY_SERVICES: []},
+        unique_id=HUB_UNIQUE_ID,
+        version=7,
+    )
+    hub.add_to_hass(hass)
+
+    assert await hass.config_entries.async_setup(hub.entry_id)
+    await hass.async_block_till_done()
+
+    entry = hass.config_entries.async_get_entry(hub.entry_id)
+    assert entry.version == 8
+    assert entry.data[CONF_PRESENCE_ENTITY] == []
 
 
 # ---- v0.4.11 residual `model` cleanup ---------------------------------------

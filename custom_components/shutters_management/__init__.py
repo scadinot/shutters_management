@@ -247,22 +247,35 @@ def _strip_name(data: dict[str, Any]) -> dict[str, Any]:
 
 
 def _is_away_for(hass: HomeAssistant, hub_data: Mapping[str, Any]) -> bool:
-    """Return True when the hub-level presence entity reports away.
+    """Return True when every configured presence entity reports away.
 
-    Falls back to scanning ``person.*`` entities when no presence entity
-    is configured at the hub, or when the configured entity's state is
-    unavailable. If neither source exists the function assumes away —
-    that's the safest default for callers like the presence simulation,
+    The hub stores ``presence_entity`` as a list of person/group entity
+    ids since v0.7.1. We treat the household as away when every listed
+    entity reports an away state. Entities whose state is unavailable
+    are skipped (logged at warning); if every configured entity is
+    unavailable we fall back to scanning ``person.*``. With no
+    configured list and no ``person.*`` entities the function assumes
+    away — the safest default for callers like the presence simulation
     where running is preferred to skipping.
     """
-    entity_id = hub_data.get(CONF_PRESENCE_ENTITY) or None
-    if entity_id:
-        state = hass.states.get(entity_id)
-        if state is not None:
-            return state.state in AWAY_STATES
+    raw = hub_data.get(CONF_PRESENCE_ENTITY) or []
+    entity_ids = [raw] if isinstance(raw, str) else list(raw)
+    entity_ids = [e for e in entity_ids if e]
+    if entity_ids:
+        states = []
+        for entity_id in entity_ids:
+            state = hass.states.get(entity_id)
+            if state is None:
+                _LOGGER.warning(
+                    "Presence entity %s is unavailable", entity_id
+                )
+                continue
+            states.append(state)
+        if states:
+            return all(s.state in AWAY_STATES for s in states)
         _LOGGER.warning(
-            "Presence entity %s is unavailable; falling back to person.* scan",
-            entity_id,
+            "All configured presence entities are unavailable; "
+            "falling back to person.* scan"
         )
     persons = hass.states.async_all("person")
     if not persons:
@@ -717,6 +730,27 @@ async def async_migrate_entry(
         )
         _LOGGER.info(
             "Migrated entry %s from version 6 to 7 (per-subentry notify/TTS modes)",
+            entry.entry_id,
+        )
+
+    if entry.version < 8:
+        # v7 → v8: presence_entity becomes a list of entity ids.
+        #
+        # The hub stored a single ``person`` or ``group`` id since v0.7.0.
+        # As of v0.7.1 the selector is multi-valued, so wrap any legacy
+        # string into a one-element list (or an empty list when nothing
+        # was configured).
+        hub_data = dict(entry.data)
+        raw = hub_data.get(CONF_PRESENCE_ENTITY)
+        if isinstance(raw, str):
+            hub_data[CONF_PRESENCE_ENTITY] = [raw] if raw else []
+        elif raw is None:
+            hub_data[CONF_PRESENCE_ENTITY] = []
+        hass.config_entries.async_update_entry(
+            entry, data=hub_data, version=8
+        )
+        _LOGGER.info(
+            "Migrated entry %s from version 7 to 8 (presence_entity as list)",
             entry.entry_id,
         )
 
