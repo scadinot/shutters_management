@@ -32,7 +32,7 @@
           "presence_hub": {
             "name": "Présence (commune à toute l'intégration)",
             "data": {
-              "presence_entity": "Entité de présence (personne ou groupe)"
+              "presence_entity": "Entités de présence (personnes ou groupes)"
             }
           }
         }
@@ -72,7 +72,7 @@
           "presence_hub": {
             "name": "Présence (commune à toute l'intégration)",
             "data": {
-              "presence_entity": "Entité de présence (personne ou groupe)"
+              "presence_entity": "Entités de présence (personnes ou groupes)"
             }
           }
         }

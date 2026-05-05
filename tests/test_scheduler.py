@@ -108,7 +108,7 @@ async def _setup_with_open_at_noon(
     base_config[CONF_ONLY_WHEN_AWAY] = only_when_away
     hub_overrides: dict = {}
     if presence_entity is not None:
-        hub_overrides[CONF_PRESENCE_ENTITY] = presence_entity
+        hub_overrides[CONF_PRESENCE_ENTITY] = [presence_entity]
     entry = build_hub_with_instance(
         instance_data=base_config,
         hub_data=hub_overrides,
@@ -182,7 +182,7 @@ async def test_instance_ignores_only_when_away_even_when_set(
     with freeze_time(fake_now):
         entry = build_hub_with_instance(
             instance_data=base_config,
-            hub_data={CONF_PRESENCE_ENTITY: "person.someone"},
+            hub_data={CONF_PRESENCE_ENTITY: ["person.someone"]},
         )
         entry.add_to_hass(hass)
         assert await hass.config_entries.async_setup(entry.entry_id)

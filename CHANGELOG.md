@@ -6,6 +6,30 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le pr
 
 ## [Non publié]
 
+## [0.7.1] — 2026-05-05
+
+### Modifié
+
+- **Sélecteur de présence multi-entités** au hub : on peut désormais
+  désigner plusieurs personnes (ou groupes) directement, sans devoir
+  passer par un `group.*` intermédiaire. Le foyer est considéré
+  *absent* quand toutes les entités configurées rapportent un état
+  d'absence.
+
+### Corrigé
+
+- Le sélecteur d'entité de présence du hub ne ré-affichait pas la
+  valeur déjà enregistrée à la réouverture du formulaire (la donnée
+  était bien persistée, seule la pré-saisie manquait).
+- Repli sur `person.*` quand l'entité de présence configurée est
+  indisponible, plutôt que de considérer à tort que les occupants sont
+  présents.
+
+### Migration automatique (v7 → v8)
+
+- L'entité de présence stockée comme chaîne en v0.7.0 est convertie en
+  liste à un élément. Aucune action requise.
+
 ## [0.7.0] — 2026-05-04
 
 ### Modifié — modes de notification par sous-entrée
