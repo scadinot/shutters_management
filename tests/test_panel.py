@@ -193,6 +193,16 @@ async def test_dashboard_empty_hub_shows_hint(hass: HomeAssistant) -> None:
     assert "sub-entry" in contents or "sous-entrée" in contents
 
 
+def _flatten_cards(cards: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Walk Lovelace card containers (vertical/horizontal-stack, grid)."""
+    out: list[dict[str, Any]] = []
+    for card in cards:
+        out.append(card)
+        if card.get("type") in ("vertical-stack", "horizontal-stack", "grid"):
+            out.extend(_flatten_cards(card.get("cards", [])))
+    return out
+
+
 async def test_sun_protection_view_has_sun_map_and_gauges(
     hass: HomeAssistant,
 ) -> None:
@@ -204,23 +214,19 @@ async def test_sun_protection_view_has_sun_map_and_gauges(
 
     config = build_dashboard_config(hass, entry)
     sun_view = next(v for v in config["views"] if v["path"] == "salon_sud")
+    all_cards = _flatten_cards(sun_view["cards"])
 
     # Sun map is now a picture card with a data:image/svg+xml URI;
     # the inline-SVG-in-markdown approach was stripped by HA's
     # markdown sanitizer.
-    pictures = [c for c in sun_view["cards"] if c["type"] == "picture"]
+    pictures = [c for c in all_cards if c["type"] == "picture"]
     assert pictures, "expected a picture card for the sun map"
     assert pictures[0]["image"].startswith("data:image/svg+xml;utf8,")
 
-    # Four gauges (with lux + UV configured in _hub_with_subentries).
-    grids = [c for c in sun_view["cards"] if c["type"] == "grid"]
-    assert grids, "expected a grid containing the margin gauges"
-    gauges = [
-        card
-        for grid in grids
-        for card in grid.get("cards", [])
-        if card.get("type") == "gauge"
-    ]
+    # Four gauges (with lux + UV configured in _hub_with_subentries),
+    # nested inside a vertical-stack > horizontal-stack so the section
+    # title and the gauges row stay grouped in the same column.
+    gauges = [c for c in all_cards if c.get("type") == "gauge"]
     gauge_entities = {g["entity"] for g in gauges}
     assert gauge_entities == {
         "sensor.salon_sud_sun_protection_lux_margin",
@@ -233,7 +239,7 @@ async def test_sun_protection_view_has_sun_map_and_gauges(
     # present and include the lux sensor as a series — otherwise the
     # conditional history-graph logic could regress unnoticed.
     history_cards = [
-        c for c in sun_view["cards"] if c["type"] == "history-graph"
+        c for c in all_cards if c["type"] == "history-graph"
     ]
     assert len(history_cards) == 1
     assert (
@@ -268,14 +274,9 @@ async def test_sun_protection_view_omits_lux_uv_without_sensors(
 
     config = build_dashboard_config(hass, entry)
     sun_view = next(v for v in config["views"] if v["path"] == "salon_sud")
+    all_cards = _flatten_cards(sun_view["cards"])
 
-    gauges = [
-        card
-        for c in sun_view["cards"]
-        if c["type"] == "grid"
-        for card in c.get("cards", [])
-        if card.get("type") == "gauge"
-    ]
+    gauges = [c for c in all_cards if c.get("type") == "gauge"]
     gauge_entities = {g["entity"] for g in gauges}
     assert gauge_entities == {
         "sensor.salon_sud_sun_protection_elevation_margin",
@@ -284,8 +285,47 @@ async def test_sun_protection_view_omits_lux_uv_without_sensors(
     # Without a lux series (and no temp_indoor in this fixture), the
     # history-graph card is omitted entirely.
     assert not any(
-        c["type"] == "history-graph" for c in sun_view["cards"]
+        c["type"] == "history-graph" for c in all_cards
     )
+
+
+async def test_sun_protection_view_groups_margins_in_vertical_stack(
+    hass: HomeAssistant,
+) -> None:
+    """The margins title and gauges live in a single vertical-stack.
+
+    Otherwise Lovelace's auto-column layout drops the title and the
+    gauges into separate columns (regression seen in v0.8.2 — title
+    orphaned in the middle column, gauges alone in the right column).
+    """
+    entry = _hub_with_subentries(
+        subentries=[_sun_sub("Salon Sud", "salon_sud")]
+    )
+    entry.add_to_hass(hass)
+
+    config = build_dashboard_config(hass, entry)
+    sun_view = next(v for v in config["views"] if v["path"] == "salon_sud")
+
+    # Find a top-level vertical-stack whose first card is the margins
+    # markdown title and whose second card is a horizontal-stack of
+    # gauges. ``next`` raises StopIteration if no such block exists,
+    # which surfaces as a clean test failure.
+    margins_block = next(
+        c
+        for c in sun_view["cards"]
+        if c.get("type") == "vertical-stack"
+        and len(c.get("cards", [])) >= 2
+        and c["cards"][0].get("type") == "markdown"
+        and c["cards"][0].get("content", "").startswith("### ")
+        and (
+            "Marges" in c["cards"][0]["content"]
+            or "Margins" in c["cards"][0]["content"]
+        )
+    )
+    inner = margins_block["cards"]
+    assert len(inner) >= 2, "vertical-stack must have title + gauges row"
+    assert inner[1]["type"] == "horizontal-stack"
+    assert all(card["type"] == "gauge" for card in inner[1]["cards"])
 
 
 async def test_scheduler_view_header_links_back_to_cockpit(
