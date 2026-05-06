@@ -6,6 +6,40 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le pr
 
 ## [Non publié]
 
+## [0.8.2] — 2026-05-06
+
+### Corrigé — panneau « Shutters Management »
+
+- **Carte du soleil vide.** Le `markdown` card de Home Assistant
+  filtre les balises `<svg>` au moment du rendu (sanitization HTML),
+  ce qui laissait le bloc « Carte du soleil » sans contenu. Le SVG
+  est désormais généré sous forme d'image `data:image/svg+xml;utf8,…`
+  et affiché via une carte `picture`. Compromis assumé : le marqueur
+  dynamique du soleil disparaît ; en remplacement, une carte
+  « Position du soleil » expose les valeurs numériques azimuth /
+  élévation et le binaire « Soleil face à la façade ».
+- **Jauge « Marge lux » en erreur** (« L'entité n'est pas
+  numérique ») quand aucun capteur lux n'est configuré au hub. Les
+  jauges **Marge lux**, **Marge UV** et la série **lux** du
+  graphique d'historique ne sont désormais générées que lorsque le
+  capteur correspondant est branché. Les marges « Élévation » et
+  « Écart d'azimuth » restent toujours présentes (calculées depuis
+  `sun.sun`).
+
+### Modifié — ergonomie
+
+- **Bouton « Retour au cockpit » fusionné avec le titre.** Sur
+  chaque sous-vue, l'ancienne grosse carte boutonnée est remplacée
+  par un en-tête compact (carte `markdown` unique) contenant un lien
+  navigation `[← Retour au cockpit](/shutters-management/cockpit)`
+  au-dessus du titre `## ...`. HA intercepte les liens relatifs en
+  routage in-app (pas de rechargement).
+- **Boutons « Tester l'ouverture » / « Tester la fermeture »
+  compacts**, intégrés en lignes d'une carte `entities` au lieu de
+  deux gros `button` cards horizontaux. Même traitement pour les
+  boutons globaux **Tout en pause** / **Tout reprendre** du cockpit
+  pour cohérence visuelle.
+
 ## [0.8.1] — 2026-05-05
 
 ### Corrigé
