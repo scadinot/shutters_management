@@ -543,6 +543,7 @@ def _build_sun_protection_view(
             "min_elevation": min_elevation,
             "latitude": hass.config.latitude,
             "longitude": hass.config.longitude,
+            "covers": list(covers),
         }
     )
 

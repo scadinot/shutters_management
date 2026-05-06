@@ -175,6 +175,10 @@ async def test_sun_protection_view_has_sun_map_and_gauges(
     assert card["subentry_prefix"] == "salon_sud"
     assert card["orientation"] == 180
     assert card["arc"] == DEFAULT_ARC
+    # Cover entity ids must be propagated to the card so the JS can
+    # aggregate their real state (otherwise the "Volet" overlay falls
+    # back to the sun-only heuristic and shows "Ouvert" at night).
+    assert card["covers"] == ["cover.salon"]
     assert card["min_elevation"] == 15
 
     # Four gauges (with lux + UV configured in _hub_with_subentries),
