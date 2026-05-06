@@ -22,9 +22,7 @@ fall back to a direct re-register.
 from __future__ import annotations
 
 import logging
-import math
 from typing import Any
-from urllib.parse import quote
 
 from homeassistant.components import frontend
 from homeassistant.components.lovelace.const import MODE_YAML
@@ -233,79 +231,6 @@ def _service_button_row(
             "service": service,
         },
     }
-
-
-# ---------------------------------------------------------------------------
-# Sun map SVG helpers
-# ---------------------------------------------------------------------------
-
-
-def _arc_path(
-    orientation_deg: float,
-    arc_deg: float,
-    cx: int = 100,
-    cy: int = 100,
-    r: int = 85,
-) -> str:
-    """Return an SVG path string drawing the configured arc wedge.
-
-    ``orientation_deg`` is a compass bearing (0=N, 90=E, ...). The
-    wedge spans ``orientation_deg ± arc_deg/2`` from the centre to the
-    horizon circle, suitable for an ``<svg viewBox='0 0 200 200'>``
-    canvas with a horizon circle of radius ``r`` centred at
-    ``(cx, cy)``.
-    """
-    half = arc_deg / 2
-    sx = cx + r * math.sin(math.radians(orientation_deg - half))
-    sy = cy - r * math.cos(math.radians(orientation_deg - half))
-    ex = cx + r * math.sin(math.radians(orientation_deg + half))
-    ey = cy - r * math.cos(math.radians(orientation_deg + half))
-    large = 1 if arc_deg > 180 else 0
-    return (
-        f"M {cx} {cy} "
-        f"L {sx:.2f} {sy:.2f} "
-        f"A {r} {r} 0 {large} 1 {ex:.2f} {ey:.2f} Z"
-    )
-
-
-def _arc_data_uri(orientation_deg: float, arc_deg: float) -> str:
-    """Return a ``data:image/svg+xml`` URI rendering the configured arc.
-
-    The previous markdown-card approach was stripped by Home Assistant's
-    HTML sanitizer (``<svg>`` is not in the allowlist), leaving the card
-    body blank. A data URI fed to a ``picture`` card bypasses the
-    sanitizer because the SVG is treated as an opaque image asset by
-    the browser.
-
-    The trade-off is that the live sun position (computed via Jinja in
-    the markdown variant) cannot follow ``sun.sun`` here. The drill-down
-    view compensates with a separate ``entities`` card showing the
-    numeric azimuth, elevation and ``sun_facing`` indicator.
-    """
-    arc_path = _arc_path(orientation_deg, arc_deg)
-    svg = (
-        '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">'
-        '<circle cx="100" cy="100" r="85" fill="#101820" '
-        'stroke="#4a4a4a" stroke-width="1"/>'
-        '<circle cx="100" cy="100" r="42.5" fill="none" '
-        'stroke="#262626" stroke-width="0.5" stroke-dasharray="2 3"/>'
-        f'<path d="{arc_path}" fill="rgba(255,196,0,0.18)" '
-        'stroke="rgba(255,196,0,0.7)" stroke-width="1"/>'
-        '<line x1="100" y1="15" x2="100" y2="185" '
-        'stroke="#333" stroke-width="0.5"/>'
-        '<line x1="15" y1="100" x2="185" y2="100" '
-        'stroke="#333" stroke-width="0.5"/>'
-        '<text x="100" y="12" fill="#aaa" text-anchor="middle" '
-        'font-size="10">N</text>'
-        '<text x="192" y="104" fill="#aaa" text-anchor="middle" '
-        'font-size="10">E</text>'
-        '<text x="100" y="198" fill="#aaa" text-anchor="middle" '
-        'font-size="10">S</text>'
-        '<text x="8" y="104" fill="#aaa" text-anchor="middle" '
-        'font-size="10">W</text>'
-        "</svg>"
-    )
-    return "data:image/svg+xml;utf8," + quote(svg, safe="")
 
 
 # ---------------------------------------------------------------------------
@@ -553,6 +478,7 @@ def _gauge_card(
 
 
 def _build_sun_protection_view(
+    hass: HomeAssistant,
     hub_entry: ConfigEntry,
     subentry: ConfigSubentry,
     labels: dict[str, str],
@@ -604,44 +530,19 @@ def _build_sun_protection_view(
         }
     )
 
-    # Sun map (static SVG data URI — HA's markdown card strips inline
-    # <svg>) wrapped with the live numeric readout in a single
-    # vertical-stack so Lovelace's auto-column layout cannot split
-    # them across separate columns.
+    # 3D sun + window scene served by the custom card registered via
+    # add_extra_js_url in __init__.py. The card receives `hass` from
+    # the Lovelace runtime and reads `sun.sun.attributes.azimuth /
+    # elevation` directly — no token, no REST round-trip.
     cards.append(
         {
-            "type": "vertical-stack",
-            "cards": [
-                {
-                    "type": "picture",
-                    "image": _arc_data_uri(orientation, arc),
-                    "tap_action": {"action": "none"},
-                    "hold_action": {"action": "none"},
-                },
-                {
-                    "type": "entities",
-                    "title": labels["sun_position"],
-                    "show_header_toggle": False,
-                    "entities": [
-                        {
-                            "entity": (
-                                f"sensor.{prefix}_sun_protection_sun_azimuth"
-                            ),
-                            "name": labels["azimuth"],
-                        },
-                        {
-                            "entity": (
-                                f"sensor.{prefix}_sun_protection_sun_elevation"
-                            ),
-                            "name": labels["elevation"],
-                        },
-                        {
-                            "entity": f"binary_sensor.{prefix}_sun_facing",
-                            "name": labels["sun_facing"],
-                        },
-                    ],
-                },
-            ],
+            "type": "custom:shutters-sun-3d-card",
+            "subentry_prefix": prefix,
+            "orientation": orientation,
+            "arc": arc,
+            "min_elevation": min_elevation,
+            "latitude": hass.config.latitude,
+            "longitude": hass.config.longitude,
         }
     )
 
@@ -814,7 +715,7 @@ def build_dashboard_config(
     for sub in sims:
         views.append(_build_scheduler_view(sub, labels))
     for sub in suns:
-        views.append(_build_sun_protection_view(entry, sub, labels))
+        views.append(_build_sun_protection_view(hass, entry, sub, labels))
 
     return {"title": PANEL_TITLE, "views": views}
 

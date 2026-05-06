@@ -6,6 +6,40 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le pr
 
 ## [Non publié]
 
+## [0.9.0] — 2026-05-06
+
+### Ajouté — visualisation 3D de la position du soleil
+
+- **Carte Lovelace `custom:shutters-sun-3d-card`** servie par
+  l'intégration : scène Three.js avec maison, fenêtre orientée
+  selon la sous-entrée, dôme céleste (méridiens, cercles
+  d'élévation, repères cardinaux), cône d'incidence reflétant l'arc
+  configuré, soleil positionné en azimuth/élévation, rayon vers la
+  fenêtre, intensité lumineuse adaptative, trajectoire du jour.
+- **Aucun token HA requis** : la carte reçoit l'objet `hass`
+  authentifié de la part du runtime Lovelace et lit
+  `sun.sun.attributes.azimuth/elevation` directement (pas de
+  round-trip REST, pas de bearer token longue durée à gérer).
+- **Three.js 0.160 + OrbitControls vendor** dans le repo
+  (`custom_components/shutters_management/frontend/`) — pas de
+  dépendance CDN, pas d'aléa réseau, pas de risque CSP.
+- **Enregistrement automatique** du module via
+  `frontend.add_extra_js_url` au setup du hub : aucune intervention
+  utilisateur dans Lovelace > Resources.
+- **Latitude propagée** depuis `hass.config.latitude` pour tracer la
+  trajectoire diurne du soleil au-dessus de l'horizon.
+- **OrbitControls** : drag = rotation de la caméra, molette = zoom,
+  clic-droit = pan ; les paramètres existent par défaut.
+
+### Modifié — drill-down sun-protection
+
+- La carte SVG statique (data URI) et l'`entities` Position du
+  soleil sont **remplacées** par la carte 3D.
+- Les jauges de marges et le `history-graph` lux + T° intérieure
+  restent inchangés (information opérationnelle distincte).
+- Les helpers `_arc_path` / `_arc_data_uri` sont retirés de
+  `panel.py` (devenus inutiles).
+
 ## [0.8.3] — 2026-05-06
 
 ### Modifié — section « Marges »

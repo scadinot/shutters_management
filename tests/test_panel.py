@@ -1,7 +1,6 @@
 """Tests for the Lovelace sidebar panel built by ``panel.py``."""
 from __future__ import annotations
 
-import math
 from types import MappingProxyType
 from typing import Any
 
@@ -33,61 +32,9 @@ from custom_components.shutters_management.panel import (
     PANEL_ICON,
     PANEL_TITLE,
     PANEL_URL_PATH,
-    _arc_data_uri,
-    _arc_path,
     _view_path,
     build_dashboard_config,
 )
-
-
-# ---------------------------------------------------------------------------
-# Pure helpers
-# ---------------------------------------------------------------------------
-
-
-def test_arc_path_south_60_deg() -> None:
-    """South façade with a 60° arc: the wedge is centred on (cx, cy+r)."""
-    path = _arc_path(180, 60)
-    # Centre move + line to start point + arc to end + close.
-    assert path.startswith("M 100 100 L ")
-    assert " A 85 85 0 0 1 " in path
-    assert path.endswith(" Z")
-    # The two endpoint coordinates straddle the south meridian: at
-    # ±30° around south (180°) the y-component is cy − r·cos(±150°) =
-    # 100 + 85·(√3/2) ≈ 173.6, and the x-component is ±85·sin(±150°)
-    # = ∓42.5, i.e. (57.5, 173.6) and (142.5, 173.6).
-    pieces = path.split()
-    sx, sy = float(pieces[4]), float(pieces[5])
-    ex, ey = float(pieces[-3]), float(pieces[-2])
-    # Start at compass 150°, end at 210°: x = 100 + 85·sin(bearing),
-    # y = 100 − 85·cos(bearing). Both endpoints share the same y at
-    # the same |bearing − 180°|; their x's are mirrored across the
-    # south meridian.
-    assert math.isclose(sx, 100 + 85 * math.sin(math.radians(150)), abs_tol=0.05)
-    assert math.isclose(sy, 100 - 85 * math.cos(math.radians(150)), abs_tol=0.05)
-    assert math.isclose(ex, 100 + 85 * math.sin(math.radians(210)), abs_tol=0.05)
-    assert math.isclose(ey, 100 - 85 * math.cos(math.radians(210)), abs_tol=0.05)
-
-
-def test_arc_path_large_arc_flag() -> None:
-    """An arc wider than 180° must set the large-arc flag."""
-    path = _arc_path(0, 270)
-    assert " A 85 85 0 1 1 " in path
-
-
-def test_arc_data_uri_starts_with_data_image_svg() -> None:
-    """``_arc_data_uri`` returns a URL-encoded inline SVG image."""
-    uri = _arc_data_uri(180, 60)
-    assert uri.startswith("data:image/svg+xml;utf8,")
-    # The SVG body itself is URL-encoded; decode and verify the arc path
-    # is present.
-    from urllib.parse import unquote
-
-    decoded = unquote(uri.split(",", 1)[1])
-    assert decoded.startswith("<svg")
-    assert decoded.endswith("</svg>")
-    assert "M 100 100 L " in decoded
-    assert " A 85 85 0 0 1 " in decoded
 
 
 # ---------------------------------------------------------------------------
@@ -206,7 +153,7 @@ def _flatten_cards(cards: list[dict[str, Any]]) -> list[dict[str, Any]]:
 async def test_sun_protection_view_has_sun_map_and_gauges(
     hass: HomeAssistant,
 ) -> None:
-    """The drill-down view embeds the arc as a picture card + gauges."""
+    """The drill-down view embeds the 3D custom card + gauges."""
     entry = _hub_with_subentries(
         subentries=[_sun_sub("Salon Sud", "salon_sud")]
     )
@@ -216,12 +163,19 @@ async def test_sun_protection_view_has_sun_map_and_gauges(
     sun_view = next(v for v in config["views"] if v["path"] == "salon_sud")
     all_cards = _flatten_cards(sun_view["cards"])
 
-    # Sun map is now a picture card with a data:image/svg+xml URI;
-    # the inline-SVG-in-markdown approach was stripped by HA's
-    # markdown sanitizer.
-    pictures = [c for c in all_cards if c["type"] == "picture"]
-    assert pictures, "expected a picture card for the sun map"
-    assert pictures[0]["image"].startswith("data:image/svg+xml;utf8,")
+    # The sun map is now the custom Lovelace card registered via
+    # add_extra_js_url. The card receives `hass` from the runtime and
+    # reads sun.sun directly — no token, no REST.
+    custom_cards = [
+        c for c in all_cards
+        if c.get("type") == "custom:shutters-sun-3d-card"
+    ]
+    assert len(custom_cards) == 1
+    card = custom_cards[0]
+    assert card["subentry_prefix"] == "salon_sud"
+    assert card["orientation"] == 180
+    assert card["arc"] == DEFAULT_ARC
+    assert card["min_elevation"] == 15
 
     # Four gauges (with lux + UV configured in _hub_with_subentries),
     # nested inside a vertical-stack > horizontal-stack so the section
