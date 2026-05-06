@@ -6,6 +6,23 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le pr
 
 ## [Non publié]
 
+## [0.8.3] — 2026-05-06
+
+### Modifié — section « Marges »
+
+- **Titre « Marges » et jauges regroupés** dans une même
+  `vertical-stack`. Avant ce correctif, l'auto-layout multi-colonnes
+  de Lovelace pouvait orpheliner le titre dans une colonne et
+  pousser les jauges dans une autre.
+- **Jauges sur une seule ligne** via `horizontal-stack` (au lieu de
+  l'ancienne grille 2×2 carrée). Le rendu reste lisible quel que
+  soit le nombre de jauges affichées (2, 3 ou 4 selon les capteurs
+  configurés au hub) et évite la dernière ligne dépareillée quand
+  une jauge est omise.
+- **Carte du soleil + Position du soleil** également groupées dans
+  une `vertical-stack` pour rester côte à côte plutôt que d'être
+  dispatchées dans deux colonnes différentes.
+
 ## [0.8.2] — 2026-05-06
 
 ### Corrigé — panneau « Shutters Management »

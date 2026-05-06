@@ -604,46 +604,53 @@ def _build_sun_protection_view(
         }
     )
 
-    # Sun map: static SVG via data URI (markdown card sanitization
-    # strips inline <svg>). The live sun position is shown numerically
-    # in the entities card right below.
+    # Sun map (static SVG data URI — HA's markdown card strips inline
+    # <svg>) wrapped with the live numeric readout in a single
+    # vertical-stack so Lovelace's auto-column layout cannot split
+    # them across separate columns.
     cards.append(
         {
-            "type": "picture",
-            "image": _arc_data_uri(orientation, arc),
-            "tap_action": {"action": "none"},
-            "hold_action": {"action": "none"},
-        }
-    )
-    cards.append(
-        {
-            "type": "entities",
-            "title": labels["sun_position"],
-            "show_header_toggle": False,
-            "entities": [
+            "type": "vertical-stack",
+            "cards": [
                 {
-                    "entity": f"sensor.{prefix}_sun_protection_sun_azimuth",
-                    "name": labels["azimuth"],
+                    "type": "picture",
+                    "image": _arc_data_uri(orientation, arc),
+                    "tap_action": {"action": "none"},
+                    "hold_action": {"action": "none"},
                 },
                 {
-                    "entity": f"sensor.{prefix}_sun_protection_sun_elevation",
-                    "name": labels["elevation"],
-                },
-                {
-                    "entity": f"binary_sensor.{prefix}_sun_facing",
-                    "name": labels["sun_facing"],
+                    "type": "entities",
+                    "title": labels["sun_position"],
+                    "show_header_toggle": False,
+                    "entities": [
+                        {
+                            "entity": (
+                                f"sensor.{prefix}_sun_protection_sun_azimuth"
+                            ),
+                            "name": labels["azimuth"],
+                        },
+                        {
+                            "entity": (
+                                f"sensor.{prefix}_sun_protection_sun_elevation"
+                            ),
+                            "name": labels["elevation"],
+                        },
+                        {
+                            "entity": f"binary_sensor.{prefix}_sun_facing",
+                            "name": labels["sun_facing"],
+                        },
+                    ],
                 },
             ],
         }
     )
 
     # Margins gauges — only those whose underlying sensor is numeric.
-    cards.append(
-        {
-            "type": "markdown",
-            "content": f"### {labels['margins']}",
-        }
-    )
+    # Wrap the section title and the gauges row in a vertical-stack so
+    # the title cannot end up orphaned in a different column from the
+    # gauges. ``horizontal-stack`` lays the gauges out in a single
+    # row regardless of count (2, 3 or 4 depending on configured
+    # sensors), which avoids the lop-sided 2x2 layout we saw in v0.8.2.
     gauges: list[dict[str, Any]] = []
     if has_lux:
         gauges.append(
@@ -689,10 +696,17 @@ def _build_sun_protection_view(
     )
     cards.append(
         {
-            "type": "grid",
-            "columns": 2,
-            "square": True,
-            "cards": gauges,
+            "type": "vertical-stack",
+            "cards": [
+                {
+                    "type": "markdown",
+                    "content": f"### {labels['margins']}",
+                },
+                {
+                    "type": "horizontal-stack",
+                    "cards": gauges,
+                },
+            ],
         }
     )
 
