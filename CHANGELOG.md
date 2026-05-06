@@ -6,6 +6,32 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le pr
 
 ## [Non publié]
 
+## [0.9.1] — 2026-05-06
+
+### Corrigé — carte 3D
+
+- **L'overlay « Volet » de la carte 3D affichait l'état recommandé
+  par le soleil au lieu de l'état réel des volets contrôlés.**
+  Cas typique : la nuit, le label restait « Ouvert » alors que les
+  volets étaient fermés, parce que la classification basée sur la
+  position du soleil renvoyait un `coverage = 0`.
+- La carte reçoit désormais la liste des `cover.*` du groupe
+  Protection solaire et **agrège leur état** depuis
+  `hass.states` :
+  - lecture de `attributes.current_position` (convention HA :
+    0 = fermé, 100 = ouvert) avec repli sur `state` (`open` /
+    `closed` / `opening` / `closing`) ;
+  - moyenne arithmétique sur les volets dont l'état est connu
+    (les `unavailable` / `unknown` sont ignorés) ;
+  - label formaté : « Ouvert » (≥ 95%), « Fermé » (≤ 5%),
+    « N% ouvert » sinon, avec couleur cohérente (vert / orange /
+    rouge) ;
+  - le mesh 3D du volet matérialise désormais la vraie position
+    (1 − moyenne / 100), pas la recommandation soleil.
+- La classification soleil reste utilisée pour la coloration du
+  cône d'incidence et du rayon soleil → fenêtre (information
+  distincte de l'état réel des volets).
+
 ## [0.9.0] — 2026-05-06
 
 ### Ajouté — visualisation 3D de la position du soleil

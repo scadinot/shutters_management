@@ -110,6 +110,7 @@ class ShuttersSun3dCard extends HTMLElement {
       longitude: 0,
       subentry_prefix: null,
       labels: null,
+      covers: [],
       ...config,
     };
     if (this._built) {
@@ -626,6 +627,12 @@ class ShuttersSun3dCard extends HTMLElement {
 
   _update(az, el) {
     const cls = this._classify(az, el);
+    const coverState = this._aggregateCoverState();
+    this._updateSun(az, el, cls);
+    this._updateShutter(coverState, cls);
+  }
+
+  _updateSun(az, el, cls) {
     const delta = angleDelta(az, this._config.orientation);
 
     const sunPos = azElToVec3(az, el, DOME_R);
@@ -652,18 +659,6 @@ class ShuttersSun3dCard extends HTMLElement {
     this._rayMat.opacity = cls.state === "axis" ? 0.8 : 0.35;
     this._rayMat.color.setHex(cls.state === "axis" ? 0xffaa44 : 0xffd966);
 
-    if (cls.coverage > 0) {
-      this._shutterMesh.visible = true;
-      this._shutterMesh.scale.y = cls.coverage;
-      this._shutterMesh.position.copy(this._windowMesh.position);
-      this._shutterMesh.position.add(
-        this._facadeNormal.clone().multiplyScalar(0.005)
-      );
-      this._shutterMesh.position.y = 1.4 + 0.6 - (1.2 * cls.coverage) / 2;
-    } else {
-      this._shutterMesh.visible = false;
-    }
-
     this._coneMesh.material.color.setHex(
       cls.state === "axis"
         ? 0xff6644
@@ -675,14 +670,113 @@ class ShuttersSun3dCard extends HTMLElement {
       cls.state === "out" || cls.state === "night" ? 0.06 : 0.12;
 
     const r = this._uiRefs;
-    r.statusValue.textContent = cls.label;
-    r.statusValue.className = "value " + cls.cssClass;
-    r.statusSub.textContent = cls.sub;
     r.azValue.textContent = Math.round(az) + "°";
     r.elValue.textContent =
       this._t("elevation_prefix") + " " + Math.round(el) + "°";
     r.facadeValue.textContent = this._config.orientation + "°";
     r.deltaValue.textContent = "Δ " + Math.round(delta) + "°";
+  }
+
+  _updateShutter(coverState, cls) {
+    // Real cover state wins over the sun-based heuristic. The
+    // classification ``cls`` is only kept as a fallback when no
+    // covers are configured (rare) so the visual still says
+    // something meaningful.
+    let coverage;
+    let label;
+    let sub;
+    let cssClass;
+
+    if (coverState !== null) {
+      coverage = coverState.coverage;
+      const avg = coverState.averagePosition;
+      if (avg >= 95) {
+        label = this._t("open");
+        cssClass = "status-open";
+      } else if (avg <= 5) {
+        label = this._t("closed");
+        cssClass = "status-close";
+      } else {
+        label = this._tFmt("partial_open", { pct: Math.round(avg) });
+        cssClass = avg < 50 ? "status-warn" : "status-open";
+      }
+      sub = this._tFmt(
+        coverState.count > 1 ? "cover_count_plural" : "cover_count_singular",
+        { n: coverState.count, known: coverState.known }
+      );
+    } else {
+      coverage = cls.coverage;
+      label = cls.label;
+      sub = cls.sub;
+      cssClass = cls.cssClass;
+    }
+
+    if (coverage > 0.005) {
+      this._shutterMesh.visible = true;
+      this._shutterMesh.scale.y = coverage;
+      this._shutterMesh.position.copy(this._windowMesh.position);
+      this._shutterMesh.position.add(
+        this._facadeNormal.clone().multiplyScalar(0.005)
+      );
+      this._shutterMesh.position.y = 1.4 + 0.6 - (1.2 * coverage) / 2;
+    } else {
+      this._shutterMesh.visible = false;
+    }
+
+    const r = this._uiRefs;
+    r.statusValue.textContent = label;
+    r.statusValue.className = "value " + cssClass;
+    r.statusSub.textContent = sub;
+  }
+
+  _aggregateCoverState() {
+    // Walk ``this._config.covers``, read each cover's HA state and
+    // produce an aggregate `{averagePosition, coverage, count, known}`.
+    // Returns ``null`` when no cover state is usable (no config, or
+    // all covers unknown / unavailable) so the caller can fall back
+    // to the sun-based heuristic.
+    const covers = this._config.covers || [];
+    if (!covers.length || !this._hass) return null;
+
+    const positions = [];
+    for (const id of covers) {
+      const s = this._hass.states[id];
+      if (!s) continue;
+      // HA can retain ``current_position`` on a cover even after the
+      // entity drops to ``unavailable`` / ``unknown`` — which would
+      // otherwise let stale numeric data sneak into the aggregate.
+      // Skip those states up front.
+      if (s.state === "unavailable" || s.state === "unknown") continue;
+      const attrPos = s.attributes && s.attributes.current_position;
+      let pos;
+      if (typeof attrPos === "number" && Number.isFinite(attrPos)) {
+        pos = attrPos;
+      } else if (s.state === "open" || s.state === "opening") {
+        pos = 100;
+      } else if (s.state === "closed" || s.state === "closing") {
+        pos = 0;
+      } else {
+        continue;
+      }
+      positions.push(pos);
+    }
+    if (!positions.length) return null;
+
+    const avg = positions.reduce((a, b) => a + b, 0) / positions.length;
+    return {
+      averagePosition: avg,
+      coverage: Math.max(0, Math.min(1, 1 - avg / 100)),
+      count: covers.length,
+      known: positions.length,
+    };
+  }
+
+  _tFmt(key, vars) {
+    let s = this._t(key);
+    for (const [k, v] of Object.entries(vars || {})) {
+      s = s.replace("{" + k + "}", String(v));
+    }
+    return s;
   }
 
   _classify(az, el) {
@@ -807,6 +901,10 @@ const DEFAULT_LABELS = {
   facade: "Façade",
   west: "O",
   open: "Ouvert",
+  closed: "Fermé",
+  partial_open: "{pct}% ouvert",
+  cover_count_singular: "{known}/{n} volet",
+  cover_count_plural: "{known}/{n} volets",
   close_high: "Fermer 70%",
   close_low: "Fermer 30%",
   sun_set: "soleil couché",
