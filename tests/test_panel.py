@@ -314,16 +314,16 @@ async def test_sun_protection_view_groups_margins_in_vertical_stack(
         c
         for c in sun_view["cards"]
         if c.get("type") == "vertical-stack"
-        and c["cards"]
+        and len(c.get("cards", [])) >= 2
         and c["cards"][0].get("type") == "markdown"
         and c["cards"][0].get("content", "").startswith("### ")
-        and any(
+        and (
             "Marges" in c["cards"][0]["content"]
             or "Margins" in c["cards"][0]["content"]
-            for _ in [None]
         )
     )
     inner = margins_block["cards"]
+    assert len(inner) >= 2, "vertical-stack must have title + gauges row"
     assert inner[1]["type"] == "horizontal-stack"
     assert all(card["type"] == "gauge" for card in inner[1]["cards"])
 

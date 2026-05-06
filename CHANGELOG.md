@@ -19,9 +19,10 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le pr
   soit le nombre de jauges affichées (2, 3 ou 4 selon les capteurs
   configurés au hub) et évite la dernière ligne dépareillée quand
   une jauge est omise.
-- **Carte du soleil + Position du soleil** également groupées dans
-  une `vertical-stack` pour rester côte à côte plutôt que d'être
-  dispatchées dans deux colonnes différentes.
+- **Carte du soleil + Position du soleil** également empilées dans
+  une `vertical-stack` pour rester regroupées dans la même colonne
+  (la position numérique apparaît directement sous l'arc) plutôt
+  que d'être dispatchées dans deux colonnes différentes.
 
 ## [0.8.2] — 2026-05-06
 
