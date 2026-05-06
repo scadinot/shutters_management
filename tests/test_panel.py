@@ -19,6 +19,7 @@ from custom_components.shutters_management.const import (
     CONF_TARGET_POSITION,
     CONF_TEMP_OUTDOOR_ENTITY,
     CONF_TYPE,
+    CONF_UV_ENTITY,
     DEFAULT_ARC,
     DOMAIN,
     HUB_TITLE,
@@ -32,8 +33,8 @@ from custom_components.shutters_management.panel import (
     PANEL_ICON,
     PANEL_TITLE,
     PANEL_URL_PATH,
+    _arc_data_uri,
     _arc_path,
-    _sun_map_markdown,
     _view_path,
     build_dashboard_config,
 )
@@ -74,27 +75,19 @@ def test_arc_path_large_arc_flag() -> None:
     assert " A 85 85 0 1 1 " in path
 
 
-def test_sun_map_markdown_references_subentry_sensors() -> None:
-    """The SVG template must reference the per-subentry azimuth/elevation sensors."""
-    sub = ConfigSubentryData(
-        subentry_type=SUBENTRY_TYPE_SUN_PROTECTION,
-        title="Salon Sud",
-        unique_id="salon_sud",
-        data={CONF_ORIENTATION: 180, CONF_ARC: 60},
-    )
-    # Build a faux ConfigSubentry-like wrapper since ``_sun_map_markdown``
-    # only reads ``unique_id``, ``title`` and ``data`` attributes.
-    class _Sub:
-        unique_id = sub["unique_id"]
-        title = sub["title"]
-        data = sub["data"]
+def test_arc_data_uri_starts_with_data_image_svg() -> None:
+    """``_arc_data_uri`` returns a URL-encoded inline SVG image."""
+    uri = _arc_data_uri(180, 60)
+    assert uri.startswith("data:image/svg+xml;utf8,")
+    # The SVG body itself is URL-encoded; decode and verify the arc path
+    # is present.
+    from urllib.parse import unquote
 
-    md = _sun_map_markdown(_Sub())
-    assert "sensor.salon_sud_sun_protection_sun_azimuth" in md
-    assert "sensor.salon_sud_sun_protection_sun_elevation" in md
-    assert "<svg " in md and "</svg>" in md
-    assert "sin(radians(az_f))" in md
-    assert "cos(radians(az_f))" in md
+    decoded = unquote(uri.split(",", 1)[1])
+    assert decoded.startswith("<svg")
+    assert decoded.endswith("</svg>")
+    assert "M 100 100 L " in decoded
+    assert " A 85 85 0 0 1 " in decoded
 
 
 # ---------------------------------------------------------------------------
@@ -112,6 +105,7 @@ def _hub_with_subentries(
             CONF_TYPE: TYPE_HUB,
             "notify_services": [],
             CONF_LUX_ENTITY: "sensor.lux",
+            CONF_UV_ENTITY: "sensor.uv",
             CONF_TEMP_OUTDOOR_ENTITY: "sensor.t_ext",
         },
         options={},
@@ -202,7 +196,7 @@ async def test_dashboard_empty_hub_shows_hint(hass: HomeAssistant) -> None:
 async def test_sun_protection_view_has_sun_map_and_gauges(
     hass: HomeAssistant,
 ) -> None:
-    """A sun-protection drill-down view embeds the SVG arc and the gauges."""
+    """The drill-down view embeds the arc as a picture card + gauges."""
     entry = _hub_with_subentries(
         subentries=[_sun_sub("Salon Sud", "salon_sud")]
     )
@@ -211,16 +205,14 @@ async def test_sun_protection_view_has_sun_map_and_gauges(
     config = build_dashboard_config(hass, entry)
     sun_view = next(v for v in config["views"] if v["path"] == "salon_sud")
 
-    card_types = [c["type"] for c in sun_view["cards"]]
-    assert "history-graph" in card_types
-    # Sun map is a markdown card containing inline SVG.
-    md_with_svg = [
-        c
-        for c in sun_view["cards"]
-        if c["type"] == "markdown" and "<svg " in c.get("content", "")
-    ]
-    assert md_with_svg, "expected at least one markdown card with inline SVG"
-    # Four gauges under a grid: lux / elevation / uv / azimuth_diff margins.
+    # Sun map is now a picture card with a data:image/svg+xml URI;
+    # the inline-SVG-in-markdown approach was stripped by HA's
+    # markdown sanitizer.
+    pictures = [c for c in sun_view["cards"] if c["type"] == "picture"]
+    assert pictures, "expected a picture card for the sun map"
+    assert pictures[0]["image"].startswith("data:image/svg+xml;utf8,")
+
+    # Four gauges (with lux + UV configured in _hub_with_subentries).
     grids = [c for c in sun_view["cards"] if c["type"] == "grid"]
     assert grids, "expected a grid containing the margin gauges"
     gauges = [
@@ -237,20 +229,78 @@ async def test_sun_protection_view_has_sun_map_and_gauges(
         "sensor.salon_sud_sun_protection_azimuth_diff",
     }
 
+    # With lux configured at the hub, the history-graph card must be
+    # present and include the lux sensor as a series — otherwise the
+    # conditional history-graph logic could regress unnoticed.
+    history_cards = [
+        c for c in sun_view["cards"] if c["type"] == "history-graph"
+    ]
+    assert len(history_cards) == 1
+    assert (
+        "sensor.salon_sud_sun_protection_lux"
+        in history_cards[0]["entities"]
+    )
 
-async def test_scheduler_view_links_back_to_cockpit(
+
+async def test_sun_protection_view_omits_lux_uv_without_sensors(
     hass: HomeAssistant,
 ) -> None:
-    """Each drill-down view starts with a back-button to /cockpit."""
+    """No lux + no UV at hub → corresponding gauges and history skipped."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title=HUB_TITLE,
+        data={
+            CONF_TYPE: TYPE_HUB,
+            "notify_services": [],
+            # Both lux and UV omitted: only sun-position-derived gauges
+            # should remain.
+            CONF_LUX_ENTITY: "",
+            CONF_UV_ENTITY: "",
+            CONF_TEMP_OUTDOOR_ENTITY: "sensor.t_ext",
+        },
+        options={},
+        entry_id="hub_no_lux",
+        unique_id=HUB_UNIQUE_ID,
+        version=8,
+        subentries_data=[_sun_sub("Salon Sud", "salon_sud")],
+    )
+    entry.add_to_hass(hass)
+
+    config = build_dashboard_config(hass, entry)
+    sun_view = next(v for v in config["views"] if v["path"] == "salon_sud")
+
+    gauges = [
+        card
+        for c in sun_view["cards"]
+        if c["type"] == "grid"
+        for card in c.get("cards", [])
+        if card.get("type") == "gauge"
+    ]
+    gauge_entities = {g["entity"] for g in gauges}
+    assert gauge_entities == {
+        "sensor.salon_sud_sun_protection_elevation_margin",
+        "sensor.salon_sud_sun_protection_azimuth_diff",
+    }
+    # Without a lux series (and no temp_indoor in this fixture), the
+    # history-graph card is omitted entirely.
+    assert not any(
+        c["type"] == "history-graph" for c in sun_view["cards"]
+    )
+
+
+async def test_scheduler_view_header_links_back_to_cockpit(
+    hass: HomeAssistant,
+) -> None:
+    """The first card is a compact markdown header with a back link."""
     entry = _hub_with_subentries(subentries=[_schedule_sub("Bureau", "bureau")])
     entry.add_to_hass(hass)
 
     config = build_dashboard_config(hass, entry)
     bureau = next(v for v in config["views"] if v["path"] == "bureau")
-    assert bureau["cards"][0]["type"] == "button"
-    nav = bureau["cards"][0]["tap_action"]
-    assert nav["action"] == "navigate"
-    assert nav["navigation_path"] == f"/{PANEL_URL_PATH}/cockpit"
+    header = bureau["cards"][0]
+    assert header["type"] == "markdown"
+    assert f"(/{PANEL_URL_PATH}/cockpit)" in header["content"]
+    assert "Bureau" in header["content"]
 
 
 # ---------------------------------------------------------------------------

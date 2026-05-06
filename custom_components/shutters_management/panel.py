@@ -24,6 +24,7 @@ from __future__ import annotations
 import logging
 import math
 from typing import Any
+from urllib.parse import quote
 
 from homeassistant.components import frontend
 from homeassistant.components.lovelace.const import MODE_YAML
@@ -36,12 +37,14 @@ from homeassistant.util import slugify
 from .const import (
     CONF_ARC,
     CONF_COVERS,
+    CONF_LUX_ENTITY,
     CONF_MIN_ELEVATION,
     CONF_MIN_UV,
     CONF_ORIENTATION,
     CONF_PRESENCE_ENTITY,
     CONF_TARGET_POSITION,
     CONF_TEMP_INDOOR_ENTITY,
+    CONF_UV_ENTITY,
     DEFAULT_ARC,
     DEFAULT_MIN_ELEVATION,
     DEFAULT_MIN_UV,
@@ -99,6 +102,11 @@ _LABELS_FR: dict[str, str] = {
     "target_position": "Position cible",
     "active": "Activée",
     "view_overview": "Vue d'ensemble des éléments configurés.",
+    "sun_position": "Position du soleil",
+    "trigger": "Lancer",
+    "azimuth": "Azimuth",
+    "elevation": "Élévation",
+    "sun_facing": "Soleil face à la façade",
 }
 
 _LABELS_EN: dict[str, str] = {
@@ -134,6 +142,11 @@ _LABELS_EN: dict[str, str] = {
     "target_position": "Target position",
     "active": "Active",
     "view_overview": "Overview of every configured element.",
+    "sun_position": "Sun position",
+    "trigger": "Trigger",
+    "azimuth": "Azimuth",
+    "elevation": "Elevation",
+    "sun_facing": "Sun facing the façade",
 }
 
 
@@ -165,13 +178,60 @@ def _navigate_to(view_path: str) -> dict[str, str]:
     }
 
 
-def _back_button(label: str) -> dict[str, Any]:
+def _header_card(title: str, labels: dict[str, str]) -> dict[str, Any]:
+    """Compact view header: a markdown link back to the cockpit + the title.
+
+    Replaces the legacy big-button card. The link is a same-origin HA
+    route (``/shutters-management/cockpit``); the frontend intercepts
+    such internal links in markdown and routes them as in-app
+    navigation, so the click does not reload the page.
+    """
+    nav_path = f"/{PANEL_URL_PATH}/cockpit"
+    return {
+        "type": "markdown",
+        "content": (
+            f"[← {labels['back_to_cockpit']}]({nav_path})\n\n"
+            f"## {title}"
+        ),
+    }
+
+
+def _action_button_row(
+    name: str,
+    icon: str,
+    target_entity_id: str,
+    action_label: str,
+) -> dict[str, Any]:
+    """Compact ``entities``-card row that calls ``button.press`` on click."""
     return {
         "type": "button",
-        "name": label,
-        "icon": "mdi:arrow-left",
-        "tap_action": _navigate_to("cockpit"),
-        "show_state": False,
+        "name": name,
+        "icon": icon,
+        "action_name": action_label,
+        "tap_action": {
+            "action": "call-service",
+            "service": "button.press",
+            "target": {"entity_id": target_entity_id},
+        },
+    }
+
+
+def _service_button_row(
+    name: str,
+    icon: str,
+    service: str,
+    action_label: str,
+) -> dict[str, Any]:
+    """Compact ``entities``-card row that calls ``service`` on click."""
+    return {
+        "type": "button",
+        "name": name,
+        "icon": icon,
+        "action_name": action_label,
+        "tap_action": {
+            "action": "call-service",
+            "service": service,
+        },
     }
 
 
@@ -208,58 +268,44 @@ def _arc_path(
     )
 
 
-def _sun_map_markdown(subentry: ConfigSubentry) -> str:
-    """Inline-SVG sun map with a Jinja-driven live sun marker.
+def _arc_data_uri(orientation_deg: float, arc_deg: float) -> str:
+    """Return a ``data:image/svg+xml`` URI rendering the configured arc.
 
-    The markdown card evaluates ``{{ states(...) }}`` at every state
-    change of the referenced entities, so the gold sun dot tracks the
-    sun in real time without any custom card.
+    The previous markdown-card approach was stripped by Home Assistant's
+    HTML sanitizer (``<svg>`` is not in the allowlist), leaving the card
+    body blank. A data URI fed to a ``picture`` card bypasses the
+    sanitizer because the SVG is treated as an opaque image asset by
+    the browser.
+
+    The trade-off is that the live sun position (computed via Jinja in
+    the markdown variant) cannot follow ``sun.sun`` here. The drill-down
+    view compensates with a separate ``entities`` card showing the
+    numeric azimuth, elevation and ``sun_facing`` indicator.
     """
-    prefix = _entity_prefix(subentry)
-    orientation = subentry.data.get(CONF_ORIENTATION, 180)
-    arc = subentry.data.get(CONF_ARC, DEFAULT_ARC)
-    az_entity = f"sensor.{prefix}_sun_protection_sun_azimuth"
-    el_entity = f"sensor.{prefix}_sun_protection_sun_elevation"
-    arc_path = _arc_path(orientation, arc)
-
-    return (
-        '<svg viewBox="0 0 200 200" '
-        'style="width:100%;max-height:320px;display:block;margin:0 auto">\n'
-        '  <circle cx="100" cy="100" r="85" fill="#101820" '
-        'stroke="#4a4a4a" stroke-width="1"/>\n'
-        '  <circle cx="100" cy="100" r="42.5" fill="none" '
-        'stroke="#262626" stroke-width="0.5" stroke-dasharray="2 3"/>\n'
-        f'  <path d="{arc_path}" fill="rgba(255,196,0,0.18)" '
-        'stroke="rgba(255,196,0,0.7)" stroke-width="1"/>\n'
-        '  <line x1="100" y1="15" x2="100" y2="185" '
-        'stroke="#333" stroke-width="0.5"/>\n'
-        '  <line x1="15" y1="100" x2="185" y2="100" '
-        'stroke="#333" stroke-width="0.5"/>\n'
-        '  <text x="100" y="12" fill="#aaa" text-anchor="middle" '
-        'font-size="10">N</text>\n'
-        '  <text x="192" y="104" fill="#aaa" text-anchor="middle" '
-        'font-size="10">E</text>\n'
-        '  <text x="100" y="198" fill="#aaa" text-anchor="middle" '
-        'font-size="10">S</text>\n'
-        '  <text x="8" y="104" fill="#aaa" text-anchor="middle" '
-        'font-size="10">W</text>\n'
-        f"  {{% set az_raw = states('{az_entity}') %}}\n"
-        f"  {{% set el_raw = states('{el_entity}') %}}\n"
-        "  {% if az_raw not in ['unknown','unavailable','none',None] "
-        "and el_raw not in ['unknown','unavailable','none',None] %}\n"
-        "  {% set az_f = az_raw | float(0) %}\n"
-        "  {% set el_f = el_raw | float(-90) %}\n"
-        "  {% if el_f > -5 %}\n"
-        "  {% set rrad = (90 - el_f) / 90 * 85 %}\n"
-        "  {% set sx = 100 + rrad * sin(radians(az_f)) %}\n"
-        "  {% set sy = 100 - rrad * cos(radians(az_f)) %}\n"
-        '  <circle cx="{{ "%.2f" | format(sx) }}" '
-        'cy="{{ "%.2f" | format(sy) }}" r="7" fill="gold" '
-        'stroke="orange" stroke-width="2"/>\n'
-        "  {% endif %}\n"
-        "  {% endif %}\n"
-        "</svg>\n"
+    arc_path = _arc_path(orientation_deg, arc_deg)
+    svg = (
+        '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">'
+        '<circle cx="100" cy="100" r="85" fill="#101820" '
+        'stroke="#4a4a4a" stroke-width="1"/>'
+        '<circle cx="100" cy="100" r="42.5" fill="none" '
+        'stroke="#262626" stroke-width="0.5" stroke-dasharray="2 3"/>'
+        f'<path d="{arc_path}" fill="rgba(255,196,0,0.18)" '
+        'stroke="rgba(255,196,0,0.7)" stroke-width="1"/>'
+        '<line x1="100" y1="15" x2="100" y2="185" '
+        'stroke="#333" stroke-width="0.5"/>'
+        '<line x1="15" y1="100" x2="185" y2="100" '
+        'stroke="#333" stroke-width="0.5"/>'
+        '<text x="100" y="12" fill="#aaa" text-anchor="middle" '
+        'font-size="10">N</text>'
+        '<text x="192" y="104" fill="#aaa" text-anchor="middle" '
+        'font-size="10">E</text>'
+        '<text x="100" y="198" fill="#aaa" text-anchor="middle" '
+        'font-size="10">S</text>'
+        '<text x="8" y="104" fill="#aaa" text-anchor="middle" '
+        'font-size="10">W</text>'
+        "</svg>"
     )
+    return "data:image/svg+xml;utf8," + quote(svg, safe="")
 
 
 # ---------------------------------------------------------------------------
@@ -383,28 +429,21 @@ def _build_cockpit_view(
 
     cards.append(
         {
-            "type": "horizontal-stack",
-            "cards": [
-                {
-                    "type": "button",
-                    "name": labels["pause_all"],
-                    "icon": "mdi:pause",
-                    "tap_action": {
-                        "action": "call-service",
-                        "service": f"{DOMAIN}.{SERVICE_PAUSE}",
-                    },
-                    "show_state": False,
-                },
-                {
-                    "type": "button",
-                    "name": labels["resume_all"],
-                    "icon": "mdi:play",
-                    "tap_action": {
-                        "action": "call-service",
-                        "service": f"{DOMAIN}.{SERVICE_RESUME}",
-                    },
-                    "show_state": False,
-                },
+            "type": "entities",
+            "show_header_toggle": False,
+            "entities": [
+                _service_button_row(
+                    labels["pause_all"],
+                    "mdi:pause",
+                    f"{DOMAIN}.{SERVICE_PAUSE}",
+                    labels["trigger"],
+                ),
+                _service_button_row(
+                    labels["resume_all"],
+                    "mdi:play",
+                    f"{DOMAIN}.{SERVICE_RESUME}",
+                    labels["trigger"],
+                ),
             ],
         }
     )
@@ -438,13 +477,7 @@ def _build_scheduler_view(
     ]
 
     cards: list[dict[str, Any]] = []
-    cards.append(_back_button(labels["back_to_cockpit"]))
-    cards.append(
-        {
-            "type": "markdown",
-            "content": f"## {subentry.title}",
-        }
-    )
+    cards.append(_header_card(subentry.title, labels))
     cards.append(
         {
             "type": "entities",
@@ -466,34 +499,21 @@ def _build_scheduler_view(
 
     cards.append(
         {
-            "type": "horizontal-stack",
-            "cards": [
-                {
-                    "type": "button",
-                    "name": labels["test_open"],
-                    "icon": "mdi:arrow-up-circle-outline",
-                    "tap_action": {
-                        "action": "call-service",
-                        "service": "button.press",
-                        "target": {
-                            "entity_id": f"button.{prefix}_open",
-                        },
-                    },
-                    "show_state": False,
-                },
-                {
-                    "type": "button",
-                    "name": labels["test_close"],
-                    "icon": "mdi:arrow-down-circle-outline",
-                    "tap_action": {
-                        "action": "call-service",
-                        "service": "button.press",
-                        "target": {
-                            "entity_id": f"button.{prefix}_close",
-                        },
-                    },
-                    "show_state": False,
-                },
+            "type": "entities",
+            "show_header_toggle": False,
+            "entities": [
+                _action_button_row(
+                    labels["test_open"],
+                    "mdi:arrow-up-circle-outline",
+                    f"button.{prefix}_open",
+                    labels["trigger"],
+                ),
+                _action_button_row(
+                    labels["test_close"],
+                    "mdi:arrow-down-circle-outline",
+                    f"button.{prefix}_close",
+                    labels["trigger"],
+                ),
             ],
         }
     )
@@ -533,9 +553,17 @@ def _gauge_card(
 
 
 def _build_sun_protection_view(
-    subentry: ConfigSubentry, labels: dict[str, str]
+    hub_entry: ConfigEntry,
+    subentry: ConfigSubentry,
+    labels: dict[str, str],
 ) -> dict[str, Any]:
-    """Drill-down view for a sun-protection subentry (graphical)."""
+    """Drill-down view for a sun-protection subentry (graphical).
+
+    Adapts to the hub configuration: gauges and history series that
+    require a sensor not provided by the hub (lux / UV) are skipped to
+    avoid the « entity is not numeric » warning that surfaces when the
+    underlying margin sensor is ``None``.
+    """
     prefix = _entity_prefix(subentry)
     covers = list(subentry.data.get(CONF_COVERS) or [])
     arc = subentry.data.get(CONF_ARC, DEFAULT_ARC)
@@ -548,14 +576,12 @@ def _build_sun_protection_view(
     orientation = subentry.data.get(CONF_ORIENTATION, 180)
     min_uv = subentry.data.get(CONF_MIN_UV, DEFAULT_MIN_UV)
 
+    has_lux = bool(hub_entry.data.get(CONF_LUX_ENTITY))
+    has_uv = bool(hub_entry.data.get(CONF_UV_ENTITY))
+    has_temp_indoor = bool(subentry.data.get(CONF_TEMP_INDOOR_ENTITY))
+
     cards: list[dict[str, Any]] = []
-    cards.append(_back_button(labels["back_to_cockpit"]))
-    cards.append(
-        {
-            "type": "markdown",
-            "content": f"## {subentry.title}",
-        }
-    )
+    cards.append(_header_card(subentry.title, labels))
     cards.append(
         {
             "type": "entities",
@@ -578,16 +604,40 @@ def _build_sun_protection_view(
         }
     )
 
-    # Sun map
+    # Sun map: static SVG via data URI (markdown card sanitization
+    # strips inline <svg>). The live sun position is shown numerically
+    # in the entities card right below.
     cards.append(
         {
-            "type": "markdown",
-            "title": labels["sun_map"],
-            "content": _sun_map_markdown(subentry),
+            "type": "picture",
+            "image": _arc_data_uri(orientation, arc),
+            "tap_action": {"action": "none"},
+            "hold_action": {"action": "none"},
+        }
+    )
+    cards.append(
+        {
+            "type": "entities",
+            "title": labels["sun_position"],
+            "show_header_toggle": False,
+            "entities": [
+                {
+                    "entity": f"sensor.{prefix}_sun_protection_sun_azimuth",
+                    "name": labels["azimuth"],
+                },
+                {
+                    "entity": f"sensor.{prefix}_sun_protection_sun_elevation",
+                    "name": labels["elevation"],
+                },
+                {
+                    "entity": f"binary_sensor.{prefix}_sun_facing",
+                    "name": labels["sun_facing"],
+                },
+            ],
         }
     )
 
-    # Margins gauges
+    # Margins gauges — only those whose underlying sensor is numeric.
     cards.append(
         {
             "type": "markdown",
@@ -595,16 +645,17 @@ def _build_sun_protection_view(
         }
     )
     gauges: list[dict[str, Any]] = []
-    gauges.append(
-        _gauge_card(
-            f"sensor.{prefix}_sun_protection_lux_margin",
-            labels["lux_margin"],
-            unit="lx",
-            minimum=-LUX_STANDARD,
-            maximum=LUX_STANDARD,
-            severity={"green": 0, "yellow": -10000, "red": -25000},
+    if has_lux:
+        gauges.append(
+            _gauge_card(
+                f"sensor.{prefix}_sun_protection_lux_margin",
+                labels["lux_margin"],
+                unit="lx",
+                minimum=-LUX_STANDARD,
+                maximum=LUX_STANDARD,
+                severity={"green": 0, "yellow": -10000, "red": -25000},
+            )
         )
-    )
     gauges.append(
         _gauge_card(
             f"sensor.{prefix}_sun_protection_elevation_margin",
@@ -615,16 +666,17 @@ def _build_sun_protection_view(
             severity={"green": 0, "yellow": -3, "red": -10},
         )
     )
-    gauges.append(
-        _gauge_card(
-            f"sensor.{prefix}_sun_protection_uv_margin",
-            labels["uv_margin"],
-            unit="",
-            minimum=-float(min_uv),
-            maximum=10 - float(min_uv),
-            severity={"green": 0, "yellow": -1, "red": -2},
+    if has_uv:
+        gauges.append(
+            _gauge_card(
+                f"sensor.{prefix}_sun_protection_uv_margin",
+                labels["uv_margin"],
+                unit="",
+                minimum=-float(min_uv),
+                maximum=10 - float(min_uv),
+                severity={"green": 0, "yellow": -1, "red": -2},
+            )
         )
-    )
     gauges.append(
         _gauge_card(
             f"sensor.{prefix}_sun_protection_azimuth_diff",
@@ -644,22 +696,24 @@ def _build_sun_protection_view(
         }
     )
 
-    # History graph: lux + indoor temperature over the last hour.
-    history_entities: list[str] = [
-        f"sensor.{prefix}_sun_protection_lux",
-    ]
-    if subentry.data.get(CONF_TEMP_INDOOR_ENTITY):
+    # History graph: only the series whose source is configured. Skip
+    # the card entirely when no series is available.
+    history_entities: list[str] = []
+    if has_lux:
+        history_entities.append(f"sensor.{prefix}_sun_protection_lux")
+    if has_temp_indoor:
         history_entities.append(
             f"sensor.{prefix}_sun_protection_temp_indoor"
         )
-    cards.append(
-        {
-            "type": "history-graph",
-            "title": labels["history"],
-            "hours_to_show": 1,
-            "entities": history_entities,
-        }
-    )
+    if history_entities:
+        cards.append(
+            {
+                "type": "history-graph",
+                "title": labels["history"],
+                "hours_to_show": 1,
+                "entities": history_entities,
+            }
+        )
 
     # Configuration recap
     config_entities: list[Any] = [
@@ -746,7 +800,7 @@ def build_dashboard_config(
     for sub in sims:
         views.append(_build_scheduler_view(sub, labels))
     for sub in suns:
-        views.append(_build_sun_protection_view(sub, labels))
+        views.append(_build_sun_protection_view(entry, sub, labels))
 
     return {"title": PANEL_TITLE, "views": views}
 
