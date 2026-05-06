@@ -229,6 +229,18 @@ async def test_sun_protection_view_has_sun_map_and_gauges(
         "sensor.salon_sud_sun_protection_azimuth_diff",
     }
 
+    # With lux configured at the hub, the history-graph card must be
+    # present and include the lux sensor as a series — otherwise the
+    # conditional history-graph logic could regress unnoticed.
+    history_cards = [
+        c for c in sun_view["cards"] if c["type"] == "history-graph"
+    ]
+    assert len(history_cards) == 1
+    assert (
+        "sensor.salon_sud_sun_protection_lux"
+        in history_cards[0]["entities"]
+    )
+
 
 async def test_sun_protection_view_omits_lux_uv_without_sensors(
     hass: HomeAssistant,

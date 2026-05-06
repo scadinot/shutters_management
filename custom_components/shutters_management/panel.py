@@ -181,8 +181,9 @@ def _navigate_to(view_path: str) -> dict[str, str]:
 def _header_card(title: str, labels: dict[str, str]) -> dict[str, Any]:
     """Compact view header: a markdown link back to the cockpit + the title.
 
-    Replaces the legacy big-button card. Home Assistant's frontend
-    intercepts relative URLs in markdown links and routes them as in-app
+    Replaces the legacy big-button card. The link is a same-origin HA
+    route (``/shutters-management/cockpit``); the frontend intercepts
+    such internal links in markdown and routes them as in-app
     navigation, so the click does not reload the page.
     """
     nav_path = f"/{PANEL_URL_PATH}/cockpit"
