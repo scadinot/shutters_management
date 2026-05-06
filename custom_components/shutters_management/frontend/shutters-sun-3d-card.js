@@ -742,6 +742,11 @@ class ShuttersSun3dCard extends HTMLElement {
     for (const id of covers) {
       const s = this._hass.states[id];
       if (!s) continue;
+      // HA can retain ``current_position`` on a cover even after the
+      // entity drops to ``unavailable`` / ``unknown`` — which would
+      // otherwise let stale numeric data sneak into the aggregate.
+      // Skip those states up front.
+      if (s.state === "unavailable" || s.state === "unknown") continue;
       const attrPos = s.attributes && s.attributes.current_position;
       let pos;
       if (typeof attrPos === "number" && Number.isFinite(attrPos)) {
