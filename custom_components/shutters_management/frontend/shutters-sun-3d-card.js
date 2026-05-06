@@ -107,6 +107,7 @@ class ShuttersSun3dCard extends HTMLElement {
       arc: 60,
       min_elevation: 5,
       latitude: null,
+      longitude: 0,
       subentry_prefix: null,
       labels: null,
       ...config,
@@ -437,8 +438,11 @@ class ShuttersSun3dCard extends HTMLElement {
       color: 0x3a2f22,
       roughness: 0.9,
     });
+    // Match the window's intrinsic height (1.2). With a near-zero
+    // intrinsic height the `scale.y = coverage` trick from the
+    // standalone HTML rendered the shutter invisible.
     const shutterMesh = new THREE.Mesh(
-      new THREE.PlaneGeometry(1.2, 0.01),
+      new THREE.PlaneGeometry(1.2, 1.2),
       shutterMat
     );
     shutterMesh.position.copy(windowMesh.position);
@@ -556,7 +560,11 @@ class ShuttersSun3dCard extends HTMLElement {
         h * 15,
         0
       );
-      const sp = solarPosition(t, this._config.latitude);
+      const sp = solarPosition(
+        t,
+        this._config.latitude,
+        this._config.longitude || 0
+      );
       if (sp.elevation < 0) continue;
       pts.push(azElToVec3(sp.azimuth, sp.elevation, DOME_R));
     }
@@ -607,7 +615,11 @@ class ShuttersSun3dCard extends HTMLElement {
       return;
     }
     if (this._config.latitude !== null && this._config.latitude !== undefined) {
-      const sp = solarPosition(new Date(), this._config.latitude);
+      const sp = solarPosition(
+        new Date(),
+        this._config.latitude,
+        this._config.longitude || 0
+      );
       this._update(sp.azimuth, sp.elevation);
     }
   }
@@ -735,12 +747,43 @@ class ShuttersSun3dCard extends HTMLElement {
       this._resizeObserver.disconnect();
       this._resizeObserver = null;
     }
+    if (this._controls) {
+      // OrbitControls registers DOM listeners on the renderer canvas;
+      // dispose() is the only way to detach them.
+      this._controls.dispose();
+      this._controls = null;
+    }
+    if (this._scene) {
+      // Walk the scene graph and free every disposable resource so
+      // setConfig() rebuilds do not leak GPU buffers / textures.
+      this._scene.traverse((obj) => {
+        if (obj.geometry) obj.geometry.dispose();
+        if (obj.material) {
+          const mats = Array.isArray(obj.material)
+            ? obj.material
+            : [obj.material];
+          for (const mat of mats) {
+            if (mat.map) mat.map.dispose();
+            mat.dispose();
+          }
+        }
+      });
+      this._scene.clear();
+      this._scene = null;
+    }
     if (this._renderer) {
       this._renderer.dispose();
       this._renderer.domElement.remove();
       this._renderer = null;
     }
-    this._scene = null;
+    this._camera = null;
+    this._sunLight = null;
+    this._sunGroup = null;
+    this._coneMesh = null;
+    this._shutterMesh = null;
+    this._windowMesh = null;
+    this._rayLine = null;
+    this._rayMat = null;
     this._built = false;
   }
 
@@ -798,8 +841,14 @@ function dayOfYear(d) {
   return Math.floor((d - start) / 86400000);
 }
 
-function solarPosition(date, lat) {
+function solarPosition(date, lat, lon = 0) {
   // Simplified NOAA algorithm; ~1° precision is plenty for the viz.
+  // ``lon`` is the site's longitude in degrees east (HA stores
+  // ``hass.config.longitude`` with the same sign convention). The
+  // local-solar-time correction needs both ``lon`` and the time-zone
+  // meridian (``lstm``) to align the path with the actual day at the
+  // user's location; without it the trajectory was offset by up to
+  // ±15° in azimuth depending on the site.
   const n = dayOfYear(date);
   const decl = THREE.MathUtils.degToRad(
     23.45 * Math.sin((2 * Math.PI * (284 + n)) / 365)
@@ -811,7 +860,7 @@ function solarPosition(date, lat) {
     date.getHours() + date.getMinutes() / 60 + date.getSeconds() / 3600;
   const tz = -date.getTimezoneOffset() / 60;
   const lstm = 15 * tz;
-  const tc = 4 * (0 - lstm) + E;
+  const tc = 4 * (lon - lstm) + E;
   const solarTime = localTime + tc / 60;
   const H = THREE.MathUtils.degToRad(15 * (solarTime - 12));
   const sinEl =

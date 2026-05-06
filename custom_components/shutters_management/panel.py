@@ -542,6 +542,7 @@ def _build_sun_protection_view(
             "arc": arc,
             "min_elevation": min_elevation,
             "latitude": hass.config.latitude,
+            "longitude": hass.config.longitude,
         }
     )
 
