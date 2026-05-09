@@ -6,6 +6,34 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le pr
 
 ## [Non publié]
 
+## [0.9.5] — 2026-05-09
+
+### Modifié — carte 3D
+
+- **Le triangle de vérité épouse les véritables courbes du soleil
+  aux solstices.** Auparavant le wedge était un rectangle
+  sphérique : sa base et son sommet étaient à élévation constante
+  (l'élévation à midi des deux solstices). Cela ignorait que
+  l'élévation du soleil varie avec l'azimuth tout au long de la
+  journée.
+- Désormais, pour chaque azimuth de la fenêtre d'acceptance
+  `[orientation − arc, orientation + arc]` :
+  - le **bord inférieur** suit la trajectoire effective du soleil
+    le **21 décembre** (solstice d'hiver) ;
+  - le **bord supérieur** suit la trajectoire effective du soleil
+    le **21 juin** (solstice d'été).
+- Aux azimuths où la trajectoire d'un solstice ne passe pas (ex.
+  azimuth très à l'est en hiver à haute latitude), le bord
+  correspondant retombe sur l'horizon (élévation 0°), de sorte
+  que le wedge épouse fidèlement l'enveloppe annuelle des
+  positions solaires possibles.
+- Nouveau helper module-level `solsticeArc(latDeg, lonDeg, summer,
+  fromAzDeg, toAzDeg, segments)` qui échantillonne la trajectoire
+  toutes les 5 min et interpole l'élévation à l'azimuth ciblé.
+- Repli sur le rectangle solsticial constant (comportement v0.9.4)
+  quand la latitude est invalide ou que les deux trajectoires
+  sont collées (cas pathologique polaire).
+
 ## [0.9.4] — 2026-05-09
 
 ### Corrigé — carte 3D
