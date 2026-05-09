@@ -247,7 +247,10 @@ class ShuttersSun3dCard extends HTMLElement {
       new THREE.MeshBasicMaterial({ color: 0x88aa66 })
     );
     horizonTorus.rotation.x = Math.PI / 2;
-    horizonTorus.position.y = 0.02;
+    // Lift the ring so its full thickness sits above the ground (the
+    // tube radius is 0.07; sitting at y=0.02 dipped half below the
+    // green disc at y=0 and z-fought with it).
+    horizonTorus.position.y = 0.09;
     this._scene.add(horizonTorus);
 
     // Cardinal / intermediate tick marks as thin boxes (cardinal
@@ -264,7 +267,10 @@ class ShuttersSun3dCard extends HTMLElement {
         tickMat
       );
       const midR = HORIZON_R - length / 2;
-      tick.position.set(Math.sin(rad) * midR, 0.02, -Math.cos(rad) * midR);
+      // Lift the box's center to thick/2 + small offset so its
+      // bottom face stays above the ground and avoids z-fighting.
+      const tickY = 0.02 + thick / 2;
+      tick.position.set(Math.sin(rad) * midR, tickY, -Math.cos(rad) * midR);
       // Default box X axis points along world X. Rotate around Y so
       // the long side aligns with the radial direction at ``rad``.
       tick.rotation.y = Math.PI / 2 - rad;
@@ -511,9 +517,10 @@ class ShuttersSun3dCard extends HTMLElement {
     const mat = new THREE.MeshBasicMaterial({
       color: 0xffaa44,
       transparent: true,
-      // Default opacity bumped from 0.10 → 0.22 for contrast; the
-      // dynamic update in _updateSun will lift it further when the
-      // sun is in the cone.
+      // Initial opacity for the brief window before the first
+      // _updateSun() call. After that the value is overwritten on
+      // every refresh with one of {0.40 in-axis, 0.32 grazing, 0.18
+      // out / night}.
       opacity: 0.22,
       side: THREE.DoubleSide,
       depthWrite: false,
