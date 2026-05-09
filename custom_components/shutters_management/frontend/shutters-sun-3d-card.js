@@ -480,18 +480,26 @@ class ShuttersSun3dCard extends HTMLElement {
     // The integration's `arc` is the FULL arc width centred on the
     // façade orientation, not a half-angle. We split it in half here.
     const halfAng = THREE.MathUtils.degToRad(this._config.arc / 2);
-    // Anchor the bottom of the wedge at the configured min_elevation:
-    // matches the integration's actual decision boundary (sun below
-    // min_elevation never triggers protection) and keeps the cone
-    // from cluttering the horizon.
-    const minElRad = THREE.MathUtils.degToRad(this._config.min_elevation || 0);
+    // The wedge spans the *yearly* elevation envelope at the
+    // configured latitude: bottom at the winter solstice noon
+    // elevation, top at the summer solstice noon elevation. This
+    // matches the physical reality of the site (the sun cannot
+    // appear outside this band at noon throughout the year) much
+    // better than the previous min_elevation-to-zenith range.
+    let { lowerRad, upperRad } = solsticeBounds(this._config.latitude);
+    // Degenerate case (e.g. polar latitude near 90° + cap effects):
+    // fall back to [horizon, zenith] so the wedge stays usable.
+    if (upperRad - lowerRad < THREE.MathUtils.degToRad(5)) {
+      lowerRad = 0;
+      upperRad = Math.PI / 2;
+    }
     const segments = 24;
     const elSegs = 12;
     const pts = [];
     const indices = [];
 
     for (let j = 0; j <= elSegs; j++) {
-      const elRad = minElRad + (j / elSegs) * (Math.PI / 2 - minElRad);
+      const elRad = lowerRad + (j / elSegs) * (upperRad - lowerRad);
       const r = Math.cos(elRad) * DOME_R;
       const y = Math.sin(elRad) * DOME_R;
       for (let i = 0; i <= segments; i++) {
@@ -528,27 +536,35 @@ class ShuttersSun3dCard extends HTMLElement {
     this._coneMesh = new THREE.Mesh(geo, mat);
     this._scene.add(this._coneMesh);
 
-    // Outline tubes (bottom arc + two slanted edges) for definition.
-    // Kept in a stable color so the wedge stays readable even when
-    // the fill darkens (out-of-axis state).
+    // Outline tubes (bottom arc + two slanted edges + top arc) for
+    // definition. Kept in a stable color so the wedge stays readable
+    // even when the fill darkens (out-of-axis state). The top arc
+    // closes the polygon — the slanted edges no longer converge at
+    // the zenith now that the cone tops out at upperRad < π/2.
     const outlineMat = new THREE.MeshBasicMaterial({ color: 0xffd089 });
     const tubeRadius = 0.05;
-
     const arcSegs = 36;
-    const arcPts = [];
-    for (let i = 0; i <= arcSegs; i++) {
-      const t = i / arcSegs;
-      const az = this._facadeRad + (t - 0.5) * 2 * halfAng;
-      const r = Math.cos(minElRad) * DOME_R;
-      const y = Math.sin(minElRad) * DOME_R;
-      arcPts.push(new THREE.Vector3(Math.sin(az) * r, y, -Math.cos(az) * r));
-    }
-    if (arcPts.length >= 2) {
-      const arcCurve = new THREE.CatmullRomCurve3(arcPts);
-      const arcGeo = new THREE.TubeGeometry(
-        arcCurve, arcSegs, tubeRadius, 6, false
+
+    const arcAtElevation = (elRad) => {
+      const pts = [];
+      for (let i = 0; i <= arcSegs; i++) {
+        const t = i / arcSegs;
+        const az = this._facadeRad + (t - 0.5) * 2 * halfAng;
+        const r = Math.cos(elRad) * DOME_R;
+        const y = Math.sin(elRad) * DOME_R;
+        pts.push(new THREE.Vector3(Math.sin(az) * r, y, -Math.cos(az) * r));
+      }
+      return pts;
+    };
+
+    for (const elRad of [lowerRad, upperRad]) {
+      const pts = arcAtElevation(elRad);
+      if (pts.length < 2) continue;
+      const curve = new THREE.CatmullRomCurve3(pts);
+      const geoArc = new THREE.TubeGeometry(
+        curve, arcSegs, tubeRadius, 6, false
       );
-      this._scene.add(new THREE.Mesh(arcGeo, outlineMat));
+      this._scene.add(new THREE.Mesh(geoArc, outlineMat));
     }
 
     for (const sign of [-1, 1]) {
@@ -556,7 +572,7 @@ class ShuttersSun3dCard extends HTMLElement {
       const edgeSegs = 16;
       const edgePts = [];
       for (let i = 0; i <= edgeSegs; i++) {
-        const elRad = minElRad + (i / edgeSegs) * (Math.PI / 2 - minElRad);
+        const elRad = lowerRad + (i / edgeSegs) * (upperRad - lowerRad);
         const r = Math.cos(elRad) * DOME_R;
         const y = Math.sin(elRad) * DOME_R;
         edgePts.push(new THREE.Vector3(Math.sin(az) * r, y, -Math.cos(az) * r));
@@ -984,6 +1000,28 @@ const DEFAULT_LABELS = {
 // ---------------------------------------------------------------------------
 // Helpers (pure, kept module-level so they can be unit-tested manually)
 // ---------------------------------------------------------------------------
+
+// Earth's axial tilt — used to derive the yearly noon-elevation
+// envelope from a single latitude. Practical accuracy: ±0.05° vs.
+// the precise 23.4393° value, well within rendering tolerance.
+const AXIAL_TILT_DEG = 23.45;
+
+function solsticeBounds(latDeg) {
+  // Yearly elevation envelope at the configured latitude:
+  //   - upper (summer solstice noon) = 90 - |φ| + 23.45  (clamped at 90)
+  //   - lower (winter solstice noon) = 90 - |φ| - 23.45  (clamped at 0)
+  // Returns radians, ready to feed into the cone geometry.
+  if (latDeg === null || latDeg === undefined) {
+    return { lowerRad: 0, upperRad: Math.PI / 2 };
+  }
+  const lat = Math.abs(latDeg);
+  const upperDeg = Math.min(90, 90 - lat + AXIAL_TILT_DEG);
+  const lowerDeg = Math.max(0, 90 - lat - AXIAL_TILT_DEG);
+  return {
+    lowerRad: THREE.MathUtils.degToRad(lowerDeg),
+    upperRad: THREE.MathUtils.degToRad(upperDeg),
+  };
+}
 
 function angleDelta(a, b) {
   return ((a - b + 540) % 360) - 180;
