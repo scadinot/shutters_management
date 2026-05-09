@@ -480,12 +480,14 @@ class ShuttersSun3dCard extends HTMLElement {
     // The integration's `arc` is the FULL arc width centred on the
     // façade orientation, not a half-angle. We split it in half here.
     const halfAng = THREE.MathUtils.degToRad(this._config.arc / 2);
-    // The wedge spans the *yearly* elevation envelope at the
-    // configured latitude: bottom at the winter solstice noon
-    // elevation, top at the summer solstice noon elevation. This
-    // matches the physical reality of the site (the sun cannot
-    // appear outside this band at noon throughout the year) much
-    // better than the previous min_elevation-to-zenith range.
+    // The wedge spans the yearly *solar-noon* elevation envelope
+    // at the configured latitude: outside the tropics the bottom
+    // sits at the winter solstice noon elevation and the top at
+    // the summer solstice noon; inside the tropics (|φ| < 23.45°)
+    // the formula is clamped at 90° (sun reaches the zenith on the
+    // day the solar declination crosses the latitude). This
+    // matches the physical reality of the site much better than
+    // the previous min_elevation-to-zenith range.
     let { lowerRad, upperRad } = solsticeBounds(this._config.latitude);
     // Degenerate case (e.g. polar latitude near 90° + cap effects):
     // fall back to [horizon, zenith] so the wedge stays usable.
@@ -1007,16 +1009,24 @@ const DEFAULT_LABELS = {
 const AXIAL_TILT_DEG = 23.45;
 
 function solsticeBounds(latDeg) {
-  // Yearly elevation envelope at the configured latitude:
-  //   - upper (summer solstice noon) = 90 - |φ| + 23.45  (clamped at 90)
-  //   - lower (winter solstice noon) = 90 - |φ| - 23.45  (clamped at 0)
-  // Returns radians, ready to feed into the cone geometry.
-  if (latDeg === null || latDeg === undefined) {
+  // Returns the yearly envelope of solar elevations *at solar noon*
+  // for the given latitude, in radians. The two extremes occur on
+  // the solstices outside the tropics; inside the tropics
+  // (|φ| < 23.45°), the maximum is reached when the declination
+  // crosses the latitude (sun overhead) and the formula is clamped
+  // at 90°. The output bounds the wedge so it never claims a
+  // region the sun cannot reach at noon throughout the year:
+  //   upper = clamp(90 - |φ| + 23.45, 0..90)
+  //   lower = clamp(90 - |φ| - 23.45, 0..90)
+  // Defensive about non-finite input (string, NaN, Infinity, ...) —
+  // such values would cascade NaN into Three.js geometry.
+  const lat = Number(latDeg);
+  if (!Number.isFinite(lat)) {
     return { lowerRad: 0, upperRad: Math.PI / 2 };
   }
-  const lat = Math.abs(latDeg);
-  const upperDeg = Math.min(90, 90 - lat + AXIAL_TILT_DEG);
-  const lowerDeg = Math.max(0, 90 - lat - AXIAL_TILT_DEG);
+  const phi = Math.min(90, Math.abs(lat));
+  const upperDeg = Math.min(90, 90 - phi + AXIAL_TILT_DEG);
+  const lowerDeg = Math.max(0, 90 - phi - AXIAL_TILT_DEG);
   return {
     lowerRad: THREE.MathUtils.degToRad(lowerDeg),
     upperRad: THREE.MathUtils.degToRad(upperDeg),

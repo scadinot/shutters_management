@@ -20,12 +20,12 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le pr
   - base ≈ `90° − |φ| − 23,45°` (clampé à 0°) — élévation
     minimale annuelle à midi (solstice d'hiver).
 
-  À titre d'exemple, à Normandie (φ ≈ 49,5°) le wedge s'étend de
+  À titre d'exemple, en Normandie (φ ≈ 49,5°) le wedge s'étend de
   ~17° à ~64°. La latitude est lue depuis `hass.config.latitude`
   (déjà transmise par le panneau Lovelace en v0.9.0). Quand la
   latitude n'est pas configurée, repli sur l'ancien comportement
   `[horizon, zénith]`. Pour les latitudes polaires où la fenêtre
-  d'envelope serait trop étroite (< 5°), même repli pour conserver
+  d'enveloppe serait trop étroite (< 5°), même repli pour conserver
   un wedge visible.
 - **Contour fermé.** Avec un sommet désormais inférieur au zénith,
   les deux arêtes inclinées ne se rejoignent plus en un point. Un
