@@ -504,14 +504,28 @@ class ShuttersSun3dCard extends HTMLElement {
     const summerArc = solsticeArc(
       lat, lon, true, fromAzDeg, toAzDeg, segments
     );
-    const trajectoriesUsable =
-      winterArc.length === segments + 1 &&
-      winterArc.every(
-        (p, i) =>
-          Number.isFinite(p.elDeg) &&
-          Number.isFinite(summerArc[i].elDeg) &&
-          summerArc[i].elDeg - p.elDeg > 1
-      );
+    // Use the trajectories whenever every value is finite *and*
+    // they are visibly separated *somewhere* in the window.
+    // Per-column ``> 1`` rejected the trajectories whenever any
+    // single azimuth had both arcs at the horizon (e.g. a façade
+    // facing north, or a wedge edge the sun never reaches in
+    // winter); that case is precisely where the trajectories shine
+    // and should drive the wedge down to the horizon — not where
+    // we want the rectangle fallback.
+    let maxSpreadDeg = 0;
+    let allFinite = winterArc.length === segments + 1;
+    if (allFinite) {
+      for (let i = 0; i <= segments; i++) {
+        const w = winterArc[i].elDeg;
+        const s = summerArc[i].elDeg;
+        if (!Number.isFinite(w) || !Number.isFinite(s)) {
+          allFinite = false;
+          break;
+        }
+        if (s - w > maxSpreadDeg) maxSpreadDeg = s - w;
+      }
+    }
+    const trajectoriesUsable = allFinite && maxSpreadDeg > 1;
 
     let { lowerRad, upperRad } = solsticeBounds(lat);
     if (upperRad - lowerRad < THREE.MathUtils.degToRad(5)) {
@@ -1094,7 +1108,10 @@ function solsticeArc(latDeg, lonDeg, summer, fromAzDeg, toAzDeg, segments) {
   const year = new Date().getFullYear();
   const date = summer ? new Date(year, 5, 21) : new Date(year, 11, 21);
   const traj = [];
-  for (let m = 0; m <= 24 * 12; m++) {
+  // Strict day window: 288 samples (00:00 to 23:55). Including
+  // the +24h sample would, at midnight-sun latitudes, drop a
+  // *next-day* trajectory point into the interpolator.
+  for (let m = 0; m < 24 * 12; m++) {
     const t = new Date(date);
     t.setHours(0, m * 5, 0, 0);
     const sp = solarPosition(t, lat, lon);
@@ -1104,7 +1121,13 @@ function solsticeArc(latDeg, lonDeg, summer, fromAzDeg, toAzDeg, segments) {
   const out = [];
   for (let i = 0; i <= segments; i++) {
     const t = i / segments;
-    const azDeg = fromAzDeg + t * (toAzDeg - fromAzDeg);
+    const rawAz = fromAzDeg + t * (toAzDeg - fromAzDeg);
+    // ``orientation`` near 0/360 makes the wedge window straddle
+    // the wrap (e.g. 350° ± 30° → 320..380). Normalize the lookup
+    // azimuth into [0, 360) since solarPosition returns azimuths
+    // there; the stored ``azDeg`` keeps the unwrapped value so
+    // the geometry stays monotonic for CatmullRom smoothing.
+    const azNorm = ((rawAz % 360) + 360) % 360;
     let elDeg = 0;
     for (let j = 0; j < traj.length - 1; j++) {
       const a1 = traj[j].azimuth;
@@ -1114,15 +1137,15 @@ function solsticeArc(latDeg, lonDeg, summer, fromAzDeg, toAzDeg, segments) {
       if (Math.abs(a2 - a1) >= 30) continue;
       const aMin = Math.min(a1, a2);
       const aMax = Math.max(a1, a2);
-      if (azDeg >= aMin && azDeg <= aMax) {
-        const f = (azDeg - a1) / (a2 - a1);
+      if (azNorm >= aMin && azNorm <= aMax) {
+        const f = (azNorm - a1) / (a2 - a1);
         elDeg =
           traj[j].elevation +
           f * (traj[j + 1].elevation - traj[j].elevation);
         break;
       }
     }
-    out.push({ azDeg, elDeg });
+    out.push({ azDeg: rawAz, elDeg });
   }
   return out;
 }
