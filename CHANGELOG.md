@@ -6,6 +6,36 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le pr
 
 ## [Non publié]
 
+## [0.9.3] — 2026-05-09
+
+### Modifié — carte 3D
+
+- **Triangle de vérité borné par l'enveloppe annuelle des
+  élévations.** La base et le sommet du wedge ne sont plus
+  rattachés au seuil `min_elevation` et au zénith ; ils suivent
+  désormais les positions du soleil aux solstices à midi solaire
+  pour la latitude configurée :
+  - sommet ≈ `90° − |φ| + 23,45°` (clampé à 90°) — élévation
+    maximale possible (solstice d'été à midi) ;
+  - base ≈ `90° − |φ| − 23,45°` (clampé à 0°) — élévation
+    minimale annuelle à midi (solstice d'hiver).
+
+  À titre d'exemple, en Normandie (φ ≈ 49,5°) le wedge s'étend de
+  ~17° à ~64°. La latitude est lue depuis `hass.config.latitude`
+  (déjà transmise par le panneau Lovelace en v0.9.0). Quand la
+  latitude n'est pas configurée, repli sur l'ancien comportement
+  `[horizon, zénith]`. Pour les latitudes polaires où la fenêtre
+  d'enveloppe serait trop étroite (< 5°), même repli pour conserver
+  un wedge visible.
+- **Contour fermé.** Avec un sommet désormais inférieur au zénith,
+  les deux arêtes inclinées ne se rejoignent plus en un point. Un
+  quatrième tube outline trace l'arc supérieur du wedge à
+  l'élévation maximale, fermant le polygone visuellement.
+- Le `min_elevation` configuré dans la sous-entrée n'est plus
+  utilisé pour la géométrie du wedge — il continue à régir le
+  moteur de décision côté Python (le seuil au-dessous duquel la
+  protection ne se déclenche jamais).
+
 ## [0.9.2] — 2026-05-06
 
 ### Modifié — carte 3D
