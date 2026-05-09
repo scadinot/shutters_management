@@ -870,11 +870,13 @@ class ShuttersSun3dCard extends HTMLElement {
   }
 
   _classify(az, el) {
-    // Use the integration's arc as the half-arc of the close zone, and
-    // arc + 30° as the grazing boundary. The numeric coverage is just
-    // for the visual representation of the shutter, the integration
-    // itself has its own decision engine driven by lux/temp/UV.
-    const arcHalf = this._config.arc / 2;
+    // ``arc`` is the half-width tolerated by the integration's
+    // decision engine — the same semantics the wedge geometry uses
+    // since v0.9.4. We add +30° to define a "grazing" buffer just
+    // outside the formal arc. The numeric coverage is purely
+    // visual for the shutter mesh; the integration itself runs its
+    // own decision pipeline (lux / temp / UV).
+    const arcHalf = this._config.arc;
     const grazing = arcHalf + 30;
     if (el < this._config.min_elevation) {
       return {
