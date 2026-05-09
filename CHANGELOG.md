@@ -6,6 +6,30 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le pr
 
 ## [Non publié]
 
+## [0.9.2] — 2026-05-06
+
+### Modifié — carte 3D
+
+- **Lignes plus visibles.** WebGL clamp les `LineBasicMaterial` à 1
+  pixel d'épaisseur côté navigateur. Les éléments structurants
+  (cercle d'horizon, repères des points cardinaux, trajectoire
+  diurne du soleil) sont désormais rendus via des géométries
+  volumiques (`TorusGeometry` pour l'horizon, `BoxGeometry` pour
+  les ticks, `TubeGeometry` pour la course du soleil) avec une
+  épaisseur réelle.
+- **Triangle de vérité plus contrasté.** L'opacité par défaut du
+  cône d'incidence passe de 0.10 à 0.22 ; en cas de soleil dans
+  l'arc, elle monte jusqu'à 0.40 (au lieu de 0.12). Trois tubes
+  d'outline (arc inférieur + deux arêtes inclinées) en orange
+  clair (`#ffd089`) délimitent désormais le wedge même quand son
+  remplissage devient sombre (état hors-arc).
+- **Base du triangle alignée sur `min_elevation`.** Le wedge ne
+  démarre plus à l'horizon (élévation 0°) mais à la valeur
+  configurée `min_elevation` de la sous-entrée Sun Protection,
+  reflet exact de la frontière de décision : le moteur n'active
+  jamais la protection si `elevation < min_elevation`. Le visuel
+  ne suggère plus une zone d'action qui n'existe pas.
+
 ## [0.9.1] — 2026-05-06
 
 ### Corrigé — carte 3D

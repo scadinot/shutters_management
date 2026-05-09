@@ -239,34 +239,36 @@ class ShuttersSun3dCard extends HTMLElement {
     ground.receiveShadow = true;
     this._scene.add(ground);
 
-    const horizonPts = [];
-    for (let i = 0; i <= 128; i++) {
-      const a = (i / 128) * Math.PI * 2;
-      horizonPts.push(Math.cos(a) * HORIZON_R, 0.02, Math.sin(a) * HORIZON_R);
-    }
-    const horizonGeo = new THREE.BufferGeometry();
-    horizonGeo.setAttribute(
-      "position",
-      new THREE.Float32BufferAttribute(horizonPts, 3)
+    // Horizon ring as a thin torus instead of a 1px Line — WebGL
+    // line widths are clamped to 1 by most browsers, so we use a
+    // tube to get a visible thickness.
+    const horizonTorus = new THREE.Mesh(
+      new THREE.TorusGeometry(HORIZON_R, 0.07, 8, 96),
+      new THREE.MeshBasicMaterial({ color: 0x88aa66 })
     );
-    this._scene.add(
-      new THREE.Line(horizonGeo, new THREE.LineBasicMaterial({ color: 0x88aa66 }))
-    );
+    horizonTorus.rotation.x = Math.PI / 2;
+    horizonTorus.position.y = 0.02;
+    this._scene.add(horizonTorus);
 
+    // Cardinal / intermediate tick marks as thin boxes (cardinal
+    // longer + thicker than intermediates) so they read against the
+    // green ground.
+    const tickMat = new THREE.MeshBasicMaterial({ color: 0x88aa66 });
     for (let deg = 0; deg < 360; deg += 30) {
       const rad = THREE.MathUtils.degToRad(deg);
-      const inner = deg % 90 === 0 ? HORIZON_R - 0.6 : HORIZON_R - 0.3;
-      const tickGeo = new THREE.BufferGeometry().setFromPoints([
-        new THREE.Vector3(Math.sin(rad) * inner, 0.02, -Math.cos(rad) * inner),
-        new THREE.Vector3(
-          Math.sin(rad) * HORIZON_R,
-          0.02,
-          -Math.cos(rad) * HORIZON_R
-        ),
-      ]);
-      this._scene.add(
-        new THREE.Line(tickGeo, new THREE.LineBasicMaterial({ color: 0x88aa66 }))
+      const isCardinal = deg % 90 === 0;
+      const length = isCardinal ? 0.6 : 0.3;
+      const thick = isCardinal ? 0.09 : 0.06;
+      const tick = new THREE.Mesh(
+        new THREE.BoxGeometry(length, thick, thick),
+        tickMat
       );
+      const midR = HORIZON_R - length / 2;
+      tick.position.set(Math.sin(rad) * midR, 0.02, -Math.cos(rad) * midR);
+      // Default box X axis points along world X. Rotate around Y so
+      // the long side aligns with the radial direction at ``rad``.
+      tick.rotation.y = Math.PI / 2 - rad;
+      this._scene.add(tick);
     }
   }
 
@@ -472,13 +474,18 @@ class ShuttersSun3dCard extends HTMLElement {
     // The integration's `arc` is the FULL arc width centred on the
     // façade orientation, not a half-angle. We split it in half here.
     const halfAng = THREE.MathUtils.degToRad(this._config.arc / 2);
+    // Anchor the bottom of the wedge at the configured min_elevation:
+    // matches the integration's actual decision boundary (sun below
+    // min_elevation never triggers protection) and keeps the cone
+    // from cluttering the horizon.
+    const minElRad = THREE.MathUtils.degToRad(this._config.min_elevation || 0);
     const segments = 24;
     const elSegs = 12;
     const pts = [];
     const indices = [];
 
     for (let j = 0; j <= elSegs; j++) {
-      const elRad = (j / elSegs) * (Math.PI / 2);
+      const elRad = minElRad + (j / elSegs) * (Math.PI / 2 - minElRad);
       const r = Math.cos(elRad) * DOME_R;
       const y = Math.sin(elRad) * DOME_R;
       for (let i = 0; i <= segments; i++) {
@@ -504,12 +511,55 @@ class ShuttersSun3dCard extends HTMLElement {
     const mat = new THREE.MeshBasicMaterial({
       color: 0xffaa44,
       transparent: true,
-      opacity: 0.1,
+      // Default opacity bumped from 0.10 → 0.22 for contrast; the
+      // dynamic update in _updateSun will lift it further when the
+      // sun is in the cone.
+      opacity: 0.22,
       side: THREE.DoubleSide,
       depthWrite: false,
     });
     this._coneMesh = new THREE.Mesh(geo, mat);
     this._scene.add(this._coneMesh);
+
+    // Outline tubes (bottom arc + two slanted edges) for definition.
+    // Kept in a stable color so the wedge stays readable even when
+    // the fill darkens (out-of-axis state).
+    const outlineMat = new THREE.MeshBasicMaterial({ color: 0xffd089 });
+    const tubeRadius = 0.05;
+
+    const arcSegs = 36;
+    const arcPts = [];
+    for (let i = 0; i <= arcSegs; i++) {
+      const t = i / arcSegs;
+      const az = this._facadeRad + (t - 0.5) * 2 * halfAng;
+      const r = Math.cos(minElRad) * DOME_R;
+      const y = Math.sin(minElRad) * DOME_R;
+      arcPts.push(new THREE.Vector3(Math.sin(az) * r, y, -Math.cos(az) * r));
+    }
+    if (arcPts.length >= 2) {
+      const arcCurve = new THREE.CatmullRomCurve3(arcPts);
+      const arcGeo = new THREE.TubeGeometry(
+        arcCurve, arcSegs, tubeRadius, 6, false
+      );
+      this._scene.add(new THREE.Mesh(arcGeo, outlineMat));
+    }
+
+    for (const sign of [-1, 1]) {
+      const az = this._facadeRad + sign * halfAng;
+      const edgeSegs = 16;
+      const edgePts = [];
+      for (let i = 0; i <= edgeSegs; i++) {
+        const elRad = minElRad + (i / edgeSegs) * (Math.PI / 2 - minElRad);
+        const r = Math.cos(elRad) * DOME_R;
+        const y = Math.sin(elRad) * DOME_R;
+        edgePts.push(new THREE.Vector3(Math.sin(az) * r, y, -Math.cos(az) * r));
+      }
+      const edgeCurve = new THREE.CatmullRomCurve3(edgePts);
+      const edgeGeo = new THREE.TubeGeometry(
+        edgeCurve, edgeSegs, tubeRadius, 6, false
+      );
+      this._scene.add(new THREE.Mesh(edgeGeo, outlineMat));
+    }
   }
 
   _buildSun() {
@@ -570,14 +620,18 @@ class ShuttersSun3dCard extends HTMLElement {
       pts.push(azElToVec3(sp.azimuth, sp.elevation, DOME_R));
     }
     if (pts.length < 2) return;
-    const geo = new THREE.BufferGeometry().setFromPoints(pts);
+    // Day path as a tube so the trace stands out against the dome
+    // grid; CatmullRom keeps the curve smooth between the 15-min
+    // sample points.
+    const curve = new THREE.CatmullRomCurve3(pts);
+    const tubeGeo = new THREE.TubeGeometry(curve, pts.length * 2, 0.07, 8, false);
     this._scene.add(
-      new THREE.Line(
-        geo,
-        new THREE.LineBasicMaterial({
+      new THREE.Mesh(
+        tubeGeo,
+        new THREE.MeshBasicMaterial({
           color: 0xffaa44,
           transparent: true,
-          opacity: 0.5,
+          opacity: 0.7,
         })
       )
     );
@@ -667,7 +721,11 @@ class ShuttersSun3dCard extends HTMLElement {
         : 0x4488aa
     );
     this._coneMesh.material.opacity =
-      cls.state === "out" || cls.state === "night" ? 0.06 : 0.12;
+      cls.state === "axis"
+        ? 0.4
+        : cls.state === "grazing"
+        ? 0.32
+        : 0.18;
 
     const r = this._uiRefs;
     r.azValue.textContent = Math.round(az) + "°";
