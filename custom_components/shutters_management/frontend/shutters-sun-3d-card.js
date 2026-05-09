@@ -481,40 +481,68 @@ class ShuttersSun3dCard extends HTMLElement {
     // the decision engine: ``__init__.py:1291`` triggers
     // ``out_of_arc`` whenever ``|az − orientation| > arc``, so the
     // effective acceptance cone spans ``[orientation − arc,
-    // orientation + arc]`` — a total width of ``2·arc``. ``halfAng``
-    // is the half-width of the cone in radians, which is exactly
-    // ``degToRad(arc)`` (no division by two; that was the v0.9.3
-    // bug that rendered the wedge twice as narrow as the actual
-    // decision boundary).
-    const halfAng = THREE.MathUtils.degToRad(this._config.arc);
-    // The wedge spans the yearly *solar-noon* elevation envelope
-    // at the configured latitude: outside the tropics the bottom
-    // sits at the winter solstice noon elevation and the top at
-    // the summer solstice noon; inside the tropics (|φ| < 23.45°)
-    // the formula is clamped at 90° (sun reaches the zenith on the
-    // day the solar declination crosses the latitude). This
-    // matches the physical reality of the site much better than
-    // the previous min_elevation-to-zenith range.
-    let { lowerRad, upperRad } = solsticeBounds(this._config.latitude);
-    // Degenerate case (e.g. polar latitude near 90° + cap effects):
-    // fall back to [horizon, zenith] so the wedge stays usable.
+    // orientation + arc]`` — a total width of ``2·arc``.
+    const halfAngDeg = this._config.arc;
+    const halfAng = THREE.MathUtils.degToRad(halfAngDeg);
+    const facadeDeg = this._config.orientation;
+    const fromAzDeg = facadeDeg - halfAngDeg;
+    const toAzDeg = facadeDeg + halfAngDeg;
+    const segments = 24;
+    const elSegs = 12;
+
+    // Bottom and top of the wedge follow the *actual* sun
+    // trajectories on the two solstices, clipped to the wedge's
+    // azimuth window. Compared to the v0.9.4 rectangle (constant
+    // noon-elevation top + bottom), this hugs the day arcs so the
+    // wedge truly outlines « where the sun can be in this site's
+    // acceptance window throughout the year ».
+    const lat = this._config.latitude;
+    const lon = this._config.longitude || 0;
+    const winterArc = solsticeArc(
+      lat, lon, false, fromAzDeg, toAzDeg, segments
+    );
+    const summerArc = solsticeArc(
+      lat, lon, true, fromAzDeg, toAzDeg, segments
+    );
+    const trajectoriesUsable =
+      winterArc.length === segments + 1 &&
+      winterArc.every(
+        (p, i) =>
+          Number.isFinite(p.elDeg) &&
+          Number.isFinite(summerArc[i].elDeg) &&
+          summerArc[i].elDeg - p.elDeg > 1
+      );
+
+    let { lowerRad, upperRad } = solsticeBounds(lat);
     if (upperRad - lowerRad < THREE.MathUtils.degToRad(5)) {
       lowerRad = 0;
       upperRad = Math.PI / 2;
     }
-    const segments = 24;
-    const elSegs = 12;
+
+    const lowerElForCol = (i) =>
+      trajectoriesUsable
+        ? THREE.MathUtils.degToRad(winterArc[i].elDeg)
+        : lowerRad;
+    const upperElForCol = (i) =>
+      trajectoriesUsable
+        ? THREE.MathUtils.degToRad(summerArc[i].elDeg)
+        : upperRad;
+    const azRadForCol = (i) =>
+      trajectoriesUsable
+        ? THREE.MathUtils.degToRad(winterArc[i].azDeg)
+        : this._facadeRad + ((i / segments) - 0.5) * 2 * halfAng;
+
     const pts = [];
     const indices = [];
 
     for (let j = 0; j <= elSegs; j++) {
-      const elRad = lowerRad + (j / elSegs) * (upperRad - lowerRad);
-      const r = Math.cos(elRad) * DOME_R;
-      const y = Math.sin(elRad) * DOME_R;
+      const t_el = j / elSegs;
       for (let i = 0; i <= segments; i++) {
-        const t = i / segments;
-        const azOffset = (t - 0.5) * 2 * halfAng;
-        const az = this._facadeRad + azOffset;
+        const az = azRadForCol(i);
+        const elRad =
+          lowerElForCol(i) + t_el * (upperElForCol(i) - lowerElForCol(i));
+        const r = Math.cos(elRad) * DOME_R;
+        const y = Math.sin(elRad) * DOME_R;
         pts.push(Math.sin(az) * r, y, -Math.cos(az) * r);
       }
     }
@@ -545,47 +573,45 @@ class ShuttersSun3dCard extends HTMLElement {
     this._coneMesh = new THREE.Mesh(geo, mat);
     this._scene.add(this._coneMesh);
 
-    // Outline tubes (bottom arc + two slanted edges + top arc) for
-    // definition. Kept in a stable color so the wedge stays readable
-    // even when the fill darkens (out-of-axis state). The top arc
-    // closes the polygon — the slanted edges no longer converge at
-    // the zenith now that the cone tops out at upperRad < π/2.
+    // Outline tubes : bottom + top follow the solstice trajectories
+    // (or sit at constant noon elevations in the fallback path);
+    // the two side edges connect winter to summer at the wedge
+    // azimuth boundaries, drawn vertically in the dome frame.
     const outlineMat = new THREE.MeshBasicMaterial({ color: 0xffd089 });
     const tubeRadius = 0.05;
-    const arcSegs = 36;
 
-    const arcAtElevation = (elRad) => {
-      const pts = [];
-      for (let i = 0; i <= arcSegs; i++) {
-        const t = i / arcSegs;
-        const az = this._facadeRad + (t - 0.5) * 2 * halfAng;
-        const r = Math.cos(elRad) * DOME_R;
-        const y = Math.sin(elRad) * DOME_R;
-        pts.push(new THREE.Vector3(Math.sin(az) * r, y, -Math.cos(az) * r));
-      }
-      return pts;
+    const colToVec = (i, useUpper) => {
+      const az = azRadForCol(i);
+      const elRad = useUpper ? upperElForCol(i) : lowerElForCol(i);
+      const r = Math.cos(elRad) * DOME_R;
+      const y = Math.sin(elRad) * DOME_R;
+      return new THREE.Vector3(Math.sin(az) * r, y, -Math.cos(az) * r);
     };
 
-    for (const elRad of [lowerRad, upperRad]) {
-      const pts = arcAtElevation(elRad);
-      if (pts.length < 2) continue;
-      const curve = new THREE.CatmullRomCurve3(pts);
+    for (const useUpper of [false, true]) {
+      const arcPts = [];
+      for (let i = 0; i <= segments; i++) arcPts.push(colToVec(i, useUpper));
+      if (arcPts.length < 2) continue;
+      const curve = new THREE.CatmullRomCurve3(arcPts);
       const geoArc = new THREE.TubeGeometry(
-        curve, arcSegs, tubeRadius, 6, false
+        curve, segments, tubeRadius, 6, false
       );
       this._scene.add(new THREE.Mesh(geoArc, outlineMat));
     }
 
-    for (const sign of [-1, 1]) {
-      const az = this._facadeRad + sign * halfAng;
+    for (const colIndex of [0, segments]) {
+      const lowEl = lowerElForCol(colIndex);
+      const highEl = upperElForCol(colIndex);
+      const az = azRadForCol(colIndex);
       const edgeSegs = 16;
       const edgePts = [];
       for (let i = 0; i <= edgeSegs; i++) {
-        const elRad = lowerRad + (i / edgeSegs) * (upperRad - lowerRad);
+        const elRad = lowEl + (i / edgeSegs) * (highEl - lowEl);
         const r = Math.cos(elRad) * DOME_R;
         const y = Math.sin(elRad) * DOME_R;
         edgePts.push(new THREE.Vector3(Math.sin(az) * r, y, -Math.cos(az) * r));
       }
+      if (edgePts.length < 2) continue;
       const edgeCurve = new THREE.CatmullRomCurve3(edgePts);
       const edgeGeo = new THREE.TubeGeometry(
         edgeCurve, edgeSegs, tubeRadius, 6, false
@@ -1040,6 +1066,65 @@ function solsticeBounds(latDeg) {
     lowerRad: THREE.MathUtils.degToRad(lowerDeg),
     upperRad: THREE.MathUtils.degToRad(upperDeg),
   };
+}
+
+function solsticeArc(latDeg, lonDeg, summer, fromAzDeg, toAzDeg, segments) {
+  // Sample the sun's trajectory on either solstice (June 21 or
+  // December 21 of the current year) at 5-minute resolution, keep
+  // only above-horizon points, and interpolate the elevation at
+  // ``segments + 1`` evenly spaced azimuths in [fromAzDeg, toAzDeg].
+  // Returns Array<{azDeg, elDeg}> ordered by increasing azimuth.
+  // Points whose azimuth is not crossed by the trajectory that day
+  // (e.g. winter sun at high latitude that never reaches the
+  // requested bearing) get elDeg = 0 — the wedge naturally drops to
+  // the horizon there.
+  const lat = Number(latDeg);
+  if (!Number.isFinite(lat)) {
+    const out = [];
+    for (let i = 0; i <= segments; i++) {
+      const t = i / segments;
+      out.push({
+        azDeg: fromAzDeg + t * (toAzDeg - fromAzDeg),
+        elDeg: NaN,
+      });
+    }
+    return out;
+  }
+  const lon = Number(lonDeg) || 0;
+  const year = new Date().getFullYear();
+  const date = summer ? new Date(year, 5, 21) : new Date(year, 11, 21);
+  const traj = [];
+  for (let m = 0; m <= 24 * 12; m++) {
+    const t = new Date(date);
+    t.setHours(0, m * 5, 0, 0);
+    const sp = solarPosition(t, lat, lon);
+    if (sp.elevation > 0) traj.push(sp);
+  }
+
+  const out = [];
+  for (let i = 0; i <= segments; i++) {
+    const t = i / segments;
+    const azDeg = fromAzDeg + t * (toAzDeg - fromAzDeg);
+    let elDeg = 0;
+    for (let j = 0; j < traj.length - 1; j++) {
+      const a1 = traj[j].azimuth;
+      const a2 = traj[j + 1].azimuth;
+      // Skip the two points that straddle the 360°→0° wrap so we
+      // do not interpolate across the discontinuity.
+      if (Math.abs(a2 - a1) >= 30) continue;
+      const aMin = Math.min(a1, a2);
+      const aMax = Math.max(a1, a2);
+      if (azDeg >= aMin && azDeg <= aMax) {
+        const f = (azDeg - a1) / (a2 - a1);
+        elDeg =
+          traj[j].elevation +
+          f * (traj[j + 1].elevation - traj[j].elevation);
+        break;
+      }
+    }
+    out.push({ azDeg, elDeg });
+  }
+  return out;
 }
 
 function angleDelta(a, b) {
