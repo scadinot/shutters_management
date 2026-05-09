@@ -477,9 +477,16 @@ class ShuttersSun3dCard extends HTMLElement {
   }
 
   _buildIncidenceCone() {
-    // The integration's `arc` is the FULL arc width centred on the
-    // façade orientation, not a half-angle. We split it in half here.
-    const halfAng = THREE.MathUtils.degToRad(this._config.arc / 2);
+    // The integration's `arc` is the **half-width** tolerated by
+    // the decision engine: ``__init__.py:1291`` triggers
+    // ``out_of_arc`` whenever ``|az − orientation| > arc``, so the
+    // effective acceptance cone spans ``[orientation − arc,
+    // orientation + arc]`` — a total width of ``2·arc``. ``halfAng``
+    // is the half-width of the cone in radians, which is exactly
+    // ``degToRad(arc)`` (no division by two; that was the v0.9.3
+    // bug that rendered the wedge twice as narrow as the actual
+    // decision boundary).
+    const halfAng = THREE.MathUtils.degToRad(this._config.arc);
     // The wedge spans the yearly *solar-noon* elevation envelope
     // at the configured latitude: outside the tropics the bottom
     // sits at the winter solstice noon elevation and the top at
@@ -863,11 +870,13 @@ class ShuttersSun3dCard extends HTMLElement {
   }
 
   _classify(az, el) {
-    // Use the integration's arc as the half-arc of the close zone, and
-    // arc + 30° as the grazing boundary. The numeric coverage is just
-    // for the visual representation of the shutter, the integration
-    // itself has its own decision engine driven by lux/temp/UV.
-    const arcHalf = this._config.arc / 2;
+    // ``arc`` is the half-width tolerated by the integration's
+    // decision engine — the same semantics the wedge geometry uses
+    // since v0.9.4. We add +30° to define a "grazing" buffer just
+    // outside the formal arc. The numeric coverage is purely
+    // visual for the shutter mesh; the integration itself runs its
+    // own decision pipeline (lux / temp / UV).
+    const arcHalf = this._config.arc;
     const grazing = arcHalf + 30;
     if (el < this._config.min_elevation) {
       return {
