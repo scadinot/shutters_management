@@ -6,6 +6,22 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le pr
 
 ## [Non publié]
 
+## [0.9.4] — 2026-05-09
+
+### Corrigé — carte 3D
+
+- **Triangle de vérité deux fois trop étroit.** La carte 3D
+  interprétait le champ `arc` comme la largeur **totale** de la
+  cône d'acceptance et la divisait par deux pour son demi-angle.
+  Or le moteur de décision Python utilise `arc` comme
+  **demi-largeur** (`if diff > arc: out_of_arc`), donc la cône
+  effective spans `2·arc` au total. Avec `arc = 40°` le wedge
+  visuel ne couvrait que ±20° au lieu de ±40°, faisant croire que
+  le soleil sortait de la zone de protection alors que
+  l'intégration la considérait active. La carte trace désormais le
+  wedge avec `halfAng = degToRad(arc)`, parfaitement aligné sur la
+  fenêtre de décision Python.
+
 ## [0.9.3] — 2026-05-09
 
 ### Modifié — carte 3D
