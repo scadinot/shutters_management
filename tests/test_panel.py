@@ -141,12 +141,16 @@ async def test_dashboard_empty_hub_shows_hint(hass: HomeAssistant) -> None:
 
 
 def _flatten_cards(cards: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Walk Lovelace card containers (vertical/horizontal-stack, grid)."""
+    """Walk Lovelace card containers (vertical/horizontal-stack, grid, conditional)."""
     out: list[dict[str, Any]] = []
     for card in cards:
         out.append(card)
         if card.get("type") in ("vertical-stack", "horizontal-stack", "grid"):
             out.extend(_flatten_cards(card.get("cards", [])))
+        elif card.get("type") == "conditional":
+            inner = card.get("card")
+            if inner is not None:
+                out.extend(_flatten_cards([inner]))
     return out
 
 
@@ -283,7 +287,47 @@ async def test_sun_protection_view_groups_margins_in_vertical_stack(
     inner = margins_block["cards"]
     assert len(inner) >= 2, "vertical-stack must have title + gauges row"
     assert inner[1]["type"] == "horizontal-stack"
-    assert all(card["type"] == "gauge" for card in inner[1]["cards"])
+    # Each gauge is wrapped in a ``conditional`` card (since v0.9.6)
+    # so it disappears when the underlying margin sensor is unknown
+    # (e.g. lux_margin while temp_outdoor < T_OUTDOOR_NO_PROTECT).
+    for wrapper in inner[1]["cards"]:
+        assert wrapper["type"] == "conditional"
+        assert wrapper["card"]["type"] == "gauge"
+
+
+async def test_margin_gauges_wrapped_in_conditional(
+    hass: HomeAssistant,
+) -> None:
+    """Each margin gauge sits inside a conditional card that hides it
+    when the entity reports ``unknown`` or ``unavailable``.
+
+    Regression coverage for v0.9.5: cold weather makes
+    ``lux_close_threshold`` return ``None``, so
+    ``sensor.<g>_sun_protection_lux_margin.state == 'unknown'`` and a
+    bare ``gauge`` card surfaces « L'entité n'est pas numérique ».
+    """
+    entry = _hub_with_subentries(
+        subentries=[_sun_sub("Salon Sud", "salon_sud")]
+    )
+    entry.add_to_hass(hass)
+
+    config = build_dashboard_config(hass, entry)
+    sun_view = next(v for v in config["views"] if v["path"] == "salon_sud")
+    all_cards = _flatten_cards(sun_view["cards"])
+
+    gauges = [c for c in all_cards if c.get("type") == "gauge"]
+    assert gauges, "expected at least one margin gauge"
+    conditionals = [c for c in all_cards if c.get("type") == "conditional"]
+    # Every gauge is wrapped exactly once.
+    assert len(conditionals) == len(gauges)
+    for cond in conditionals:
+        assert cond["card"]["type"] == "gauge"
+        entity = cond["card"]["entity"]
+        # Both ``unknown`` and ``unavailable`` must be filtered out.
+        state_nots = {c.get("state_not") for c in cond["conditions"]}
+        assert state_nots == {"unknown", "unavailable"}
+        for c in cond["conditions"]:
+            assert c["entity"] == entity
 
 
 async def test_scheduler_view_header_links_back_to_cockpit(

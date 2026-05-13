@@ -6,6 +6,31 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le pr
 
 ## [Non publié]
 
+## [0.9.6] — 2026-05-09
+
+### Corrigé — jauges de marges
+
+- **« L'entité n'est pas numérique »** sur la jauge **Marge lux**
+  (et symétriquement sur la **Marge UV**) quand la condition de
+  protection ne s'applique pas. Cas reproductible : capteur de
+  luminosité extérieure configuré, mais température extérieure
+  inférieure à 20 °C (`T_OUTDOOR_NO_PROTECT`). Dans cette
+  situation, le moteur de décision Python renvoie
+  `lux_close_threshold = None` (la protection est désactivée car
+  on veut conserver le gain solaire), donc
+  `sensor.<groupe>_sun_protection_lux_margin` passe en état
+  `unknown` et la `gauge` Lovelace surfaçait l'erreur.
+- Les quatre jauges de marges (`lux`, `élévation`, `UV`, `écart
+  d'azimuth`) sont désormais enveloppées dans une carte
+  `conditional` qui les masque proprement quand l'entité n'a pas
+  de valeur numérique. Elles réapparaissent automatiquement dès
+  que la lecture redevient valide (par exemple lever du soleil +
+  réchauffement extérieur).
+- Aucun changement de sémantique côté capteurs : `None` reste
+  l'expression correcte du fait « la protection ne s'applique
+  pas aujourd'hui » ; on évite simplement de l'afficher comme une
+  erreur.
+
 ## [0.9.5] — 2026-05-09
 
 ### Modifié — carte 3D

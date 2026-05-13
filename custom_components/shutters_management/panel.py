@@ -477,6 +477,36 @@ def _gauge_card(
     return card
 
 
+def _conditional_numeric_card(card: dict[str, Any]) -> dict[str, Any]:
+    """Hide ``card`` when its entity is ``unknown`` or ``unavailable``.
+
+    Two distinct paths can produce a non-numeric state on a margin
+    sensor and we want to handle both cleanly:
+
+    * **Protection deliberately not applicable** — e.g. lux_margin
+      returns ``None`` whenever ``t_ext < T_OUTDOOR_NO_PROTECT``
+      because the integration intentionally disables sun protection
+      in cold weather to keep the solar gain. The margin loses its
+      operational meaning and HA exposes ``unknown``.
+    * **Upstream sensor unavailable** — the lux / UV / temperature
+      provider drops out, propagating to ``unavailable``.
+
+    In both cases a bare ``gauge`` card surfaces « L'entité n'est
+    pas numérique ». Wrapping it in a ``conditional`` hides the
+    card cleanly; it reappears automatically when the entity reads
+    a number again.
+    """
+    entity = card["entity"]
+    return {
+        "type": "conditional",
+        "conditions": [
+            {"entity": entity, "state_not": "unknown"},
+            {"entity": entity, "state_not": "unavailable"},
+        ],
+        "card": card,
+    }
+
+
 def _build_sun_protection_view(
     hass: HomeAssistant,
     hub_entry: ConfigEntry,
@@ -606,7 +636,9 @@ def _build_sun_protection_view(
                 },
                 {
                     "type": "horizontal-stack",
-                    "cards": gauges,
+                    "cards": [
+                        _conditional_numeric_card(g) for g in gauges
+                    ],
                 },
             ],
         }
