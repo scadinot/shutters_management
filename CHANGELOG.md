@@ -19,7 +19,7 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le pr
   `lux_close_threshold = None` (la protection est désactivée car
   on veut conserver le gain solaire), donc
   `sensor.<groupe>_sun_protection_lux_margin` passe en état
-  `unknown` et la `gauge` Lovelace surfacait l'erreur.
+  `unknown` et la `gauge` Lovelace surfaçait l'erreur.
 - Les quatre jauges de marges (`lux`, `élévation`, `UV`, `écart
   d'azimuth`) sont désormais enveloppées dans une carte
   `conditional` qui les masque proprement quand l'entité n'a pas

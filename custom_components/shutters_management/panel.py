@@ -480,13 +480,21 @@ def _gauge_card(
 def _conditional_numeric_card(card: dict[str, Any]) -> dict[str, Any]:
     """Hide ``card`` when its entity is ``unknown`` or ``unavailable``.
 
-    The sun-protection margin sensors return ``None`` when the
-    relevant input is missing (e.g. lux_margin is ``None`` while
-    ``t_ext < T_OUTDOOR_NO_PROTECT`` because the integration won't
-    protect in cold weather). HA exposes that as ``unknown`` and a
-    bare ``gauge`` card renders the warning « L'entité n'est pas
-    numérique ». Wrap each numeric card in a ``conditional`` so it
-    disappears cleanly instead.
+    Two distinct paths can produce a non-numeric state on a margin
+    sensor and we want to handle both cleanly:
+
+    * **Protection deliberately not applicable** — e.g. lux_margin
+      returns ``None`` whenever ``t_ext < T_OUTDOOR_NO_PROTECT``
+      because the integration intentionally disables sun protection
+      in cold weather to keep the solar gain. The margin loses its
+      operational meaning and HA exposes ``unknown``.
+    * **Upstream sensor unavailable** — the lux / UV / temperature
+      provider drops out, propagating to ``unavailable``.
+
+    In both cases a bare ``gauge`` card surfaces « L'entité n'est
+    pas numérique ». Wrapping it in a ``conditional`` hides the
+    card cleanly; it reappears automatically when the entity reads
+    a number again.
     """
     entity = card["entity"]
     return {
