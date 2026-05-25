@@ -33,6 +33,7 @@ from homeassistant.helpers.json import json_bytes, json_fragment
 from homeassistant.util import slugify
 
 from .const import (
+    ARC_HYSTERESIS_DEG,
     CONF_ARC,
     CONF_COVERS,
     CONF_LUX_ENTITY,
@@ -46,8 +47,10 @@ from .const import (
     DEFAULT_ARC,
     DEFAULT_MIN_ELEVATION,
     DEFAULT_MIN_UV,
+    DEFAULT_ORIENTATION,
     DEFAULT_TARGET_POSITION,
     DOMAIN,
+    ELEVATION_HYSTERESIS_DEG,
     HUB_TITLE,
     LUX_STANDARD,
     SERVICE_PAUSE,
@@ -105,6 +108,57 @@ _LABELS_FR: dict[str, str] = {
     "azimuth": "Azimuth",
     "elevation": "Élévation",
     "sun_facing": "Soleil face à la façade",
+    "lux_short": "Lux",
+    "sun_facing_short": "Face",
+    "elevation_short": "Élév.",
+    "all_covers": "Volets configurés",
+    "decision_params": "Paramètres de décision",
+    "geometry": "Géométrie du soleil",
+    "lux_gate": "Luminosité (gate adaptatif)",
+    "uv_gate": "UV (gate optionnel)",
+    "temperatures": "Températures",
+    "hysteresis_debounce": "Hystérésis et debounce",
+    "subentry_config": "Configuration de la sous-entrée",
+    "final_decision": "Décision finale",
+    "criterion": "Critère",
+    "value": "Valeur",
+    "threshold": "Seuil",
+    "hysteresis_exit": "Hystérésis sortie",
+    "phase": "Phase",
+    "duration": "Durée",
+    "parameter": "Paramètre",
+    "indicator": "Indicateur",
+    "outdoor_lux": "Lux extérieure",
+    "exit_lux": "Sortie lux",
+    "adaptive_brackets": "Brackets adaptatifs",
+    "uv_index": "Indice UV",
+    "outdoor_temp": "T° extérieure",
+    "indoor_temp": "T° intérieure",
+    "exit_comfort": "Sortie confort",
+    "close_phase": "Fermeture (close)",
+    "open_phase": "Réouverture (open)",
+    "current_counter": "Compteur courant",
+    "override_reset": "Reset override",
+    "facade_orientation": "Orientation façade",
+    "half_arc": "Demi-arc accepté",
+    "min_elevation_label": "Élévation min",
+    "min_uv_label": "UV min",
+    "indoor_temp_sensor": "Capteur T° intérieure",
+    "not_configured": "non configuré",
+    "status_label": "Statut",
+    "protection_active": "Protection active",
+    "override_until": "Override jusqu'à",
+    "lux_adaptive_brackets_value": (
+        "T°ext < 24°C : 70 000 lx · < 30°C : 50 000 lx · "
+        "≥ 30°C : 35 000 lx"
+    ),
+    "exit_lux_value": "< 25 000 lx pendant 20 min",
+    "exit_comfort_value": "T°int < 21°C ET T°ext < 22°C",
+    "close_phase_value": "10 min (sustained lux ≥ seuil)",
+    "open_phase_value": "20 min (sustained lux < 25 000 lx)",
+    "override_reset_value": "à 04 h chaque jour",
+    "outdoor_temp_threshold": "≥ 20°C pour activer la protection",
+    "indoor_temp_threshold": "≥ 23°C (standard) / 24°C (mild)",
 }
 
 _LABELS_EN: dict[str, str] = {
@@ -145,6 +199,57 @@ _LABELS_EN: dict[str, str] = {
     "azimuth": "Azimuth",
     "elevation": "Elevation",
     "sun_facing": "Sun facing the façade",
+    "lux_short": "Lux",
+    "sun_facing_short": "Facing",
+    "elevation_short": "Elev.",
+    "all_covers": "Configured covers",
+    "decision_params": "Decision parameters",
+    "geometry": "Sun geometry",
+    "lux_gate": "Lux (adaptive gate)",
+    "uv_gate": "UV (optional gate)",
+    "temperatures": "Temperatures",
+    "hysteresis_debounce": "Hysteresis and debounce",
+    "subentry_config": "Subentry configuration",
+    "final_decision": "Final decision",
+    "criterion": "Criterion",
+    "value": "Value",
+    "threshold": "Threshold",
+    "hysteresis_exit": "Exit hysteresis",
+    "phase": "Phase",
+    "duration": "Duration",
+    "parameter": "Parameter",
+    "indicator": "Indicator",
+    "outdoor_lux": "Outdoor lux",
+    "exit_lux": "Lux exit",
+    "adaptive_brackets": "Adaptive brackets",
+    "uv_index": "UV index",
+    "outdoor_temp": "Outdoor temp.",
+    "indoor_temp": "Indoor temp.",
+    "exit_comfort": "Comfort exit",
+    "close_phase": "Close phase",
+    "open_phase": "Open phase",
+    "current_counter": "Current counter",
+    "override_reset": "Override reset",
+    "facade_orientation": "Façade orientation",
+    "half_arc": "Accepted half-arc",
+    "min_elevation_label": "Min elevation",
+    "min_uv_label": "Min UV",
+    "indoor_temp_sensor": "Indoor temp. sensor",
+    "not_configured": "not configured",
+    "status_label": "Status",
+    "protection_active": "Sun protection active",
+    "override_until": "Override until",
+    "lux_adaptive_brackets_value": (
+        "Outdoor < 24°C: 70 000 lx · < 30°C: 50 000 lx · "
+        "≥ 30°C: 35 000 lx"
+    ),
+    "exit_lux_value": "< 25 000 lx for 20 min",
+    "exit_comfort_value": "Indoor < 21°C AND outdoor < 22°C",
+    "close_phase_value": "10 min (sustained lux ≥ threshold)",
+    "open_phase_value": "20 min (sustained lux < 25 000 lx)",
+    "override_reset_value": "at 04 h every day",
+    "outdoor_temp_threshold": "≥ 20°C to enable protection",
+    "indoor_temp_threshold": "≥ 23°C (standard) / 24°C (mild)",
 }
 
 
@@ -253,14 +358,42 @@ def _scheduler_tile(subentry: ConfigSubentry) -> dict[str, Any]:
     }
 
 
-def _sun_tile(subentry: ConfigSubentry) -> dict[str, Any]:
+def _sun_tile(
+    subentry: ConfigSubentry, labels: dict[str, str]
+) -> dict[str, Any]:
+    """Cockpit tile for a sun-protection subentry.
+
+    Rendered as a ``glance`` card showing four key indicators at a
+    glance (status, lux, sun_facing, elevation). The card itself
+    is clickable to navigate into the drill-down view, so the user
+    keeps the one-click access while gaining live context.
+    """
     prefix = _entity_prefix(subentry)
     return {
-        "type": "tile",
-        "entity": f"binary_sensor.{prefix}_sun_protection_active",
-        "name": subentry.title,
-        "icon": "mdi:weather-sunny",
+        "type": "glance",
+        "title": subentry.title,
+        "show_state": True,
+        "state_color": True,
+        "columns": 4,
         "tap_action": _navigate_to(_view_path(subentry)),
+        "entities": [
+            {
+                "entity": f"sensor.{prefix}_sun_protection_status",
+                "name": labels["status_label"],
+            },
+            {
+                "entity": f"sensor.{prefix}_sun_protection_lux",
+                "name": labels["lux_short"],
+            },
+            {
+                "entity": f"binary_sensor.{prefix}_sun_facing",
+                "name": labels["sun_facing_short"],
+            },
+            {
+                "entity": f"sensor.{prefix}_sun_protection_sun_elevation",
+                "name": labels["elevation_short"],
+            },
+        ],
     }
 
 
@@ -348,7 +481,30 @@ def _build_cockpit_view(
                 "type": "grid",
                 "columns": 1,
                 "square": False,
-                "cards": [_sun_tile(sub) for sub in suns],
+                "cards": [_sun_tile(sub, labels) for sub in suns],
+            }
+        )
+
+    # Global list of every cover declared in any subentry, deduplicated
+    # and sorted alphabetically. Gives one-click access to each shutter
+    # without diving into a specific drill-down.
+    all_covers: set[str] = set()
+    for sub in entry.subentries.values():
+        for cover_id in sub.data.get(CONF_COVERS) or []:
+            if cover_id:
+                all_covers.add(cover_id)
+    if all_covers:
+        cards.append(
+            {
+                "type": "markdown",
+                "content": f"### {labels['all_covers']}",
+            }
+        )
+        cards.append(
+            {
+                "type": "entities",
+                "show_header_toggle": False,
+                "entities": sorted(all_covers),
             }
         )
 
@@ -507,6 +663,114 @@ def _conditional_numeric_card(card: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _decision_parameters_markdown(
+    subentry: ConfigSubentry,
+    labels: dict[str, str],
+) -> dict[str, Any]:
+    """Comprehensive markdown table of every parameter that drives
+    the sun-protection decision, with current value + threshold
+    side-by-side.
+
+    Static constants from ``const.py`` (debounce, hysteresis,
+    brackets) are substituted at build time. Per-subentry config
+    (orientation, arc, min_elevation, min_uv, target_position) is
+    likewise inlined. Live values come from Jinja templates that
+    HA's markdown card re-renders on every state change.
+    """
+    prefix = _entity_prefix(subentry)
+    arc = subentry.data.get(CONF_ARC, DEFAULT_ARC)
+    min_elevation = subentry.data.get(
+        CONF_MIN_ELEVATION, DEFAULT_MIN_ELEVATION
+    )
+    min_uv = subentry.data.get(CONF_MIN_UV, DEFAULT_MIN_UV)
+    orientation = subentry.data.get(CONF_ORIENTATION, DEFAULT_ORIENTATION)
+    target_position = subentry.data.get(
+        CONF_TARGET_POSITION, DEFAULT_TARGET_POSITION
+    )
+    temp_indoor_entity = subentry.data.get(CONF_TEMP_INDOOR_ENTITY) or ""
+    indoor_sensor_repr = temp_indoor_entity or labels["not_configured"]
+
+    az_diff = f"sensor.{prefix}_sun_protection_azimuth_diff"
+    elevation = f"sensor.{prefix}_sun_protection_sun_elevation"
+    lux = f"sensor.{prefix}_sun_protection_lux"
+    lux_threshold = f"sensor.{prefix}_sun_protection_lux_threshold"
+    uv = f"sensor.{prefix}_sun_protection_uv_index"
+    temp_outdoor = f"sensor.{prefix}_sun_protection_temp_outdoor"
+    temp_indoor = f"sensor.{prefix}_sun_protection_temp_indoor"
+    pending = f"sensor.{prefix}_sun_protection_pending_seconds"
+    status = f"sensor.{prefix}_sun_protection_status"
+    protection_active = f"binary_sensor.{prefix}_sun_protection_active"
+    override = f"sensor.{prefix}_sun_protection_override_until"
+
+    L = labels
+
+    content = (
+        f"### {L['decision_params']}\n\n"
+        f"**{L['geometry']}**\n\n"
+        f"| {L['criterion']} | {L['value']} | {L['threshold']} | "
+        f"{L['hysteresis_exit']} |\n"
+        f"|---|---|---|---|\n"
+        f"| {L['elevation']} | "
+        f"{{{{ states('{elevation}') }}}}° | "
+        f"≥ {min_elevation}° | "
+        f"−{ELEVATION_HYSTERESIS_DEG}° |\n"
+        f"| {L['azimuth_diff']} | "
+        f"{{{{ states('{az_diff}') }}}}° | "
+        f"≤ {arc}° | +{ARC_HYSTERESIS_DEG}° |\n\n"
+        f"**{L['lux_gate']}**\n\n"
+        f"| {L['criterion']} | {L['value']} | {L['threshold']} |\n"
+        f"|---|---|---|\n"
+        f"| {L['outdoor_lux']} | "
+        f"{{{{ states('{lux}') }}}} lx | "
+        f"≥ {{{{ states('{lux_threshold}') }}}} lx |\n"
+        f"| {L['exit_lux']} | — | {L['exit_lux_value']} |\n"
+        f"| {L['adaptive_brackets']} | — | "
+        f"{L['lux_adaptive_brackets_value']} |\n\n"
+        f"**{L['uv_gate']}**\n\n"
+        f"| {L['criterion']} | {L['value']} | {L['threshold']} |\n"
+        f"|---|---|---|\n"
+        f"| {L['uv_index']} | {{{{ states('{uv}') }}}} | "
+        f"≥ {min_uv} |\n\n"
+        f"**{L['temperatures']}**\n\n"
+        f"| {L['criterion']} | {L['value']} | {L['threshold']} |\n"
+        f"|---|---|---|\n"
+        f"| {L['outdoor_temp']} | "
+        f"{{{{ states('{temp_outdoor}') }}}}°C | "
+        f"{L['outdoor_temp_threshold']} |\n"
+        f"| {L['indoor_temp']} | "
+        f"{{{{ states('{temp_indoor}') }}}}°C | "
+        f"{L['indoor_temp_threshold']} |\n"
+        f"| {L['exit_comfort']} | — | {L['exit_comfort_value']} |\n\n"
+        f"**{L['hysteresis_debounce']}**\n\n"
+        f"| {L['phase']} | {L['duration']} |\n"
+        f"|---|---|\n"
+        f"| {L['close_phase']} | {L['close_phase_value']} |\n"
+        f"| {L['open_phase']} | {L['open_phase_value']} |\n"
+        f"| {L['current_counter']} | "
+        f"{{{{ states('{pending}') }}}} s |\n"
+        f"| {L['override_reset']} | {L['override_reset_value']} |\n\n"
+        f"**{L['subentry_config']}**\n\n"
+        f"| {L['parameter']} | {L['value']} |\n"
+        f"|---|---|\n"
+        f"| {L['facade_orientation']} | {orientation}° |\n"
+        f"| {L['half_arc']} | {arc}° |\n"
+        f"| {L['min_elevation_label']} | {min_elevation}° |\n"
+        f"| {L['min_uv_label']} | {min_uv} |\n"
+        f"| {L['target_position']} | {target_position} % |\n"
+        f"| {L['indoor_temp_sensor']} | {indoor_sensor_repr} |\n\n"
+        f"**{L['final_decision']}**\n\n"
+        f"| {L['indicator']} | {L['value']} |\n"
+        f"|---|---|\n"
+        f"| {L['status_label']} | "
+        f"**{{{{ states('{status}') }}}}** |\n"
+        f"| {L['protection_active']} | "
+        f"{{{{ states('{protection_active}') }}}} |\n"
+        f"| {L['override_until']} | "
+        f"{{{{ states('{override}') }}}} |\n"
+    )
+    return {"type": "markdown", "content": content}
+
+
 def _build_sun_protection_view(
     hass: HomeAssistant,
     hub_entry: ConfigEntry,
@@ -529,7 +793,7 @@ def _build_sun_protection_view(
     target_position = subentry.data.get(
         CONF_TARGET_POSITION, DEFAULT_TARGET_POSITION
     )
-    orientation = subentry.data.get(CONF_ORIENTATION, 180)
+    orientation = subentry.data.get(CONF_ORIENTATION, DEFAULT_ORIENTATION)
     min_uv = subentry.data.get(CONF_MIN_UV, DEFAULT_MIN_UV)
 
     has_lux = bool(hub_entry.data.get(CONF_LUX_ENTITY))
@@ -576,6 +840,10 @@ def _build_sun_protection_view(
             "covers": list(covers),
         }
     )
+
+    # Comprehensive decision-parameter recap: every gate, every
+    # threshold, with the live values pulled via Jinja templates.
+    cards.append(_decision_parameters_markdown(subentry, labels))
 
     # Margins gauges — only those whose underlying sensor is numeric.
     # Wrap the section title and the gauges row in a vertical-stack so
