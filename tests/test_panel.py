@@ -330,6 +330,120 @@ async def test_margin_gauges_wrapped_in_conditional(
             assert c["entity"] == entity
 
 
+async def test_cockpit_sun_tile_is_glance_with_summary(
+    hass: HomeAssistant,
+) -> None:
+    """Each sun-protection tile in the cockpit is a glance card
+    summarizing status, lux, sun_facing and elevation.
+
+    Replaces the legacy ``tile`` card so the user can read the key
+    state without opening the drill-down. The whole glance stays
+    clickable to navigate, just like the tile did.
+    """
+    entry = _hub_with_subentries(
+        subentries=[_sun_sub("Salon Sud", "salon_sud")]
+    )
+    entry.add_to_hass(hass)
+
+    config = build_dashboard_config(hass, entry)
+    cockpit = next(v for v in config["views"] if v["path"] == "cockpit")
+    cockpit_cards = _flatten_cards(cockpit["cards"])
+
+    glance_cards = [
+        c for c in cockpit_cards
+        if c.get("type") == "glance" and c.get("title") == "Salon Sud"
+    ]
+    assert len(glance_cards) == 1
+    glance = glance_cards[0]
+    nav = glance["tap_action"]
+    assert nav["action"] == "navigate"
+    assert nav["navigation_path"] == f"/{PANEL_URL_PATH}/salon_sud"
+    entity_ids = [e["entity"] for e in glance["entities"]]
+    assert entity_ids == [
+        "sensor.salon_sud_sun_protection_status",
+        "sensor.salon_sud_sun_protection_lux",
+        "binary_sensor.salon_sud_sun_facing",
+        "sensor.salon_sud_sun_protection_sun_elevation",
+    ]
+
+
+async def test_cockpit_lists_all_configured_covers(
+    hass: HomeAssistant,
+) -> None:
+    """The cockpit lists every cover from every subentry, deduplicated
+    and sorted, so the user has one-click access to each shutter."""
+    schedule = ConfigSubentryData(
+        subentry_type=SUBENTRY_TYPE_INSTANCE,
+        title="Bureau",
+        unique_id="bureau",
+        data={CONF_COVERS: ["cover.bureau", "cover.salon"]},
+    )
+    sun = _sun_sub("Salon Sud", "salon_sud")  # CONF_COVERS: ["cover.salon"]
+    entry = _hub_with_subentries(subentries=[schedule, sun])
+    entry.add_to_hass(hass)
+
+    config = build_dashboard_config(hass, entry)
+    cockpit = next(v for v in config["views"] if v["path"] == "cockpit")
+
+    entities_cards = [
+        c for c in cockpit["cards"] if c.get("type") == "entities"
+    ]
+    # The new "Volets configurés" entities card lists every unique
+    # cover from every subentry, sorted alphabetically.
+    cover_lists = [
+        c["entities"] for c in entities_cards
+        if all(
+            isinstance(e, str) and e.startswith("cover.")
+            for e in c.get("entities", [])
+        )
+    ]
+    assert cover_lists, "expected a covers-only entities card in cockpit"
+    assert cover_lists[0] == ["cover.bureau", "cover.salon"]
+
+
+async def test_sun_protection_view_has_decision_parameters_markdown(
+    hass: HomeAssistant,
+) -> None:
+    """The drill-down sun protection view carries a comprehensive
+    « Paramètres de décision » markdown card with current values and
+    static thresholds for every gate."""
+    entry = _hub_with_subentries(
+        subentries=[_sun_sub("Salon Sud", "salon_sud")]
+    )
+    entry.add_to_hass(hass)
+
+    config = build_dashboard_config(hass, entry)
+    sun_view = next(v for v in config["views"] if v["path"] == "salon_sud")
+    all_cards = _flatten_cards(sun_view["cards"])
+
+    md_cards = [
+        c for c in all_cards
+        if c.get("type") == "markdown"
+        and "Paramètres de décision" in c.get("content", "")
+    ]
+    assert len(md_cards) == 1
+    content = md_cards[0]["content"]
+    # Key sections must be present.
+    for header in (
+        "Géométrie du soleil",
+        "Luminosité (gate adaptatif)",
+        "UV (gate optionnel)",
+        "Températures",
+        "Hystérésis et debounce",
+        "Configuration de la sous-entrée",
+        "Décision finale",
+    ):
+        assert header in content, f"missing section: {header}"
+    # Live templates reference the per-subentry sensors.
+    assert "states('sensor.salon_sud_sun_protection_status')" in content
+    assert "states('sensor.salon_sud_sun_protection_lux')" in content
+    assert "states('binary_sensor.salon_sud_sun_protection_active')" in content
+    # Static thresholds and the subentry's own config land in the table.
+    assert "10 min" in content  # close debounce
+    assert "20 min" in content  # open debounce
+    assert "≤ 60°" in content   # DEFAULT_ARC value
+
+
 async def test_scheduler_view_header_links_back_to_cockpit(
     hass: HomeAssistant,
 ) -> None:

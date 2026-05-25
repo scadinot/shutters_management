@@ -6,6 +6,44 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le pr
 
 ## [Non publié]
 
+## [0.9.7] — 2026-05-13
+
+### Ajouté — dashboard plus riche
+
+- **Tuiles cockpit Protection solaire enrichies.** Chaque tuile
+  passe d'un simple `tile` à un `glance` qui affiche directement
+  le statut courant, la lecture lux, l'indicateur « soleil face
+  à la façade » et l'élévation. La carte reste cliquable d'un
+  bloc pour ouvrir le drill-down — accès en un seul clic, mais
+  avec le résumé d'état visible avant de cliquer.
+- **Liste globale « Volets configurés »** dans le cockpit, listant
+  l'ensemble des `cover.*` utilisés par toutes les sous-entrées
+  (planifications, simulations de présence, protections
+  solaires), dédupliqués et triés alphabétiquement. Donne un
+  accès direct à chaque volet sans devoir entrer dans une
+  sous-vue spécifique.
+- **Carte « Paramètres de décision »** dans le drill-down
+  Protection solaire. Tableau markdown structuré qui répertorie
+  **toutes** les variables de la décision avec leur valeur
+  courante **et** leur seuil, groupées en sections :
+  - Géométrie du soleil (élévation, écart d'azimuth, hystérésis
+    de sortie).
+  - Luminosité avec les brackets adaptatifs selon T°ext
+    (mild / standard / heatwave).
+  - UV (gate optionnel).
+  - Températures intérieure et extérieure avec leurs seuils.
+  - Hystérésis et debounce (10 min fermeture, 20 min réouverture,
+    reset à 04 h).
+  - Configuration de la sous-entrée (orientation, arc,
+    min_elevation, min_uv, position cible, capteur intérieur).
+  - Décision finale (statut, protection active, override).
+
+  Les valeurs courantes sont injectées via Jinja
+  (`{{ states('sensor...') }}`) et se rafraîchissent à chaque
+  changement d'état ; les seuils statiques sont substitués au
+  build et reflètent les constantes du moteur de décision
+  Python.
+
 ## [0.9.6] — 2026-05-09
 
 ### Corrigé — jauges de marges
