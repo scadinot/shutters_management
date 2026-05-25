@@ -453,8 +453,10 @@ def _build_cockpit_view(
         return {
             "type": "vertical-stack",
             "cards": [
-                {"type": "markdown",
-                 "content": f"### {labels[title_key]}"},
+                {
+                    "type": "markdown",
+                    "content": f"### {labels[title_key]}",
+                },
                 content,
             ],
         }
