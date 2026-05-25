@@ -47,6 +47,7 @@ from .const import (
     DEFAULT_ARC,
     DEFAULT_MIN_ELEVATION,
     DEFAULT_MIN_UV,
+    DEFAULT_ORIENTATION,
     DEFAULT_TARGET_POSITION,
     DOMAIN,
     ELEVATION_HYSTERESIS_DEG,
@@ -236,10 +237,10 @@ _LABELS_EN: dict[str, str] = {
     "indoor_temp_sensor": "Indoor temp. sensor",
     "not_configured": "not configured",
     "status_label": "Status",
-    "protection_active": "Protection active",
+    "protection_active": "Sun protection active",
     "override_until": "Override until",
     "lux_adaptive_brackets_value": (
-        "T°ext < 24°C: 70 000 lx · < 30°C: 50 000 lx · "
+        "Outdoor < 24°C: 70 000 lx · < 30°C: 50 000 lx · "
         "≥ 30°C: 35 000 lx"
     ),
     "exit_lux_value": "< 25 000 lx for 20 min",
@@ -663,7 +664,6 @@ def _conditional_numeric_card(card: dict[str, Any]) -> dict[str, Any]:
 
 
 def _decision_parameters_markdown(
-    hub_entry: ConfigEntry,
     subentry: ConfigSubentry,
     labels: dict[str, str],
 ) -> dict[str, Any]:
@@ -683,7 +683,7 @@ def _decision_parameters_markdown(
         CONF_MIN_ELEVATION, DEFAULT_MIN_ELEVATION
     )
     min_uv = subentry.data.get(CONF_MIN_UV, DEFAULT_MIN_UV)
-    orientation = subentry.data.get(CONF_ORIENTATION, 180)
+    orientation = subentry.data.get(CONF_ORIENTATION, DEFAULT_ORIENTATION)
     target_position = subentry.data.get(
         CONF_TARGET_POSITION, DEFAULT_TARGET_POSITION
     )
@@ -793,7 +793,7 @@ def _build_sun_protection_view(
     target_position = subentry.data.get(
         CONF_TARGET_POSITION, DEFAULT_TARGET_POSITION
     )
-    orientation = subentry.data.get(CONF_ORIENTATION, 180)
+    orientation = subentry.data.get(CONF_ORIENTATION, DEFAULT_ORIENTATION)
     min_uv = subentry.data.get(CONF_MIN_UV, DEFAULT_MIN_UV)
 
     has_lux = bool(hub_entry.data.get(CONF_LUX_ENTITY))
@@ -843,9 +843,7 @@ def _build_sun_protection_view(
 
     # Comprehensive decision-parameter recap: every gate, every
     # threshold, with the live values pulled via Jinja templates.
-    cards.append(
-        _decision_parameters_markdown(hub_entry, subentry, labels)
-    )
+    cards.append(_decision_parameters_markdown(subentry, labels))
 
     # Margins gauges — only those whose underlying sensor is numeric.
     # Wrap the section title and the gauges row in a vertical-stack so
