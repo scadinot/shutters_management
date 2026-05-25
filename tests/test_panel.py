@@ -365,6 +365,13 @@ async def test_cockpit_sun_tile_is_glance_with_summary(
         "binary_sensor.salon_sud_sun_facing",
         "sensor.salon_sud_sun_protection_sun_elevation",
     ]
+    # Each entity must carry its own tap_action: navigate. HA's
+    # ``glance`` card otherwise falls back to ``more-info`` per
+    # entity, which would intercept clicks and pop up the entity
+    # dialog instead of opening the drill-down.
+    for ent in glance["entities"]:
+        assert ent["tap_action"]["action"] == "navigate"
+        assert ent["tap_action"]["navigation_path"] == nav["navigation_path"]
 
 
 async def test_cockpit_lists_all_configured_covers(
@@ -384,21 +391,62 @@ async def test_cockpit_lists_all_configured_covers(
 
     config = build_dashboard_config(hass, entry)
     cockpit = next(v for v in config["views"] if v["path"] == "cockpit")
+    # The covers list now lives inside a vertical-stack (the section
+    # « Volets configurés » keeps its title + entities together so
+    # Lovelace's auto-column layout does not split them). Flatten to
+    # reach it.
+    cockpit_cards = _flatten_cards(cockpit["cards"])
 
     entities_cards = [
-        c for c in cockpit["cards"] if c.get("type") == "entities"
+        c for c in cockpit_cards if c.get("type") == "entities"
     ]
-    # The new "Volets configurés" entities card lists every unique
-    # cover from every subentry, sorted alphabetically.
     cover_lists = [
         c["entities"] for c in entities_cards
-        if all(
+        if c.get("entities")
+        and all(
             isinstance(e, str) and e.startswith("cover.")
-            for e in c.get("entities", [])
+            for e in c["entities"]
         )
     ]
     assert cover_lists, "expected a covers-only entities card in cockpit"
     assert cover_lists[0] == ["cover.bureau", "cover.salon"]
+
+
+async def test_cockpit_sections_wrapped_in_vertical_stack(
+    hass: HomeAssistant,
+) -> None:
+    """Each cockpit section (title + content) lives inside a single
+    vertical-stack so Lovelace's auto-column layout cannot orphan
+    the « Planifications » / « Simulations » / « Protections solaires »
+    / « Volets configurés » titles in a different column from their
+    cards. Same fix pattern as the « Marges » section in v0.8.3.
+    """
+    entry = _hub_with_subentries(
+        subentries=[
+            _schedule_sub("Bureau", "bureau"),
+            _sim_sub("Salon", "salon"),
+            _sun_sub("Salon Sud", "salon_sud"),
+        ]
+    )
+    entry.add_to_hass(hass)
+
+    config = build_dashboard_config(hass, entry)
+    cockpit = next(v for v in config["views"] if v["path"] == "cockpit")
+
+    # Helper: find every top-level vertical-stack whose first card is
+    # a markdown ``### …`` heading. The cockpit has one per section.
+    section_stacks = [
+        c for c in cockpit["cards"]
+        if c.get("type") == "vertical-stack"
+        and len(c.get("cards", [])) >= 2
+        and c["cards"][0].get("type") == "markdown"
+        and c["cards"][0].get("content", "").startswith("### ")
+    ]
+    # 4 sections: schedules + sims + suns + all_covers.
+    assert len(section_stacks) == 4
+    # Each stack's second card is the actual content (grid or entities).
+    second_types = {s["cards"][1].get("type") for s in section_stacks}
+    assert second_types <= {"grid", "entities"}
 
 
 async def test_sun_protection_view_has_decision_parameters_markdown(

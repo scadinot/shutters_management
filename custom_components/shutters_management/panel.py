@@ -364,34 +364,42 @@ def _sun_tile(
     """Cockpit tile for a sun-protection subentry.
 
     Rendered as a ``glance`` card showing four key indicators at a
-    glance (status, lux, sun_facing, elevation). The card itself
-    is clickable to navigate into the drill-down view, so the user
-    keeps the one-click access while gaining live context.
+    glance (status, lux, sun_facing, elevation). Each entity also
+    carries its own ``tap_action: navigate`` so a click anywhere
+    on the card opens the drill-down — HA's ``glance`` ignores the
+    card-level ``tap_action`` when entities are declared (they
+    default to ``more-info``), so the per-entity override is
+    required to restore the one-click navigation behaviour.
     """
     prefix = _entity_prefix(subentry)
+    nav = _navigate_to(_view_path(subentry))
     return {
         "type": "glance",
         "title": subentry.title,
         "show_state": True,
         "state_color": True,
         "columns": 4,
-        "tap_action": _navigate_to(_view_path(subentry)),
+        "tap_action": nav,
         "entities": [
             {
                 "entity": f"sensor.{prefix}_sun_protection_status",
                 "name": labels["status_label"],
+                "tap_action": nav,
             },
             {
                 "entity": f"sensor.{prefix}_sun_protection_lux",
                 "name": labels["lux_short"],
+                "tap_action": nav,
             },
             {
                 "entity": f"binary_sensor.{prefix}_sun_facing",
                 "name": labels["sun_facing_short"],
+                "tap_action": nav,
             },
             {
                 "entity": f"sensor.{prefix}_sun_protection_sun_elevation",
                 "name": labels["elevation_short"],
+                "tap_action": nav,
             },
         ],
     }
@@ -437,52 +445,57 @@ def _build_cockpit_view(
             {"type": "markdown", "content": labels["no_subentries"]}
         )
 
+    # Each cockpit section bundles its title and content in a single
+    # vertical-stack so Lovelace's auto-column layout cannot orphan
+    # the title in a different column from its tiles or entities
+    # (same fix pattern as the « Marges » section in v0.8.3).
+    def _section(title_key: str, content: dict[str, Any]) -> dict[str, Any]:
+        return {
+            "type": "vertical-stack",
+            "cards": [
+                {"type": "markdown",
+                 "content": f"### {labels[title_key]}"},
+                content,
+            ],
+        }
+
     if schedules:
         cards.append(
-            {
-                "type": "markdown",
-                "content": f"### {labels['schedules']}",
-            }
-        )
-        cards.append(
-            {
-                "type": "grid",
-                "columns": 1,
-                "square": False,
-                "cards": [
-                    _scheduler_tile(sub) for sub in schedules
-                ],
-            }
+            _section(
+                "schedules",
+                {
+                    "type": "grid",
+                    "columns": 1,
+                    "square": False,
+                    "cards": [
+                        _scheduler_tile(sub) for sub in schedules
+                    ],
+                },
+            )
         )
     if sims:
         cards.append(
-            {
-                "type": "markdown",
-                "content": f"### {labels['simulations']}",
-            }
-        )
-        cards.append(
-            {
-                "type": "grid",
-                "columns": 1,
-                "square": False,
-                "cards": [_scheduler_tile(sub) for sub in sims],
-            }
+            _section(
+                "simulations",
+                {
+                    "type": "grid",
+                    "columns": 1,
+                    "square": False,
+                    "cards": [_scheduler_tile(sub) for sub in sims],
+                },
+            )
         )
     if suns:
         cards.append(
-            {
-                "type": "markdown",
-                "content": f"### {labels['sun_protections']}",
-            }
-        )
-        cards.append(
-            {
-                "type": "grid",
-                "columns": 1,
-                "square": False,
-                "cards": [_sun_tile(sub, labels) for sub in suns],
-            }
+            _section(
+                "sun_protections",
+                {
+                    "type": "grid",
+                    "columns": 1,
+                    "square": False,
+                    "cards": [_sun_tile(sub, labels) for sub in suns],
+                },
+            )
         )
 
     # Global list of every cover declared in any subentry, deduplicated
@@ -495,17 +508,14 @@ def _build_cockpit_view(
                 all_covers.add(cover_id)
     if all_covers:
         cards.append(
-            {
-                "type": "markdown",
-                "content": f"### {labels['all_covers']}",
-            }
-        )
-        cards.append(
-            {
-                "type": "entities",
-                "show_header_toggle": False,
-                "entities": sorted(all_covers),
-            }
+            _section(
+                "all_covers",
+                {
+                    "type": "entities",
+                    "show_header_toggle": False,
+                    "entities": sorted(all_covers),
+                },
+            )
         )
 
     cards.append(
