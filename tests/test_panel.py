@@ -416,24 +416,32 @@ async def test_sun_protection_view_has_decision_parameters_markdown(
     sun_view = next(v for v in config["views"] if v["path"] == "salon_sud")
     all_cards = _flatten_cards(sun_view["cards"])
 
+    # The header is localized by ``_labels(hass)``; depending on the
+    # test environment language (default ``en``) the section title
+    # will be in EN or FR. Match either.
     md_cards = [
         c for c in all_cards
         if c.get("type") == "markdown"
-        and "Paramètres de décision" in c.get("content", "")
+        and (
+            "Paramètres de décision" in c.get("content", "")
+            or "Decision parameters" in c.get("content", "")
+        )
     ]
     assert len(md_cards) == 1
     content = md_cards[0]["content"]
-    # Key sections must be present.
-    for header in (
-        "Géométrie du soleil",
-        "Luminosité (gate adaptatif)",
-        "UV (gate optionnel)",
-        "Températures",
-        "Hystérésis et debounce",
-        "Configuration de la sous-entrée",
-        "Décision finale",
+    # Key sections must be present (FR ↔ EN equivalents).
+    for fr, en in (
+        ("Géométrie du soleil", "Sun geometry"),
+        ("Luminosité (gate adaptatif)", "Lux (adaptive gate)"),
+        ("UV (gate optionnel)", "UV (optional gate)"),
+        ("Températures", "Temperatures"),
+        ("Hystérésis et debounce", "Hysteresis and debounce"),
+        ("Configuration de la sous-entrée", "Subentry configuration"),
+        ("Décision finale", "Final decision"),
     ):
-        assert header in content, f"missing section: {header}"
+        assert fr in content or en in content, (
+            f"missing section: {fr} / {en}"
+        )
     # Live templates reference the per-subentry sensors.
     assert "states('sensor.salon_sud_sun_protection_status')" in content
     assert "states('sensor.salon_sud_sun_protection_lux')" in content
