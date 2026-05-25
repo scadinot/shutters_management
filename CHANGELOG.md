@@ -6,6 +6,28 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le pr
 
 ## [Non publié]
 
+## [0.9.8] — 2026-05-25
+
+### Corrigé — cockpit
+
+- **Titres de sections orphelins.** Les titres « Planifications »,
+  « Simulations de présence », « Protections solaires » et
+  « Volets configurés » pouvaient se retrouver dans une colonne
+  différente de leur contenu (tiles ou liste d'entities) à cause
+  de l'auto-layout multi-colonnes de Lovelace. Chaque section
+  est désormais enveloppée dans un `vertical-stack` qui force
+  l'auto-layout à traiter titre + contenu comme un seul bloc
+  (même fix pattern que la section « Marges » en v0.8.3).
+- **Tuile Protection solaire non cliquable hors des icônes.**
+  Depuis le passage au `glance` en v0.9.7, seules les icônes des
+  4 entités (Statut, Lux, Face, Élév.) étaient cliquables et
+  ouvraient la pop-up « more-info » par défaut ; le
+  `tap_action: navigate` au niveau carte n'avait aucun effet.
+  Chaque entité du `glance` porte désormais son propre
+  `tap_action: navigate` vers le drill-down, restaurant le
+  comportement « clic n'importe où sur la carte ouvre la sous-vue »
+  du v0.9.6 sous tile.
+
 ## [0.9.7] — 2026-05-13
 
 ### Ajouté — dashboard plus riche
