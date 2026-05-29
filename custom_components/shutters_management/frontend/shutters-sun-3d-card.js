@@ -536,10 +536,16 @@ class ShuttersSun3dCard extends HTMLElement {
     }
 
     const lowerElForCol = (_i) => minElRad;
-    const upperElForCol = (i) =>
-      trajectoriesUsable
-        ? THREE.MathUtils.degToRad(summerArc[i].elDeg)
-        : upperRad;
+    const upperElForCol = (i) => {
+      if (!trajectoriesUsable) return upperRad;
+      // ``solsticeArc`` returns 0° at azimuths the sun does not
+      // cross on June 21 (typical at the east/west edges for
+      // north-facing façades). Clamp at ``minElRad`` so the top
+      // edge never dips below the base — otherwise the mesh
+      // inverts and the outline tube crosses the bottom outline.
+      const summerRad = THREE.MathUtils.degToRad(summerArc[i].elDeg);
+      return Math.max(minElRad, summerRad);
+    };
     const azRadForCol = (i) =>
       trajectoriesUsable
         ? THREE.MathUtils.degToRad(summerArc[i].azDeg)

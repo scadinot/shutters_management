@@ -22,12 +22,12 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le pr
   réelle du soleil au **solstice d'été** (21 juin), clippée à la
   fenêtre `[orientation − arc, orientation + arc]`. La courbe
   reste utile pour visualiser l'enveloppe annuelle maximale.
-- Remplace le bord inférieur cale sur la trajectoire du solstice
+- Remplace le bord inférieur calé sur la trajectoire du solstice
   d'hiver introduit en v0.9.5 : ce repère astronomique ne
   correspondait pas au seuil de décision utilisé par le moteur,
-  ce qui pouvait dérouter quand le min_elevation et la
+  ce qui pouvait dérouter quand le `min_elevation` et la
   trajectoire d'hiver divergeaient (par exemple `min_elevation =
-  15°` à Normandie où le soleil d'hiver descend jusqu'à 17° à
+  15°` en Normandie où le soleil d'hiver descend jusqu'à 17° à
   midi).
 
 ## [0.9.8] — 2026-05-25
