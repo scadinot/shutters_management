@@ -449,12 +449,18 @@ async def test_cockpit_sections_wrapped_in_vertical_stack(
     assert second_types <= {"grid", "entities"}
 
 
-async def test_sun_protection_view_has_decision_parameters_markdown(
+async def test_sun_protection_view_has_decision_state_markdown(
     hass: HomeAssistant,
 ) -> None:
-    """The drill-down sun protection view carries a comprehensive
-    « Paramètres de décision » markdown card with current values and
-    static thresholds for every gate."""
+    """The drill-down sun protection view carries the v0.9.10
+    « État de la décision » markdown card.
+
+    The card is structured as 3 H2 sections (state / close
+    conditions / configuration) and 6 numbered H3 sub-sections
+    mirroring the engine's decision pipeline. No anglicisms
+    (« gate », « bracket », « debounce », « sustained ») should
+    leak into the rendered content in either language.
+    """
     entry = _hub_with_subentries(
         subentries=[_sun_sub("Salon Sud", "salon_sud")]
     )
@@ -464,40 +470,60 @@ async def test_sun_protection_view_has_decision_parameters_markdown(
     sun_view = next(v for v in config["views"] if v["path"] == "salon_sud")
     all_cards = _flatten_cards(sun_view["cards"])
 
-    # The header is localized by ``_labels(hass)``; depending on the
-    # test environment language (default ``en``) the section title
-    # will be in EN or FR. Match either.
     md_cards = [
         c for c in all_cards
         if c.get("type") == "markdown"
         and (
-            "Paramètres de décision" in c.get("content", "")
-            or "Decision parameters" in c.get("content", "")
+            "État de la décision" in c.get("content", "")
+            or "Decision state" in c.get("content", "")
         )
     ]
     assert len(md_cards) == 1
     content = md_cards[0]["content"]
-    # Key sections must be present (FR ↔ EN equivalents).
+
+    # 3 top-level H2 sections (FR ↔ EN equivalents).
     for fr, en in (
-        ("Géométrie du soleil", "Sun geometry"),
-        ("Luminosité (gate adaptatif)", "Lux (adaptive gate)"),
-        ("UV (gate optionnel)", "UV (optional gate)"),
-        ("Températures", "Temperatures"),
-        ("Hystérésis et debounce", "Hysteresis and debounce"),
+        ("État de la décision", "Decision state"),
+        ("Conditions de fermeture", "Close conditions"),
         ("Configuration de la sous-entrée", "Subentry configuration"),
-        ("Décision finale", "Final decision"),
     ):
         assert fr in content or en in content, (
-            f"missing section: {fr} / {en}"
+            f"missing H2 section: {fr} / {en}"
         )
-    # Live templates reference the per-subentry sensors.
+
+    # 6 numbered H3 sub-sections — verify the numbering survives
+    # the build so the reader follows the engine's pipeline order.
+    for i in range(1, 7):
+        assert f"### {i}." in content, (
+            f"missing numbered sub-section {i}"
+        )
+
+    # Pipeline section titles (FR ↔ EN).
+    for fr, en in (
+        ("Position du soleil", "Sun position"),
+        ("Température extérieure", "Outdoor temperature"),
+        ("Luminosité", "Outdoor brightness"),
+        ("Indice UV", "UV index"),
+        ("Confort intérieur", "Indoor comfort"),
+        ("Temporisation", "Timing"),
+    ):
+        assert fr in content or en in content, (
+            f"missing pipeline section: {fr} / {en}"
+        )
+
+    # No anglicism leaks anywhere in the rendered card.
+    for anglicism in ("gate", "bracket", "debounce", "sustained"):
+        assert anglicism.lower() not in content.lower(), (
+            f"unexpected anglicism: {anglicism!r}"
+        )
+
+    # Live templates still target the per-subentry diagnostic
+    # sensors so the card refreshes on state change.
     assert "states('sensor.salon_sud_sun_protection_status')" in content
     assert "states('sensor.salon_sud_sun_protection_lux')" in content
     assert "states('binary_sensor.salon_sud_sun_protection_active')" in content
-    # Static thresholds and the subentry's own config land in the table.
-    assert "10 min" in content  # close debounce
-    assert "20 min" in content  # open debounce
-    assert "≤ 60°" in content   # DEFAULT_ARC value
+    # Subentry config substituted at build time.
+    assert "60°" in content   # DEFAULT_ARC = 60
 
 
 async def test_scheduler_view_header_links_back_to_cockpit(
