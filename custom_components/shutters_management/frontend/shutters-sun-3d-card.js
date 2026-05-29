@@ -531,8 +531,15 @@ class ShuttersSun3dCard extends HTMLElement {
     const trajectoriesUsable = allFinite && maxSpreadDeg > 1;
 
     let { upperRad } = solsticeBounds(lat);
-    if (upperRad - minElRad < THREE.MathUtils.degToRad(5)) {
-      upperRad = Math.PI / 2;
+    // Never push the fallback top above the actual decision
+    // boundary: when ``min_elevation`` is near or above the summer
+    // solstice peak (high latitudes, or ``min_elevation = 60°``),
+    // pushing ``upperRad`` to the zenith would draw a large
+    // « acceptance zone » that the engine can never reach. Clamp
+    // at ``minElRad`` instead so the wedge collapses to a flat
+    // line on the base — geometrically truthful.
+    if (upperRad < minElRad) {
+      upperRad = minElRad;
     }
 
     const lowerElForCol = (_i) => minElRad;
