@@ -6,6 +6,39 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le pr
 
 ## [Non publié]
 
+## [0.9.10] — 2026-05-29
+
+### Modifié — carte « État de la décision » (ex « Paramètres de décision »)
+
+- **Refonte complète** de la carte de récapitulatif des
+  paramètres de décision dans le drill-down Protection solaire,
+  suite à un retour utilisateur : la version v0.9.7 « contenait
+  des anglicismes » et « manquait de clarté ».
+- **Trois principes** :
+  1. **Statut en haut** : la première section affiche l'état
+     décisionnel courant (statut, protection active, override),
+     pour répondre immédiatement à « pourquoi suis-je dans cet
+     état ? ».
+  2. **Pipeline narratif** : six sous-sections numérotées 1 à 6,
+     dans l'ordre exact de `_compute_decision`
+     (`__init__.py:1219-1330`) — position du soleil, température
+     extérieure, luminosité, indice UV, confort intérieur,
+     temporisation.
+  3. **Format homogène** : chaque section a la même structure —
+     sous-titre clair, un mini-paragraphe explicatif, puis une
+     table à 3 colonnes constantes (Critère / Valeur actuelle /
+     Condition).
+- **Vocabulaire 100 % français.** Remplacement systématique des
+  anglicismes : *gate* → décrit en prose · *brackets adaptatifs*
+  → « régime adaptatif » · *debounce* → « temporisation » ·
+  *sustained* → « tenu » / « pendant » · *close/open* →
+  « fermeture/réouverture ». Les libellés EN suivent la même
+  structure mais conservent un anglais idiomatique.
+- **Configuration sous-entrée en fin de carte** : les valeurs
+  statiques (orientation, demi-arc, élévation minimale, UV
+  minimum, position cible, capteur de température intérieure)
+  ferment la carte avec un mini-paragraphe d'introduction.
+
 ## [0.9.9] — 2026-05-25
 
 ### Modifié — carte 3D

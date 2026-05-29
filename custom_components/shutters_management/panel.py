@@ -112,53 +112,123 @@ _LABELS_FR: dict[str, str] = {
     "sun_facing_short": "Face",
     "elevation_short": "Élév.",
     "all_covers": "Volets configurés",
-    "decision_params": "Paramètres de décision",
-    "geometry": "Géométrie du soleil",
-    "lux_gate": "Luminosité (gate adaptatif)",
-    "uv_gate": "UV (gate optionnel)",
-    "temperatures": "Températures",
-    "hysteresis_debounce": "Hystérésis et debounce",
-    "subentry_config": "Configuration de la sous-entrée",
-    "final_decision": "Décision finale",
-    "criterion": "Critère",
-    "value": "Valeur",
-    "threshold": "Seuil",
-    "hysteresis_exit": "Hystérésis sortie",
-    "phase": "Phase",
-    "duration": "Durée",
-    "parameter": "Paramètre",
-    "indicator": "Indicateur",
-    "outdoor_lux": "Lux extérieure",
-    "exit_lux": "Sortie lux",
-    "adaptive_brackets": "Brackets adaptatifs",
-    "uv_index": "Indice UV",
-    "outdoor_temp": "T° extérieure",
-    "indoor_temp": "T° intérieure",
-    "exit_comfort": "Sortie confort",
-    "close_phase": "Fermeture (close)",
-    "open_phase": "Réouverture (open)",
-    "current_counter": "Compteur courant",
-    "override_reset": "Reset override",
-    "facade_orientation": "Orientation façade",
-    "half_arc": "Demi-arc accepté",
-    "min_elevation_label": "Élévation min",
-    "min_uv_label": "UV min",
-    "indoor_temp_sensor": "Capteur T° intérieure",
-    "not_configured": "non configuré",
-    "status_label": "Statut",
+    # « Paramètres de décision » — refonte v0.9.10 : terminologie
+    # 100 % française, statut au sommet, pipeline narratif.
+    "decision_state": "État de la décision",
+    "current_status": "Statut courant",
     "protection_active": "Protection active",
-    "override_until": "Override jusqu'à",
-    "lux_adaptive_brackets_value": (
-        "T°ext < 24°C : 70 000 lx · < 30°C : 50 000 lx · "
-        "≥ 30°C : 35 000 lx"
+    "manual_override": "Override manuel",
+    "override_reset_note": (
+        "réinitialisé automatiquement à 04 h"
     ),
-    "exit_lux_value": "< 25 000 lx pendant 20 min",
-    "exit_comfort_value": "T°int < 21°C ET T°ext < 22°C",
-    "close_phase_value": "10 min (sustained lux ≥ seuil)",
-    "open_phase_value": "20 min (sustained lux < 25 000 lx)",
-    "override_reset_value": "à 04 h chaque jour",
-    "outdoor_temp_threshold": "≥ 20°C pour activer la protection",
-    "indoor_temp_threshold": "≥ 23°C (standard) / 24°C (mild)",
+    "close_conditions": "Conditions de fermeture",
+    "close_conditions_intro": (
+        "Toutes les conditions ci-dessous doivent être satisfaites "
+        "pour que le moteur déclenche la fermeture."
+    ),
+    "sun_position_section": "Position du soleil",
+    "sun_position_intro": (
+        "Le soleil doit être suffisamment haut et dans l'arc "
+        "d'acceptation de la façade."
+    ),
+    "outdoor_temp_section": "Température extérieure",
+    "outdoor_temp_intro": (
+        "La protection ne se déclenche qu'au-dessus d'un seuil de "
+        "chaleur extérieure, pour préserver le gain solaire en "
+        "saison fraîche."
+    ),
+    "lux_section": "Luminosité",
+    "lux_intro": (
+        "Le seuil de luminosité dépend du régime thermique extérieur "
+        "(plus il fait chaud, moins il faut de soleil pour fermer)."
+    ),
+    "uv_section": "Indice UV (optionnel)",
+    "uv_intro": (
+        "Filtre supplémentaire désactivé si aucun capteur UV n'est "
+        "configuré sur le hub."
+    ),
+    "comfort_section": "Confort intérieur (optionnel)",
+    "comfort_intro": (
+        "La pièce doit déjà être tiède pour justifier la fermeture "
+        "— évite de fermer une pièce trop fraîche le matin."
+    ),
+    "timing_section": "Temporisation",
+    "timing_intro": (
+        "Les conditions doivent tenir un certain temps avant que le "
+        "moteur n'agisse, pour éviter de réagir à un nuage de "
+        "passage. Le compteur ci-dessous reflète la phase "
+        "actuellement en cours (fermeture ou réouverture)."
+    ),
+    "config_section": "Configuration de la sous-entrée",
+    "config_intro": (
+        "Valeurs statiques fixées au moment de la création ou de la "
+        "modification du groupe."
+    ),
+    # Colonnes / cellules
+    "criterion": "Critère",
+    "current_value": "Valeur actuelle",
+    "condition": "Condition",
+    "indicator": "Indicateur",
+    "value": "Valeur",
+    "step": "Étape",
+    "duration": "Durée",
+    "current_counter": "Compteur courant",
+    "parameter": "Paramètre",
+    # Lignes de tables (critères)
+    "elevation_label": "Élévation",
+    "elevation_condition": (
+        "≥ {min}° (sortie à {exit}°, hystérésis −{hys}°)"
+    ),
+    "azimuth_diff_label": "Écart à la façade",
+    "azimuth_diff_condition": (
+        "≤ {arc}° (sortie à {exit}°, hystérésis +{hys}°)"
+    ),
+    "outdoor_temp_label": "T° extérieure",
+    "outdoor_temp_condition": "≥ 20 °C pour activer la protection",
+    "thermal_regime_label": "Régime adaptatif",
+    "thermal_regime_value": "dépend de la T° extérieure",
+    "thermal_regime_condition": (
+        "mi-saison (20–24 °C) · chaud (24–30 °C) · "
+        "canicule (≥ 30 °C)"
+    ),
+    "outdoor_lux_label": "Luminosité extérieure",
+    "outdoor_lux_condition": "≥ {threshold_template} lx",
+    "lux_threshold_label": "Seuil adaptatif",
+    "lux_threshold_value": "dépend de la T° extérieure",
+    "lux_threshold_condition": (
+        "mi-saison : 70 000 lx · chaud : 50 000 lx · "
+        "canicule : 35 000 lx"
+    ),
+    "lux_reopen_label": "Réouverture",
+    "lux_reopen_condition": (
+        "redescend sous 25 000 lx pendant 20 min"
+    ),
+    "uv_index_label": "Indice UV",
+    "uv_index_condition": "≥ {min} (seuil configuré)",
+    "indoor_temp_label": "T° intérieure",
+    "indoor_temp_condition": (
+        "≥ 23 °C en régime chaud / 24 °C en mi-saison"
+    ),
+    "heatwave_bypass_label": "Régime canicule",
+    "heatwave_bypass_value": "T°ext ≥ 30 °C",
+    "heatwave_bypass_condition": (
+        "bypass : on ferme même si la pièce est fraîche"
+    ),
+    "comfort_reopen_label": "Réouverture confort",
+    "comfort_reopen_condition": (
+        "T°int < 21 °C ET T°ext < 22 °C simultanément"
+    ),
+    "close_step_label": "Avant fermeture",
+    "close_step_duration": "10 min de conditions favorables",
+    "open_step_label": "Avant réouverture",
+    "open_step_duration": "20 min de luminosité insuffisante",
+    "facade_orientation_label": "Orientation de la façade",
+    "half_arc_label": "Demi-arc accepté",
+    "min_elevation_param_label": "Élévation minimale",
+    "min_uv_param_label": "Indice UV minimum",
+    "target_position_param_label": "Position cible (volets fermés)",
+    "indoor_temp_sensor_label": "Capteur de T° intérieure",
+    "not_configured": "non configuré",
 }
 
 _LABELS_EN: dict[str, str] = {
@@ -203,53 +273,115 @@ _LABELS_EN: dict[str, str] = {
     "sun_facing_short": "Facing",
     "elevation_short": "Elev.",
     "all_covers": "Configured covers",
-    "decision_params": "Decision parameters",
-    "geometry": "Sun geometry",
-    "lux_gate": "Lux (adaptive gate)",
-    "uv_gate": "UV (optional gate)",
-    "temperatures": "Temperatures",
-    "hysteresis_debounce": "Hysteresis and debounce",
-    "subentry_config": "Subentry configuration",
-    "final_decision": "Final decision",
-    "criterion": "Criterion",
-    "value": "Value",
-    "threshold": "Threshold",
-    "hysteresis_exit": "Exit hysteresis",
-    "phase": "Phase",
-    "duration": "Duration",
-    "parameter": "Parameter",
-    "indicator": "Indicator",
-    "outdoor_lux": "Outdoor lux",
-    "exit_lux": "Lux exit",
-    "adaptive_brackets": "Adaptive brackets",
-    "uv_index": "UV index",
-    "outdoor_temp": "Outdoor temp.",
-    "indoor_temp": "Indoor temp.",
-    "exit_comfort": "Comfort exit",
-    "close_phase": "Close phase",
-    "open_phase": "Open phase",
-    "current_counter": "Current counter",
-    "override_reset": "Override reset",
-    "facade_orientation": "Façade orientation",
-    "half_arc": "Accepted half-arc",
-    "min_elevation_label": "Min elevation",
-    "min_uv_label": "Min UV",
-    "indoor_temp_sensor": "Indoor temp. sensor",
-    "not_configured": "not configured",
-    "status_label": "Status",
+    # « Decision parameters » — v0.9.10 rewrite mirroring the
+    # French rework: status at top, narrative pipeline.
+    "decision_state": "Decision state",
+    "current_status": "Current status",
     "protection_active": "Sun protection active",
-    "override_until": "Override until",
-    "lux_adaptive_brackets_value": (
-        "Outdoor < 24°C: 70 000 lx · < 30°C: 50 000 lx · "
-        "≥ 30°C: 35 000 lx"
+    "manual_override": "Manual override",
+    "override_reset_note": "auto-reset at 04:00 every day",
+    "close_conditions": "Close conditions",
+    "close_conditions_intro": (
+        "Every condition below must be satisfied for the engine "
+        "to trigger the close."
     ),
-    "exit_lux_value": "< 25 000 lx for 20 min",
-    "exit_comfort_value": "Indoor < 21°C AND outdoor < 22°C",
-    "close_phase_value": "10 min (sustained lux ≥ threshold)",
-    "open_phase_value": "20 min (sustained lux < 25 000 lx)",
-    "override_reset_value": "at 04 h every day",
-    "outdoor_temp_threshold": "≥ 20°C to enable protection",
-    "indoor_temp_threshold": "≥ 23°C (standard) / 24°C (mild)",
+    "sun_position_section": "Sun position",
+    "sun_position_intro": (
+        "The sun must be high enough and inside the façade's "
+        "acceptance arc."
+    ),
+    "outdoor_temp_section": "Outdoor temperature",
+    "outdoor_temp_intro": (
+        "Sun protection only triggers above an outdoor warmth "
+        "threshold to preserve solar gain in cool seasons."
+    ),
+    "lux_section": "Outdoor brightness",
+    "lux_intro": (
+        "The lux threshold depends on the outdoor thermal regime "
+        "(the warmer it is, the less sun is needed to close)."
+    ),
+    "uv_section": "UV index (optional)",
+    "uv_intro": (
+        "Extra filter, disabled if no UV sensor is configured "
+        "on the hub."
+    ),
+    "comfort_section": "Indoor comfort (optional)",
+    "comfort_intro": (
+        "The room must already be warm to justify closing — "
+        "prevents shading a cool room in the morning."
+    ),
+    "timing_section": "Timing",
+    "timing_intro": (
+        "Conditions must hold for a while before the engine "
+        "acts, so a passing cloud doesn't toggle the shutters. "
+        "The counter below reflects whichever phase is currently "
+        "active (close or reopen)."
+    ),
+    "config_section": "Subentry configuration",
+    "config_intro": (
+        "Static values set when the group was created or edited."
+    ),
+    "criterion": "Criterion",
+    "current_value": "Current value",
+    "condition": "Condition",
+    "indicator": "Indicator",
+    "value": "Value",
+    "step": "Step",
+    "duration": "Duration",
+    "current_counter": "Current counter",
+    "parameter": "Parameter",
+    "elevation_label": "Elevation",
+    "elevation_condition": (
+        "≥ {min}° (exit at {exit}°, hysteresis −{hys}°)"
+    ),
+    "azimuth_diff_label": "Offset from façade",
+    "azimuth_diff_condition": (
+        "≤ {arc}° (exit at {exit}°, hysteresis +{hys}°)"
+    ),
+    "outdoor_temp_label": "Outdoor T°",
+    "outdoor_temp_condition": "≥ 20 °C to enable protection",
+    "thermal_regime_label": "Thermal regime",
+    "thermal_regime_value": "depends on outdoor T°",
+    "thermal_regime_condition": (
+        "mid-season (20–24 °C) · warm (24–30 °C) · "
+        "heatwave (≥ 30 °C)"
+    ),
+    "outdoor_lux_label": "Outdoor brightness",
+    "outdoor_lux_condition": "≥ {threshold_template} lx",
+    "lux_threshold_label": "Adaptive threshold",
+    "lux_threshold_value": "depends on outdoor T°",
+    "lux_threshold_condition": (
+        "mid-season: 70 000 lx · warm: 50 000 lx · "
+        "heatwave: 35 000 lx"
+    ),
+    "lux_reopen_label": "Reopen",
+    "lux_reopen_condition": "drops below 25 000 lx for 20 min",
+    "uv_index_label": "UV index",
+    "uv_index_condition": "≥ {min} (configured threshold)",
+    "indoor_temp_label": "Indoor T°",
+    "indoor_temp_condition": (
+        "≥ 23 °C in warm regime / 24 °C in mid-season"
+    ),
+    "heatwave_bypass_label": "Heatwave regime",
+    "heatwave_bypass_value": "Outdoor T° ≥ 30 °C",
+    "heatwave_bypass_condition": (
+        "bypass: close even if the room is cool"
+    ),
+    "comfort_reopen_label": "Comfort reopen",
+    "comfort_reopen_condition": (
+        "Indoor < 21 °C AND outdoor < 22 °C simultaneously"
+    ),
+    "close_step_label": "Before close",
+    "close_step_duration": "10 min of favourable conditions",
+    "open_step_label": "Before reopen",
+    "open_step_duration": "20 min of insufficient brightness",
+    "facade_orientation_label": "Façade orientation",
+    "half_arc_label": "Accepted half-arc",
+    "min_elevation_param_label": "Minimum elevation",
+    "min_uv_param_label": "Minimum UV index",
+    "target_position_param_label": "Target position (closed)",
+    "indoor_temp_sensor_label": "Indoor T° sensor",
+    "not_configured": "not configured",
 }
 
 
@@ -383,7 +515,7 @@ def _sun_tile(
         "entities": [
             {
                 "entity": f"sensor.{prefix}_sun_protection_status",
-                "name": labels["status_label"],
+                "name": labels["status"],
                 "tap_action": nav,
             },
             {
@@ -679,15 +811,16 @@ def _decision_parameters_markdown(
     subentry: ConfigSubentry,
     labels: dict[str, str],
 ) -> dict[str, Any]:
-    """Comprehensive markdown table of every parameter that drives
-    the sun-protection decision, with current value + threshold
-    side-by-side.
+    """Narrative markdown summary of the sun-protection decision.
 
-    Static constants from ``const.py`` (debounce, hysteresis,
-    brackets) are substituted at build time. Per-subentry config
-    (orientation, arc, min_elevation, min_uv, target_position) is
-    likewise inlined. Live values come from Jinja templates that
-    HA's markdown card re-renders on every state change.
+    Three top-level sections — ``État de la décision`` (state),
+    ``Conditions de fermeture`` (close conditions, ordered like
+    ``_compute_decision``), ``Configuration de la sous-entrée``.
+    Each close condition gets its own H3 with an intro paragraph
+    and a 3-column table (Criterion / Current value / Condition).
+    Static constants come from ``const.py``; per-subentry config
+    is inlined; live values use Jinja ``{{ states('...') }}``
+    templates re-rendered by HA's markdown card.
     """
     prefix = _entity_prefix(subentry)
     arc = subentry.data.get(CONF_ARC, DEFAULT_ARC)
@@ -715,70 +848,121 @@ def _decision_parameters_markdown(
     override = f"sensor.{prefix}_sun_protection_override_until"
 
     L = labels
+    elev_exit = max(0, min_elevation - ELEVATION_HYSTERESIS_DEG)
+    arc_exit = arc + ARC_HYSTERESIS_DEG
+    lux_threshold_template = f"{{{{ states('{lux_threshold}') }}}}"
 
     content = (
-        f"### {L['decision_params']}\n\n"
-        f"**{L['geometry']}**\n\n"
-        f"| {L['criterion']} | {L['value']} | {L['threshold']} | "
-        f"{L['hysteresis_exit']} |\n"
-        f"|---|---|---|---|\n"
-        f"| {L['elevation']} | "
-        f"{{{{ states('{elevation}') }}}}° | "
-        f"≥ {min_elevation}° | "
-        f"−{ELEVATION_HYSTERESIS_DEG}° |\n"
-        f"| {L['azimuth_diff']} | "
-        f"{{{{ states('{az_diff}') }}}}° | "
-        f"≤ {arc}° | +{ARC_HYSTERESIS_DEG}° |\n\n"
-        f"**{L['lux_gate']}**\n\n"
-        f"| {L['criterion']} | {L['value']} | {L['threshold']} |\n"
-        f"|---|---|---|\n"
-        f"| {L['outdoor_lux']} | "
-        f"{{{{ states('{lux}') }}}} lx | "
-        f"≥ {{{{ states('{lux_threshold}') }}}} lx |\n"
-        f"| {L['exit_lux']} | — | {L['exit_lux_value']} |\n"
-        f"| {L['adaptive_brackets']} | — | "
-        f"{L['lux_adaptive_brackets_value']} |\n\n"
-        f"**{L['uv_gate']}**\n\n"
-        f"| {L['criterion']} | {L['value']} | {L['threshold']} |\n"
-        f"|---|---|---|\n"
-        f"| {L['uv_index']} | {{{{ states('{uv}') }}}} | "
-        f"≥ {min_uv} |\n\n"
-        f"**{L['temperatures']}**\n\n"
-        f"| {L['criterion']} | {L['value']} | {L['threshold']} |\n"
-        f"|---|---|---|\n"
-        f"| {L['outdoor_temp']} | "
-        f"{{{{ states('{temp_outdoor}') }}}}°C | "
-        f"{L['outdoor_temp_threshold']} |\n"
-        f"| {L['indoor_temp']} | "
-        f"{{{{ states('{temp_indoor}') }}}}°C | "
-        f"{L['indoor_temp_threshold']} |\n"
-        f"| {L['exit_comfort']} | — | {L['exit_comfort_value']} |\n\n"
-        f"**{L['hysteresis_debounce']}**\n\n"
-        f"| {L['phase']} | {L['duration']} |\n"
-        f"|---|---|\n"
-        f"| {L['close_phase']} | {L['close_phase_value']} |\n"
-        f"| {L['open_phase']} | {L['open_phase_value']} |\n"
-        f"| {L['current_counter']} | "
-        f"{{{{ states('{pending}') }}}} s |\n"
-        f"| {L['override_reset']} | {L['override_reset_value']} |\n\n"
-        f"**{L['subentry_config']}**\n\n"
-        f"| {L['parameter']} | {L['value']} |\n"
-        f"|---|---|\n"
-        f"| {L['facade_orientation']} | {orientation}° |\n"
-        f"| {L['half_arc']} | {arc}° |\n"
-        f"| {L['min_elevation_label']} | {min_elevation}° |\n"
-        f"| {L['min_uv_label']} | {min_uv} |\n"
-        f"| {L['target_position']} | {target_position} % |\n"
-        f"| {L['indoor_temp_sensor']} | {indoor_sensor_repr} |\n\n"
-        f"**{L['final_decision']}**\n\n"
+        f"## {L['decision_state']}\n\n"
         f"| {L['indicator']} | {L['value']} |\n"
         f"|---|---|\n"
-        f"| {L['status_label']} | "
+        f"| {L['current_status']} | "
         f"**{{{{ states('{status}') }}}}** |\n"
         f"| {L['protection_active']} | "
         f"{{{{ states('{protection_active}') }}}} |\n"
-        f"| {L['override_until']} | "
-        f"{{{{ states('{override}') }}}} |\n"
+        f"| {L['manual_override']} | "
+        f"{{{{ states('{override}') }}}} "
+        f"({L['override_reset_note']}) |\n\n"
+        f"## {L['close_conditions']}\n\n"
+        f"{L['close_conditions_intro']}\n\n"
+        # 1. Sun position
+        f"### 1. {L['sun_position_section']}\n\n"
+        f"{L['sun_position_intro']}\n\n"
+        f"| {L['criterion']} | {L['current_value']} | "
+        f"{L['condition']} |\n"
+        f"|---|---|---|\n"
+        f"| {L['elevation_label']} | "
+        f"{{{{ states('{elevation}') }}}}° | "
+        + L['elevation_condition'].format(
+            min=min_elevation,
+            exit=elev_exit,
+            hys=ELEVATION_HYSTERESIS_DEG,
+        )
+        + " |\n"
+        f"| {L['azimuth_diff_label']} | "
+        f"{{{{ states('{az_diff}') }}}}° | "
+        + L['azimuth_diff_condition'].format(
+            arc=arc,
+            exit=arc_exit,
+            hys=ARC_HYSTERESIS_DEG,
+        )
+        + " |\n\n"
+        # 2. Outdoor temperature
+        f"### 2. {L['outdoor_temp_section']}\n\n"
+        f"{L['outdoor_temp_intro']}\n\n"
+        f"| {L['criterion']} | {L['current_value']} | "
+        f"{L['condition']} |\n"
+        f"|---|---|---|\n"
+        f"| {L['outdoor_temp_label']} | "
+        f"{{{{ states('{temp_outdoor}') }}}} °C | "
+        f"{L['outdoor_temp_condition']} |\n"
+        f"| {L['thermal_regime_label']} | "
+        f"{L['thermal_regime_value']} | "
+        f"{L['thermal_regime_condition']} |\n\n"
+        # 3. Brightness
+        f"### 3. {L['lux_section']}\n\n"
+        f"{L['lux_intro']}\n\n"
+        f"| {L['criterion']} | {L['current_value']} | "
+        f"{L['condition']} |\n"
+        f"|---|---|---|\n"
+        f"| {L['outdoor_lux_label']} | "
+        f"{{{{ states('{lux}') }}}} lx | "
+        + L['outdoor_lux_condition'].format(
+            threshold_template=lux_threshold_template
+        )
+        + " |\n"
+        f"| {L['lux_threshold_label']} | "
+        f"{L['lux_threshold_value']} | "
+        f"{L['lux_threshold_condition']} |\n"
+        f"| {L['lux_reopen_label']} | — | "
+        f"{L['lux_reopen_condition']} |\n\n"
+        # 4. UV
+        f"### 4. {L['uv_section']}\n\n"
+        f"{L['uv_intro']}\n\n"
+        f"| {L['criterion']} | {L['current_value']} | "
+        f"{L['condition']} |\n"
+        f"|---|---|---|\n"
+        f"| {L['uv_index_label']} | "
+        f"{{{{ states('{uv}') }}}} | "
+        + L['uv_index_condition'].format(min=min_uv)
+        + " |\n\n"
+        # 5. Indoor comfort
+        f"### 5. {L['comfort_section']}\n\n"
+        f"{L['comfort_intro']}\n\n"
+        f"| {L['criterion']} | {L['current_value']} | "
+        f"{L['condition']} |\n"
+        f"|---|---|---|\n"
+        f"| {L['indoor_temp_label']} | "
+        f"{{{{ states('{temp_indoor}') }}}} °C | "
+        f"{L['indoor_temp_condition']} |\n"
+        f"| {L['heatwave_bypass_label']} | "
+        f"{L['heatwave_bypass_value']} | "
+        f"{L['heatwave_bypass_condition']} |\n"
+        f"| {L['comfort_reopen_label']} | — | "
+        f"{L['comfort_reopen_condition']} |\n\n"
+        # 6. Timing
+        f"### 6. {L['timing_section']}\n\n"
+        f"{L['timing_intro']}\n\n"
+        f"| {L['step']} | {L['duration']} | "
+        f"{L['current_counter']} |\n"
+        f"|---|---|---|\n"
+        f"| {L['close_step_label']} | "
+        f"{L['close_step_duration']} | "
+        f"{{{{ states('{pending}') }}}} s |\n"
+        f"| {L['open_step_label']} | "
+        f"{L['open_step_duration']} | "
+        f"{{{{ states('{pending}') }}}} s |\n\n"
+        # Configuration
+        f"## {L['config_section']}\n\n"
+        f"{L['config_intro']}\n\n"
+        f"| {L['parameter']} | {L['value']} |\n"
+        f"|---|---|\n"
+        f"| {L['facade_orientation_label']} | {orientation}° |\n"
+        f"| {L['half_arc_label']} | {arc}° |\n"
+        f"| {L['min_elevation_param_label']} | {min_elevation}° |\n"
+        f"| {L['min_uv_param_label']} | {min_uv} |\n"
+        f"| {L['target_position_param_label']} | {target_position} % |\n"
+        f"| {L['indoor_temp_sensor_label']} | {indoor_sensor_repr} |\n"
     )
     return {"type": "markdown", "content": content}
 
@@ -853,8 +1037,10 @@ def _build_sun_protection_view(
         }
     )
 
-    # Comprehensive decision-parameter recap: every gate, every
-    # threshold, with the live values pulled via Jinja templates.
+    # Narrative recap of every decision input: status at the top,
+    # then the close-condition pipeline section by section, then
+    # the static configuration. Live values land via Jinja
+    # templates that HA refreshes on every state change.
     cards.append(_decision_parameters_markdown(subentry, labels))
 
     # Margins gauges — only those whose underlying sensor is numeric.
