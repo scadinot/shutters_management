@@ -129,7 +129,7 @@ _LABELS_FR: dict[str, str] = {
     "sun_position_section": "Position du soleil",
     "sun_position_intro": (
         "Le soleil doit être suffisamment haut et dans l'arc "
-        "d'acceptance de la façade."
+        "d'acceptation de la façade."
     ),
     "outdoor_temp_section": "Température extérieure",
     "outdoor_temp_intro": (
@@ -155,7 +155,9 @@ _LABELS_FR: dict[str, str] = {
     "timing_section": "Temporisation",
     "timing_intro": (
         "Les conditions doivent tenir un certain temps avant que le "
-        "moteur n'agisse, pour éviter de réagir à un nuage de passage."
+        "moteur n'agisse, pour éviter de réagir à un nuage de "
+        "passage. Le compteur ci-dessous reflète la phase "
+        "actuellement en cours (fermeture ou réouverture)."
     ),
     "config_section": "Configuration de la sous-entrée",
     "config_intro": (
@@ -220,9 +222,6 @@ _LABELS_FR: dict[str, str] = {
     "close_step_duration": "10 min de conditions favorables",
     "open_step_label": "Avant réouverture",
     "open_step_duration": "20 min de luminosité insuffisante",
-    "open_step_counter_note": (
-        "compteur partagé avec la fermeture"
-    ),
     "facade_orientation_label": "Orientation de la façade",
     "half_arc_label": "Demi-arc accepté",
     "min_elevation_param_label": "Élévation minimale",
@@ -314,7 +313,9 @@ _LABELS_EN: dict[str, str] = {
     "timing_section": "Timing",
     "timing_intro": (
         "Conditions must hold for a while before the engine "
-        "acts, so a passing cloud doesn't toggle the shutters."
+        "acts, so a passing cloud doesn't toggle the shutters. "
+        "The counter below reflects whichever phase is currently "
+        "active (close or reopen)."
     ),
     "config_section": "Subentry configuration",
     "config_intro": (
@@ -374,7 +375,6 @@ _LABELS_EN: dict[str, str] = {
     "close_step_duration": "10 min of favourable conditions",
     "open_step_label": "Before reopen",
     "open_step_duration": "20 min of insufficient brightness",
-    "open_step_counter_note": "counter shared with the close step",
     "facade_orientation_label": "Façade orientation",
     "half_arc_label": "Accepted half-arc",
     "min_elevation_param_label": "Minimum elevation",
@@ -951,7 +951,7 @@ def _decision_parameters_markdown(
         f"{{{{ states('{pending}') }}}} s |\n"
         f"| {L['open_step_label']} | "
         f"{L['open_step_duration']} | "
-        f"{L['open_step_counter_note']} |\n\n"
+        f"{{{{ states('{pending}') }}}} s |\n\n"
         # Configuration
         f"## {L['config_section']}\n\n"
         f"{L['config_intro']}\n\n"
