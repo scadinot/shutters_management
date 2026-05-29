@@ -6,6 +6,30 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le pr
 
 ## [Non publié]
 
+## [0.9.9] — 2026-05-25
+
+### Modifié — carte 3D
+
+- **Base du triangle calée sur `min_elevation`.** Le bord inférieur
+  du wedge est désormais une ligne droite parallèle à l'horizon,
+  à l'élévation `min_elevation` configurée dans la sous-entrée
+  Sun Protection (15° par défaut). C'est exactement le seuil de
+  décision Python (`__init__.py:_compute_decision` retourne
+  `below_horizon` quand `elevation < min_elevation`), donc le
+  wedge matérialise désormais visuellement la zone où la
+  protection peut effectivement se déclencher.
+- Le **sommet** du wedge continue à épouser la trajectoire
+  réelle du soleil au **solstice d'été** (21 juin), clippée à la
+  fenêtre `[orientation − arc, orientation + arc]`. La courbe
+  reste utile pour visualiser l'enveloppe annuelle maximale.
+- Remplace le bord inférieur calé sur la trajectoire du solstice
+  d'hiver introduit en v0.9.5 : ce repère astronomique ne
+  correspondait pas au seuil de décision utilisé par le moteur,
+  ce qui pouvait dérouter quand le `min_elevation` et la
+  trajectoire d'hiver divergeaient (par exemple `min_elevation =
+  15°` en Normandie où le soleil d'hiver descend jusqu'à 17° à
+  midi).
+
 ## [0.9.8] — 2026-05-25
 
 ### Corrigé — cockpit

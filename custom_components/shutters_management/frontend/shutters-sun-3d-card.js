@@ -490,60 +490,72 @@ class ShuttersSun3dCard extends HTMLElement {
     const segments = 24;
     const elSegs = 12;
 
-    // Bottom and top of the wedge follow the *actual* sun
-    // trajectories on the two solstices, clipped to the wedge's
-    // azimuth window. Compared to the v0.9.4 rectangle (constant
-    // noon-elevation top + bottom), this hugs the day arcs so the
-    // wedge truly outlines « where the sun can be in this site's
-    // acceptance window throughout the year ».
+    // Bottom of the wedge sits at the configured ``min_elevation``
+    // threshold — the same value the Python decision engine reads
+    // via ``__init__.py:1242`` to decide « sun too low, never
+    // close ». Drawing it as a flat arc parallel to the horizon
+    // makes the user's actual decision boundary visible. Top of
+    // the wedge still follows the *actual* sun trajectory on the
+    // **summer solstice** (21 June), clipped to the wedge's
+    // azimuth window — useful to gauge the yearly maximum
+    // envelope.
+    const minElevationDeg = this._config.min_elevation || 0;
+    const minElRad = THREE.MathUtils.degToRad(minElevationDeg);
     const lat = this._config.latitude;
     const lon = this._config.longitude || 0;
-    const winterArc = solsticeArc(
-      lat, lon, false, fromAzDeg, toAzDeg, segments
-    );
     const summerArc = solsticeArc(
       lat, lon, true, fromAzDeg, toAzDeg, segments
     );
-    // Use the trajectories whenever every value is finite *and*
-    // they are visibly separated *somewhere* in the window.
-    // Per-column ``> 1`` rejected the trajectories whenever any
-    // single azimuth had both arcs at the horizon (e.g. a façade
-    // facing north, or a wedge edge the sun never reaches in
-    // winter); that case is precisely where the trajectories shine
-    // and should drive the wedge down to the horizon — not where
-    // we want the rectangle fallback.
+    // Use the summer trajectory whenever every value is finite
+    // *and* visibly above the min_elevation base *somewhere* in
+    // the window. Per-column ``> 1`` would reject the trajectory
+    // whenever the sun never reaches the bearing on the solstice
+    // (e.g. north-facing façade at temperate latitudes); that case
+    // is precisely where the trajectory shines and should drive
+    // the top edge down to the base — not where we want the
+    // rectangle fallback.
     let maxSpreadDeg = 0;
-    let allFinite = winterArc.length === segments + 1;
+    let allFinite = summerArc.length === segments + 1;
     if (allFinite) {
       for (let i = 0; i <= segments; i++) {
-        const w = winterArc[i].elDeg;
         const s = summerArc[i].elDeg;
-        if (!Number.isFinite(w) || !Number.isFinite(s)) {
+        if (!Number.isFinite(s)) {
           allFinite = false;
           break;
         }
-        if (s - w > maxSpreadDeg) maxSpreadDeg = s - w;
+        if (s - minElevationDeg > maxSpreadDeg) {
+          maxSpreadDeg = s - minElevationDeg;
+        }
       }
     }
     const trajectoriesUsable = allFinite && maxSpreadDeg > 1;
 
-    let { lowerRad, upperRad } = solsticeBounds(lat);
-    if (upperRad - lowerRad < THREE.MathUtils.degToRad(5)) {
-      lowerRad = 0;
-      upperRad = Math.PI / 2;
+    let { upperRad } = solsticeBounds(lat);
+    // Never push the fallback top above the actual decision
+    // boundary: when ``min_elevation`` is near or above the summer
+    // solstice peak (high latitudes, or ``min_elevation = 60°``),
+    // pushing ``upperRad`` to the zenith would draw a large
+    // « acceptance zone » that the engine can never reach. Clamp
+    // at ``minElRad`` instead so the wedge collapses to a flat
+    // line on the base — geometrically truthful.
+    if (upperRad < minElRad) {
+      upperRad = minElRad;
     }
 
-    const lowerElForCol = (i) =>
-      trajectoriesUsable
-        ? THREE.MathUtils.degToRad(winterArc[i].elDeg)
-        : lowerRad;
-    const upperElForCol = (i) =>
-      trajectoriesUsable
-        ? THREE.MathUtils.degToRad(summerArc[i].elDeg)
-        : upperRad;
+    const lowerElForCol = (_i) => minElRad;
+    const upperElForCol = (i) => {
+      if (!trajectoriesUsable) return upperRad;
+      // ``solsticeArc`` returns 0° at azimuths the sun does not
+      // cross on June 21 (typical at the east/west edges for
+      // north-facing façades). Clamp at ``minElRad`` so the top
+      // edge never dips below the base — otherwise the mesh
+      // inverts and the outline tube crosses the bottom outline.
+      const summerRad = THREE.MathUtils.degToRad(summerArc[i].elDeg);
+      return Math.max(minElRad, summerRad);
+    };
     const azRadForCol = (i) =>
       trajectoriesUsable
-        ? THREE.MathUtils.degToRad(winterArc[i].azDeg)
+        ? THREE.MathUtils.degToRad(summerArc[i].azDeg)
         : this._facadeRad + ((i / segments) - 0.5) * 2 * halfAng;
 
     const pts = [];
