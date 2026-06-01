@@ -866,17 +866,20 @@ def _decision_parameters_markdown(
     # --- Jinja value formatters (locale-aware) ----------------------------
     # Integer rounding for elevation, azimuth offset, lux, UV, pending sec.
     # Single-decimal rounding for temperatures, with `,` decimal separator
-    # in FR (and `.` in EN) via a final `replace`.
+    # in FR (and `.` in EN) via a final `replace`. Both helpers short-
+    # circuit non-numeric states (`unknown`/`unavailable`/…) to « — »
+    # rather than letting `float(0)` coerce them to a misleading 0.
     def num0(state_entity: str) -> str:
         return (
-            "{{ states('" + state_entity + "') | float(0) | "
-            "round(0) | int }}"
+            "{% set v = states('" + state_entity + "') %}"
+            "{{ '—' if not is_number(v) else v | float | round(0) | int }}"
         )
 
     def num1(state_entity: str) -> str:
         return (
-            "{{ '%.1f' | format(states('" + state_entity + "') "
-            "| float(0)) | replace('.', '" + sep + "') }}"
+            "{% set v = states('" + state_entity + "') %}"
+            "{{ '—' if not is_number(v) else "
+            "('%.1f' | format(v | float) | replace('.', '" + sep + "')) }}"
         )
 
     lux_threshold_template = num0(lux_threshold)
@@ -895,17 +898,17 @@ def _decision_parameters_markdown(
         "'disabled': 'var(--info-color)',"
         "'no_sensor': 'var(--error-color)'"
         "}.get(s, 'var(--secondary-text-color)') %}"
-        '<span style="color: {{ c }}">**'
+        '<span style="color: {{ c }}"><strong>'
         "{{ state_translated('" + status + "') }}"
-        "**</span>"
+        "</strong></span>"
     )
     # Protection active: the binary_sensor has no device_class so
     # state_translated() would return raw on/off → use a small if/else
     # with our own labels, accented in orange when active.
     protection_cell = (
         "{% if is_state('" + protection_active + "', 'on') %}"
-        '<span style="color: var(--warning-color)">**'
-        + L["state_active"] + "**</span>"
+        '<span style="color: var(--warning-color)"><strong>'
+        + L["state_active"] + "</strong></span>"
         "{% else %}"
         '<span style="color: var(--secondary-text-color)">'
         + L["state_inactive"] + "</span>"
@@ -921,10 +924,10 @@ def _decision_parameters_markdown(
         '<span style="color: var(--secondary-text-color)">'
         + L["override_none"] + "</span>"
         "{% else %}"
-        '<span style="color: var(--info-color)">**'
+        '<span style="color: var(--info-color)"><strong>'
         + L["override_active_prefix"] + " "
         "{{ as_timestamp(v) | timestamp_custom('%H:%M', true) }}"
-        "**</span> (" + L["override_reset_note"] + ")"
+        "</strong></span> (" + L["override_reset_note"] + ")"
         "{% endif %}"
     )
 

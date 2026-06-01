@@ -536,11 +536,17 @@ async def test_sun_protection_view_has_decision_state_markdown(
     assert "var(--warning-color)" in content   # active state color
     assert "var(--secondary-text-color)" in content   # inactive / fallback
     assert "var(--info-color)" in content   # override / manual control
-    # Raw enum keys must never leak into the rendered card —
-    # they should always be wrapped in ``state_translated`` or
-    # used only as keys in the color-mapping dict.
-    assert "**below_horizon**" not in content
-    assert "**unknown**" not in content
+    # Emphasis inside the colored spans uses <strong> (not Markdown
+    # ``**``) so the bold renders reliably within inline HTML.
+    assert "<strong>" in content and "</strong>" in content
+    assert "**" not in content
+    # Raw enum values must never leak into the rendered card — the
+    # status always goes through ``state_translated``. (``below_horizon``
+    # is not even one of the color-map keys, so it must be absent.)
+    assert "below_horizon" not in content
+    # Live numeric cells short-circuit non-numeric states to « — »
+    # via ``is_number`` instead of coercing them to a misleading 0.
+    assert "is_number(v)" in content
     # Reset note only appears inside the override active branch
     # (no longer next to « Aucun »).
     assert content.count("Aucun") + content.count("None") >= 1
