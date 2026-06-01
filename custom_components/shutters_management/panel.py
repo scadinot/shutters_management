@@ -884,50 +884,50 @@ def _decision_parameters_markdown(
 
     lux_threshold_template = num0(lux_threshold)
 
-    # --- État de la décision : valeurs humaines + couleurs sémantiques ----
-    # Status: state_translated() renders the translated enum label
-    # (« Soleil trop bas », « Actif », …). Colors come from a parallel
-    # lookup on the raw enum so they survive the translation. The fallback
-    # — including `unknown`/`unavailable` — is the muted secondary color.
-    status_cell = (
+    # --- État de la décision ------------------------------------------------
+    # The current status is rendered as a colored <ha-alert> banner. It is
+    # the single most important "why am I in this state?" signal, and
+    # ha-alert is the only sanitizer-safe way to get theme colors in a
+    # markdown card: HA strips inline `style` attributes, so a
+    # <span style="color: …"> renders colorless. ha-alert exposes four
+    # types — info (blue) / warning (orange) / error (red) / success
+    # (green) — onto which we fold the decision palette: warning for an
+    # engaged or closing protection, error for a misconfiguration, and
+    # info (the default) for user control (override/disabled) and every
+    # idle/standby state. state_translated() supplies the human label.
+    status_banner = (
         "{% set s = states('" + status + "') %}"
-        "{% set c = {"
-        "'active': 'var(--warning-color)',"
-        "'pending_close': 'var(--warning-color)',"
-        "'override': 'var(--info-color)',"
-        "'disabled': 'var(--info-color)',"
-        "'no_sensor': 'var(--error-color)'"
-        "}.get(s, 'var(--secondary-text-color)') %}"
-        '<span style="color: {{ c }}"><strong>'
+        "{% set t = {"
+        "'active': 'warning',"
+        "'pending_close': 'warning',"
+        "'no_sensor': 'error'"
+        "}.get(s, 'info') %}"
+        '<ha-alert alert-type="{{ t }}" title="' + L["current_status"] + '">'
         "{{ state_translated('" + status + "') }}"
-        "</strong></span>"
+        "</ha-alert>"
     )
     # Protection active: the binary_sensor has no device_class so
-    # state_translated() would return raw on/off → use a small if/else
-    # with our own labels, accented in orange when active.
+    # state_translated() would return raw on/off → a small if/else with
+    # our own labels, the active state emphasized in bold.
     protection_cell = (
         "{% if is_state('" + protection_active + "', 'on') %}"
-        '<span style="color: var(--warning-color)"><strong>'
-        + L["state_active"] + "</strong></span>"
+        "<strong>" + L["state_active"] + "</strong>"
         "{% else %}"
-        '<span style="color: var(--secondary-text-color)">'
-        + L["state_inactive"] + "</span>"
+        + L["state_inactive"] +
         "{% endif %}"
     )
     # Override: timestamp sensor. When unknown/unavailable/none, render
-    # « Aucun » in gray and drop the reset note (which only makes sense
-    # for an active override). When set, render the formatted HH:MM in
-    # blue bold followed by the reset note in regular text.
+    # « Aucun » and drop the reset note (which only makes sense for an
+    # active override). When set, render the formatted HH:MM in bold
+    # followed by the reset note in regular text.
     override_cell = (
         "{% set v = states('" + override + "') %}"
         "{% if v in ['unknown', 'unavailable', 'none', ''] %}"
-        '<span style="color: var(--secondary-text-color)">'
-        + L["override_none"] + "</span>"
+        + L["override_none"] +
         "{% else %}"
-        '<span style="color: var(--info-color)"><strong>'
-        + L["override_active_prefix"] + " "
+        "<strong>" + L["override_active_prefix"] + " "
         "{{ as_timestamp(v) | timestamp_custom('%H:%M', true) }}"
-        "</strong></span> (" + L["override_reset_note"] + ")"
+        "</strong> (" + L["override_reset_note"] + ")"
         "{% endif %}"
     )
 
@@ -939,9 +939,9 @@ def _decision_parameters_markdown(
 
     content = (
         f"## {L['decision_state']}\n\n"
+        f"{status_banner}\n\n"
         f"| {L['indicator']} | {L['value']} |\n"
         f"|---|---|\n"
-        f"| {L['current_status']} | {status_cell} |\n"
         f"| {L['protection_active']} | {protection_cell} |\n"
         f"| {L['manual_override']} | {override_cell} |\n\n"
         f"## {L['close_conditions']}\n\n"

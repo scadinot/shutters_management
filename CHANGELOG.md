@@ -6,6 +6,37 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le pr
 
 ## [Non publié]
 
+## [0.9.12] — 2026-06-01
+
+### Corrigé — couleurs de « État de la décision » désormais visibles
+
+- **Les couleurs sémantiques introduites en v0.9.11 ne
+  s'affichaient pas.** La carte Markdown de Home Assistant fait
+  passer le HTML par un sanitizer qui **supprime l'attribut
+  `style`** ; les `<span style="color: var(--…-color)">` étaient
+  donc rendus sans couleur (seul le gras `<strong>` survivait).
+- **Le statut courant devient une bannière `<ha-alert>`.**
+  `ha-alert` est l'élément natif whitelisté par le sanitizer et
+  le seul moyen fiable d'obtenir des couleurs thématisées dans
+  une carte Markdown. Le type de l'alerte est calculé en Jinja
+  à partir de l'état brut, puis le libellé humain vient de
+  `state_translated()` :
+  - `warning` (orange) — protection `active` ou `pending_close` ;
+  - `error` (rouge) — `no_sensor` (problème de configuration) ;
+  - `info` (bleu, défaut) — contrôle utilisateur
+    (`override`, `disabled`) et tous les états de veille
+    (`below_horizon`, `out_of_arc`, `lux_too_low`, `uv_too_low`,
+    `temp_too_cold`, `room_too_cool`, `unknown`, `unavailable`).
+  La palette à quatre teintes de `ha-alert` n'a pas de gris
+  neutre : les états de veille, auparavant gris, sont repliés
+  sur `info` (bleu).
+- **Mise en page hybride.** La bannière colorée répond
+  immédiatement à « pourquoi suis-je dans cet état ? », et les
+  deux indicateurs secondaires (**Protection active**,
+  **Override manuel**) restent dans la table compacte en
+  dessous, en gras (`<strong>`) sans couleur — l'inline `style`
+  étant de toute façon strippé.
+
 ## [0.9.11] — 2026-06-01
 
 ### Modifié — polissage du drill-down Protection solaire

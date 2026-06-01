@@ -530,14 +530,22 @@ async def test_sun_protection_view_has_decision_state_markdown(
     # Subentry config substituted at build time.
     assert "60°" in content   # DEFAULT_ARC = 60
 
-    # v0.9.11 — humanized state values and semantic colors in
-    # the « État de la décision » card.
+    # v0.9.12 — humanized state values + a colored <ha-alert> banner for
+    # the current status. ha-alert is the sanitizer-safe way to get theme
+    # colors in a markdown card (inline `style` is stripped by HA), so the
+    # status is rendered as a banner whose type folds onto the decision
+    # palette: warning / error / info (default).
     assert "state_translated('sensor.salon_sud_sun_protection_status')" in content
-    assert "var(--warning-color)" in content   # active state color
-    assert "var(--secondary-text-color)" in content   # inactive / fallback
-    assert "var(--info-color)" in content   # override / manual control
-    # Emphasis inside the colored spans uses <strong> (not Markdown
-    # ``**``) so the bold renders reliably within inline HTML.
+    assert "<ha-alert" in content and "</ha-alert>" in content
+    assert 'alert-type="{{ t }}"' in content
+    assert "'active': 'warning'" in content
+    assert "'no_sensor': 'error'" in content
+    # Inline `style` colors must not leak back in — they render colorless
+    # in HA's markdown card, which is the bug this banner replaces.
+    assert "style=" not in content
+    assert "var(--" not in content
+    # The two secondary indicators stay in the table, emphasized with
+    # <strong> (not Markdown ``**``) so the bold renders within HTML.
     assert "<strong>" in content and "</strong>" in content
     assert "**" not in content
     # Raw enum values must never leak into the rendered card — the
