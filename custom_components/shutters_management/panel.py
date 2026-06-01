@@ -52,7 +52,7 @@ from .const import (
     DOMAIN,
     ELEVATION_HYSTERESIS_DEG,
     HUB_TITLE,
-    LUX_STANDARD,
+    LUX_MILD,
     SERVICE_PAUSE,
     SERVICE_RESUME,
     SUBENTRY_TYPE_INSTANCE,
@@ -92,10 +92,10 @@ _LABELS_FR: dict[str, str] = {
         "une simulation de présence ou une protection solaire depuis "
         "l'intégration."
     ),
-    "lux_margin": "Marge lux",
-    "elevation_margin": "Marge élévation",
-    "uv_margin": "Marge UV",
-    "azimuth_diff": "Écart d'azimuth",
+    "lux_margin": "Lux",
+    "elevation_margin": "Élévation",
+    "uv_margin": "UV",
+    "azimuth_diff": "Azimut",
     "status": "Statut",
     "override": "Override",
     "orientation": "Orientation",
@@ -229,6 +229,12 @@ _LABELS_FR: dict[str, str] = {
     "target_position_param_label": "Position cible (volets fermés)",
     "indoor_temp_sensor_label": "Capteur de T° intérieure",
     "not_configured": "non configuré",
+    # v0.9.11 — état coloré et formatage local
+    "decimal_sep": ",",
+    "state_active": "Active",
+    "state_inactive": "Inactive",
+    "override_none": "Aucun",
+    "override_active_prefix": "Jusqu'à",
 }
 
 _LABELS_EN: dict[str, str] = {
@@ -253,10 +259,10 @@ _LABELS_EN: dict[str, str] = {
         "No sub-entry is configured. Add a schedule, presence simulation "
         "or sun protection from the integration."
     ),
-    "lux_margin": "Lux margin",
-    "elevation_margin": "Elevation margin",
-    "uv_margin": "UV margin",
-    "azimuth_diff": "Azimuth diff",
+    "lux_margin": "Lux",
+    "elevation_margin": "Elevation",
+    "uv_margin": "UV",
+    "azimuth_diff": "Azimuth",
     "status": "Status",
     "override": "Override",
     "orientation": "Orientation",
@@ -382,6 +388,12 @@ _LABELS_EN: dict[str, str] = {
     "target_position_param_label": "Target position (closed)",
     "indoor_temp_sensor_label": "Indoor T° sensor",
     "not_configured": "not configured",
+    # v0.9.11 — colored state + locale-aware formatting
+    "decimal_sep": ".",
+    "state_active": "Active",
+    "state_inactive": "Inactive",
+    "override_none": "None",
+    "override_active_prefix": "Until",
 }
 
 
@@ -833,7 +845,6 @@ def _decision_parameters_markdown(
         CONF_TARGET_POSITION, DEFAULT_TARGET_POSITION
     )
     temp_indoor_entity = subentry.data.get(CONF_TEMP_INDOOR_ENTITY) or ""
-    indoor_sensor_repr = temp_indoor_entity or labels["not_configured"]
 
     az_diff = f"sensor.{prefix}_sun_protection_azimuth_diff"
     elevation = f"sensor.{prefix}_sun_protection_sun_elevation"
@@ -848,21 +859,88 @@ def _decision_parameters_markdown(
     override = f"sensor.{prefix}_sun_protection_override_until"
 
     L = labels
+    sep = L["decimal_sep"]
     elev_exit = max(0, min_elevation - ELEVATION_HYSTERESIS_DEG)
     arc_exit = arc + ARC_HYSTERESIS_DEG
-    lux_threshold_template = f"{{{{ states('{lux_threshold}') }}}}"
+
+    # --- Jinja value formatters (locale-aware) ----------------------------
+    # Integer rounding for elevation, azimuth offset, lux, UV, pending sec.
+    # Single-decimal rounding for temperatures, with `,` decimal separator
+    # in FR (and `.` in EN) via a final `replace`.
+    def num0(state_entity: str) -> str:
+        return (
+            "{{ states('" + state_entity + "') | float(0) | "
+            "round(0) | int }}"
+        )
+
+    def num1(state_entity: str) -> str:
+        return (
+            "{{ '%.1f' | format(states('" + state_entity + "') "
+            "| float(0)) | replace('.', '" + sep + "') }}"
+        )
+
+    lux_threshold_template = num0(lux_threshold)
+
+    # --- État de la décision : valeurs humaines + couleurs sémantiques ----
+    # Status: state_translated() renders the translated enum label
+    # (« Soleil trop bas », « Actif », …). Colors come from a parallel
+    # lookup on the raw enum so they survive the translation. The fallback
+    # — including `unknown`/`unavailable` — is the muted secondary color.
+    status_cell = (
+        "{% set s = states('" + status + "') %}"
+        "{% set c = {"
+        "'active': 'var(--warning-color)',"
+        "'pending_close': 'var(--warning-color)',"
+        "'override': 'var(--info-color)',"
+        "'disabled': 'var(--info-color)',"
+        "'no_sensor': 'var(--error-color)'"
+        "}.get(s, 'var(--secondary-text-color)') %}"
+        '<span style="color: {{ c }}">**'
+        "{{ state_translated('" + status + "') }}"
+        "**</span>"
+    )
+    # Protection active: the binary_sensor has no device_class so
+    # state_translated() would return raw on/off → use a small if/else
+    # with our own labels, accented in orange when active.
+    protection_cell = (
+        "{% if is_state('" + protection_active + "', 'on') %}"
+        '<span style="color: var(--warning-color)">**'
+        + L["state_active"] + "**</span>"
+        "{% else %}"
+        '<span style="color: var(--secondary-text-color)">'
+        + L["state_inactive"] + "</span>"
+        "{% endif %}"
+    )
+    # Override: timestamp sensor. When unknown/unavailable/none, render
+    # « Aucun » in gray and drop the reset note (which only makes sense
+    # for an active override). When set, render the formatted HH:MM in
+    # blue bold followed by the reset note in regular text.
+    override_cell = (
+        "{% set v = states('" + override + "') %}"
+        "{% if v in ['unknown', 'unavailable', 'none', ''] %}"
+        '<span style="color: var(--secondary-text-color)">'
+        + L["override_none"] + "</span>"
+        "{% else %}"
+        '<span style="color: var(--info-color)">**'
+        + L["override_active_prefix"] + " "
+        "{{ as_timestamp(v) | timestamp_custom('%H:%M', true) }}"
+        "**</span> (" + L["override_reset_note"] + ")"
+        "{% endif %}"
+    )
+
+    # --- Capteur de T° intérieure : valeur live (Configuration) -----------
+    if temp_indoor_entity:
+        indoor_sensor_repr = num1(temp_indoor_entity) + " °C"
+    else:
+        indoor_sensor_repr = L["not_configured"]
 
     content = (
         f"## {L['decision_state']}\n\n"
         f"| {L['indicator']} | {L['value']} |\n"
         f"|---|---|\n"
-        f"| {L['current_status']} | "
-        f"**{{{{ states('{status}') }}}}** |\n"
-        f"| {L['protection_active']} | "
-        f"{{{{ states('{protection_active}') }}}} |\n"
-        f"| {L['manual_override']} | "
-        f"{{{{ states('{override}') }}}} "
-        f"({L['override_reset_note']}) |\n\n"
+        f"| {L['current_status']} | {status_cell} |\n"
+        f"| {L['protection_active']} | {protection_cell} |\n"
+        f"| {L['manual_override']} | {override_cell} |\n\n"
         f"## {L['close_conditions']}\n\n"
         f"{L['close_conditions_intro']}\n\n"
         # 1. Sun position
@@ -871,16 +949,14 @@ def _decision_parameters_markdown(
         f"| {L['criterion']} | {L['current_value']} | "
         f"{L['condition']} |\n"
         f"|---|---|---|\n"
-        f"| {L['elevation_label']} | "
-        f"{{{{ states('{elevation}') }}}}° | "
+        f"| {L['elevation_label']} | {num0(elevation)}° | "
         + L['elevation_condition'].format(
             min=min_elevation,
             exit=elev_exit,
             hys=ELEVATION_HYSTERESIS_DEG,
         )
         + " |\n"
-        f"| {L['azimuth_diff_label']} | "
-        f"{{{{ states('{az_diff}') }}}}° | "
+        f"| {L['azimuth_diff_label']} | {num0(az_diff)}° | "
         + L['azimuth_diff_condition'].format(
             arc=arc,
             exit=arc_exit,
@@ -893,8 +969,7 @@ def _decision_parameters_markdown(
         f"| {L['criterion']} | {L['current_value']} | "
         f"{L['condition']} |\n"
         f"|---|---|---|\n"
-        f"| {L['outdoor_temp_label']} | "
-        f"{{{{ states('{temp_outdoor}') }}}} °C | "
+        f"| {L['outdoor_temp_label']} | {num1(temp_outdoor)} °C | "
         f"{L['outdoor_temp_condition']} |\n"
         f"| {L['thermal_regime_label']} | "
         f"{L['thermal_regime_value']} | "
@@ -905,8 +980,7 @@ def _decision_parameters_markdown(
         f"| {L['criterion']} | {L['current_value']} | "
         f"{L['condition']} |\n"
         f"|---|---|---|\n"
-        f"| {L['outdoor_lux_label']} | "
-        f"{{{{ states('{lux}') }}}} lx | "
+        f"| {L['outdoor_lux_label']} | {num0(lux)} lx | "
         + L['outdoor_lux_condition'].format(
             threshold_template=lux_threshold_template
         )
@@ -922,8 +996,7 @@ def _decision_parameters_markdown(
         f"| {L['criterion']} | {L['current_value']} | "
         f"{L['condition']} |\n"
         f"|---|---|---|\n"
-        f"| {L['uv_index_label']} | "
-        f"{{{{ states('{uv}') }}}} | "
+        f"| {L['uv_index_label']} | {num1(uv)} | "
         + L['uv_index_condition'].format(min=min_uv)
         + " |\n\n"
         # 5. Indoor comfort
@@ -932,8 +1005,7 @@ def _decision_parameters_markdown(
         f"| {L['criterion']} | {L['current_value']} | "
         f"{L['condition']} |\n"
         f"|---|---|---|\n"
-        f"| {L['indoor_temp_label']} | "
-        f"{{{{ states('{temp_indoor}') }}}} °C | "
+        f"| {L['indoor_temp_label']} | {num1(temp_indoor)} °C | "
         f"{L['indoor_temp_condition']} |\n"
         f"| {L['heatwave_bypass_label']} | "
         f"{L['heatwave_bypass_value']} | "
@@ -947,11 +1019,9 @@ def _decision_parameters_markdown(
         f"{L['current_counter']} |\n"
         f"|---|---|---|\n"
         f"| {L['close_step_label']} | "
-        f"{L['close_step_duration']} | "
-        f"{{{{ states('{pending}') }}}} s |\n"
+        f"{L['close_step_duration']} | {num0(pending)} s |\n"
         f"| {L['open_step_label']} | "
-        f"{L['open_step_duration']} | "
-        f"{{{{ states('{pending}') }}}} s |\n\n"
+        f"{L['open_step_duration']} | {num0(pending)} s |\n\n"
         # Configuration
         f"## {L['config_section']}\n\n"
         f"{L['config_intro']}\n\n"
@@ -1056,8 +1126,8 @@ def _build_sun_protection_view(
                 f"sensor.{prefix}_sun_protection_lux_margin",
                 labels["lux_margin"],
                 unit="lx",
-                minimum=-LUX_STANDARD,
-                maximum=LUX_STANDARD,
+                minimum=-LUX_MILD,
+                maximum=LUX_MILD,
                 severity={"green": 0, "yellow": -10000, "red": -25000},
             )
         )

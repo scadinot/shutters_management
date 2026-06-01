@@ -6,6 +6,70 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le pr
 
 ## [Non publié]
 
+## [0.9.11] — 2026-06-01
+
+### Modifié — polissage du drill-down Protection solaire
+
+Suite logique de la refonte v0.9.10, traitement des derniers
+points d'aspérité de la vue détaillée d'une protection solaire,
+sur retour d'écran live :
+
+- **Carte « État de la décision » humanisée**. Les trois cellules
+  affichaient encore des chaînes brutes
+  (`below_horizon`, `off`, `unknown`) :
+  - **Statut courant** passe par `state_translated('sensor.X')`,
+    qui consomme les traductions enum définies dans
+    `translations/{fr,en}.json` → « Soleil trop bas »,
+    « Soleil hors arc », « Actif », etc.
+  - **Protection active** rend « Active »/« Inactive » via un
+    `{% if is_state('binary_sensor.X', 'on') %}` (le
+    `binary_sensor` n'expose pas de `device_class`, donc
+    `state_translated` y retournerait juste `on`/`off`).
+  - **Override manuel** rend « Aucun » quand aucun override
+    n'est actif (en gris), ou « Jusqu'à HH:MM » (en bleu gras)
+    suivi de la note de réinitialisation. La note était
+    précédemment affichée même sans override actif, ce qui
+    induisait en erreur — elle est désormais conditionnelle.
+- **Couleurs sémantiques** dans cette même carte, via
+  `<span style="color: var(--…-color)">`. Les couleurs reposent
+  sur les variables CSS du thème HA actif (clair/sombre), donc
+  aucune valeur en dur :
+  - **orange** (`--warning-color`) pour les états d'alerte
+    (`active`, `pending_close`) et la protection active ;
+  - **bleu** (`--info-color`) pour les états de contrôle
+    utilisateur (`override`, `disabled`) et l'override actif ;
+  - **rouge** (`--error-color`) pour `no_sensor` (problème de
+    configuration) ;
+  - **gris** (`--secondary-text-color`) pour les conditions
+    naturelles non remplies (`below_horizon`, `out_of_arc`,
+    `lux_too_low`, `uv_too_low`, `temp_too_cold`, `room_too_cool`)
+    et les fallbacks (`unknown`, `unavailable`).
+- **Formatage local des nombres**. Les templates Jinja qui
+  injectaient des valeurs brutes (`5.13°`, `340.0 lx`,
+  `20.08 °C`) sont passés par deux nouveaux helpers de
+  formatage : `num0` (arrondi à l'entier) pour l'élévation, le
+  décalage azimutal, la luminosité, l'indice UV et le compteur
+  de temporisation, et `num1` (1 décimale, virgule en FR via
+  `replace('.', ',')`) pour les températures intérieures et
+  extérieures.
+- **Capteur de T° intérieure live**. La section
+  Configuration affichait l'identifiant technique du capteur
+  (`sensor.sonde_maurane_temperature`) ; elle affiche désormais
+  la valeur live (`22,8 °C`) ; quand `temp_indoor_entity` est
+  vide, la mention « non configuré » est conservée.
+- **Libellés des jauges « Marges » raccourcis**. Les anciens
+  libellés (`Marge lux`, `Marge élévation`, `Marge UV`,
+  `Écart d'azimuth`) étaient tronqués dans la grille à 4
+  colonnes (« Marge éléva… ») ; ils deviennent `Lux`,
+  `Élévation`, `UV`, `Azimut` (le titre « Marges » de la
+  section reste explicite).
+- **Plage de la jauge lux élargie** de `[-LUX_STANDARD,
+  LUX_STANDARD] = [-50 000, 50 000]` à `[-LUX_MILD, LUX_MILD]
+  = [-70 000, 70 000]`. En régime mi-saison (T°ext < 24 °C), le
+  seuil de fermeture vaut `LUX_MILD = 70 000 lx`, ce qui peut
+  amener la marge à `≈ -70 000 lx` ; l'aiguille collait donc
+  au minimum sur la vue précédente.
+
 ## [0.9.10] — 2026-05-29
 
 ### Modifié — carte « État de la décision » (ex « Paramètres de décision »)

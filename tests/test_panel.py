@@ -518,12 +518,32 @@ async def test_sun_protection_view_has_decision_state_markdown(
         )
 
     # Live templates still target the per-subentry diagnostic
-    # sensors so the card refreshes on state change.
-    assert "states('sensor.salon_sud_sun_protection_status')" in content
+    # sensors so the card refreshes on state change. The status
+    # sensor goes through ``state_translated`` (for the human
+    # label) plus ``states(...)`` (for the color-mapping enum
+    # lookup), and the protection binary_sensor is wrapped in
+    # an ``is_state(...)`` so the substring check stays loose
+    # — what matters is that the entity_id is referenced.
+    assert "sensor.salon_sud_sun_protection_status" in content
+    assert "binary_sensor.salon_sud_sun_protection_active" in content
     assert "states('sensor.salon_sud_sun_protection_lux')" in content
-    assert "states('binary_sensor.salon_sud_sun_protection_active')" in content
     # Subentry config substituted at build time.
     assert "60°" in content   # DEFAULT_ARC = 60
+
+    # v0.9.11 — humanized state values and semantic colors in
+    # the « État de la décision » card.
+    assert "state_translated('sensor.salon_sud_sun_protection_status')" in content
+    assert "var(--warning-color)" in content   # active state color
+    assert "var(--secondary-text-color)" in content   # inactive / fallback
+    assert "var(--info-color)" in content   # override / manual control
+    # Raw enum keys must never leak into the rendered card —
+    # they should always be wrapped in ``state_translated`` or
+    # used only as keys in the color-mapping dict.
+    assert "**below_horizon**" not in content
+    assert "**unknown**" not in content
+    # Reset note only appears inside the override active branch
+    # (no longer next to « Aucun »).
+    assert content.count("Aucun") + content.count("None") >= 1
 
 
 async def test_scheduler_view_header_links_back_to_cockpit(
