@@ -531,28 +531,14 @@ class ShuttersSun3dCard extends HTMLElement {
       return new THREE.Vector3(Math.sin(az) * r, y, -Math.cos(az) * r);
     };
 
-    // Base outline (constant minElRad) — drawn as a straight polyline
-    // wrapped in a TubeGeometry. The previous CatmullRomCurve3 path
-    // extrapolated slightly past the endpoints when fed collinear
-    // points, producing a horizontal sliver that overshot the wedge
-    // (visible above the « N » marker in v0.9.13). Using a CurvePath
-    // of LineCurve3 segments removes that extrapolation entirely.
-    {
-      const arcPts = [];
-      for (let i = 0; i <= segments; i++) arcPts.push(colToVec(i, false));
-      if (arcPts.length >= 2) {
-        const path = new THREE.CurvePath();
-        for (let k = 1; k < arcPts.length; k++) {
-          path.add(new THREE.LineCurve3(arcPts[k - 1], arcPts[k]));
-        }
-        const geoArc = new THREE.TubeGeometry(
-          path, segments, tubeRadius, 6, false
-        );
-        this._scene.add(new THREE.Mesh(geoArc, outlineMat));
-      }
-    }
     // Top outline (summer-solstice trajectory) — true curve, the
-    // Catmull-Rom spline is appropriate here for a smooth tube.
+    // Catmull-Rom spline is appropriate here for a smooth tube. The
+    // base outline (constant ``minElRad``) is intentionally NOT drawn:
+    // even bounded to the azimuth window in v0.9.14, the separate
+    // base tube sat right against the horizon ring and combined with
+    // the two side edges to form a visually heavy quadrilateral at
+    // ground level around the house. The translucent wedge mesh
+    // already shows its own lower edge — the tube is redundant.
     {
       const arcPts = [];
       for (let i = 0; i <= segments; i++) arcPts.push(colToVec(i, true));
