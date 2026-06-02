@@ -6,6 +6,41 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le pr
 
 ## [Non publié]
 
+## [0.9.17] — 2026-06-02
+
+### Modifié — suppression complète du day path sur la vue 3D
+
+Quatrième et dernière itération sur le « trait parasite »
+signalé depuis la v0.9.13. Captures successives annotées par
+l'utilisateur :
+
+- v0.9.14 : bornage du tube de base du wedge — sans effet sur
+  le trait pointé.
+- v0.9.15 : suppression du tube de base — « tu as enlevé la
+  mauvaise ligne », donc le tube de base est utile, on l'a
+  restauré en v0.9.16.
+- v0.9.16 : remplacement du `CatmullRomCurve3` du day path par
+  un `CurvePath` de `LineCurve3` (élimination de l'extrapolation
+  spline) — sans effet visible sur le trait pointé.
+
+**Cause racine identifiée** : même sans extrapolation spline,
+le **rayon de 0.07 m** du tube du day path le faisait visuellement
+**déborder sous le disque vert** près du lever / coucher du
+soleil. Les premiers et derniers points conservés par
+`_buildDayPath` étaient à ≈ 0.3° d'élévation, soit y ≈ 0.058
+sur la dome — le rayon du tube descendait alors jusqu'à
+y ≈ -0.012, sous le disque (y = 0). Pour le wedge base, le
+seuil `min_elevation` (≥ 5°, typiquement 15°) gardait au
+contraire le tube bien au-dessus du sol.
+
+**Fix retenu** : **suppression complète** du `_buildDayPath`
+(appel dans `_build()` + définition de la méthode). Le day
+path n'apportait aucune information décisionnelle — le wedge
+matérialise déjà la zone d'acceptance, et la position courante
+du soleil reste visible via la sphère `_sunSphere`. Plutôt
+qu'un nouveau correctif géométrique fragile (filtre
+d'élévation > 1°, troncature, etc.), retrait pur et simple.
+
 ## [0.9.16] — 2026-06-02
 
 ### Corrigé — la « mauvaise ligne » sur la vue 3D était le day path, pas la base du wedge
