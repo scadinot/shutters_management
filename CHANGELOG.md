@@ -27,7 +27,7 @@ le trait qui dépasse :
   la v0.9.13, et la « mauvaise ligne » de la v0.9.15.
 - **Fix appliqué au day path** : remplacement du
   `CatmullRomCurve3` par un `THREE.CurvePath` de
-  `THREE.LineCurve3` segments — pas d'extrapolation, la tube
+  `THREE.LineCurve3` segments — pas d'extrapolation, le tube
   s'arrête net juste au-dessus de l'horizon des deux côtés. Les
   ≈96 échantillons (15 min de pas) gardent un rendu polyligne
   visuellement lisse.

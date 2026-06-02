@@ -533,12 +533,13 @@ class ShuttersSun3dCard extends HTMLElement {
       return new THREE.Vector3(Math.sin(az) * r, y, -Math.cos(az) * r);
     };
 
-    // Base outline (constant ``minElRad``) — built as a straight
-    // polyline wrapped in a TubeGeometry. A naive CatmullRomCurve3 on
-    // these 25 collinear points would extrapolate slightly past the
-    // endpoints and produce a horizontal sliver overshooting the
-    // azimuth window; a CurvePath of LineCurve3 segments removes
-    // that extrapolation entirely.
+    // Base outline (constant ``minElRad``) — built as a polyline
+    // wrapped in a TubeGeometry. The 25 points form a horizontal arc
+    // on the dome (constant elevation, evenly spaced in azimuth).
+    // A naive CatmullRomCurve3 extrapolates tangentially past the
+    // first and last sample, producing a sliver that overshoots the
+    // azimuth window at both ends; a CurvePath of LineCurve3
+    // segments removes that extrapolation entirely.
     {
       const arcPts = [];
       for (let i = 0; i <= segments; i++) arcPts.push(colToVec(i, false));
