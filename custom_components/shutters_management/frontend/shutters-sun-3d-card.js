@@ -555,7 +555,7 @@ class ShuttersSun3dCard extends HTMLElement {
       if (extent > maxVerticalExtent) maxVerticalExtent = extent;
     }
     const baseOutlineWorthDrawing =
-      maxVerticalExtent > THREE.MathUtils.degToRad(10);
+      maxVerticalExtent >= THREE.MathUtils.degToRad(10);
     if (baseOutlineWorthDrawing) {
       const arcPts = [];
       for (let i = 0; i <= segments; i++) arcPts.push(colToVec(i, false));
