@@ -548,6 +548,28 @@ async def test_sun_protection_view_has_decision_state_markdown(
     # <strong> (not Markdown ``**``) so the bold renders within HTML.
     assert "<strong>" in content and "</strong>" in content
     assert "**" not in content
+
+    # v0.9.13 — per-row / per-section colored dot.
+    # Emojis carry their own color, sanitizer-safe alternative to inline
+    # CSS. Each « Conditions de fermeture » section gains a 4th column
+    # « État » with 🟢/🔴/⚪ computed in Jinja from the margin sensors,
+    # and the section H3 heading carries an aggregate dot.
+    assert "🟢" in content and "🔴" in content and "⚪" in content
+    # The status column header is present in both languages.
+    assert "| État |" in content or "| State |" in content
+    # The per-row dot for the elevation criterion uses the existing
+    # elevation_margin sensor with a `>= 0` test.
+    assert (
+        "sensor.salon_sud_sun_protection_elevation_margin"
+        in content
+    )
+    assert "| float >= 0" in content
+    # Section H3 headings now carry an aggregate dot template.
+    assert "### 1." in content
+    assert (
+        "{% if not is_number(v0)) or (not is_number(v1)" in content
+        or "is_number(v0)" in content
+    )
     # Raw enum values must never leak into the rendered card — the
     # status always goes through ``state_translated``. (``below_horizon``
     # is not even one of the color-map keys, so it must be absent.)

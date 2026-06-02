@@ -235,6 +235,8 @@ _LABELS_FR: dict[str, str] = {
     "state_inactive": "Inactive",
     "override_none": "Aucun",
     "override_active_prefix": "Jusqu'à",
+    # v0.9.13 — voyant par ligne / par section
+    "status_col": "État",
 }
 
 _LABELS_EN: dict[str, str] = {
@@ -394,6 +396,8 @@ _LABELS_EN: dict[str, str] = {
     "state_inactive": "Inactive",
     "override_none": "None",
     "override_active_prefix": "Until",
+    # v0.9.13 — per-row / per-section indicator
+    "status_col": "State",
 }
 
 
@@ -884,6 +888,96 @@ def _decision_parameters_markdown(
 
     lux_threshold_template = num0(lux_threshold)
 
+    # --- Per-row / per-section indicator (v0.9.13) ----------------------
+    # Each decision criterion in the « Conditions de fermeture » tables
+    # gets a colored dot in its own column, computed live in Jinja from
+    # the engine's margin sensors. HA's markdown sanitizer strips inline
+    # ``style`` attributes, so colors must come from the glyph itself —
+    # Unicode emojis carry their own font color independent of CSS.
+    #   🟢  the criterion is satisfied
+    #   🔴  the criterion blocks the close decision
+    #   ⚪  the criterion is non-applicable (sensor unknown / optional)
+    # ``dot`` evaluates one criterion ; ``section_dot`` aggregates a
+    # section over its mandatory rows (all green → 🟢, any unknown →
+    # ⚪, any concrete red → 🔴).
+    def dot(state_entity: str, cond_template: str) -> str:
+        cond = cond_template.format(v="v")
+        return (
+            "{% set v = states('" + state_entity + "') %}"
+            "{% if not is_number(v) %}⚪"
+            "{% elif " + cond + " %}🟢"
+            "{% else %}🔴{% endif %}"
+        )
+
+    def section_dot(checks: list[tuple[str, str]]) -> str:
+        setups: list[str] = []
+        guards: list[str] = []
+        conds: list[str] = []
+        for i, (entity, cond_template) in enumerate(checks):
+            name = f"v{i}"
+            setups.append(f"{{% set {name} = states('{entity}') %}}")
+            guards.append(f"(not is_number({name}))")
+            conds.append("(" + cond_template.format(v=name) + ")")
+        return (
+            "".join(setups)
+            + "{% if " + " or ".join(guards) + " %}⚪"
+            + "{% elif " + " and ".join(conds) + " %}🟢"
+            + "{% else %}🔴{% endif %}"
+        )
+
+    # Per-row dots, mandatory criteria only. Informational rows
+    # (regime, reopen hints, timing counters) get a neutral « — ».
+    elev_margin = f"sensor.{prefix}_sun_protection_elevation_margin"
+    lux_margin = f"sensor.{prefix}_sun_protection_lux_margin"
+    uv_margin = f"sensor.{prefix}_sun_protection_uv_margin"
+
+    dot_elev = dot(elev_margin, "{v} | float >= 0")
+    dot_az = dot(az_diff, f"{{v}} | float <= {arc}")
+    dot_temp_outdoor = dot(temp_outdoor, "{v} | float >= 20")
+    dot_lux = dot(lux_margin, "{v} | float >= 0")
+    dot_uv = dot(uv_margin, "{v} | float >= 0")
+    # Indoor comfort criterion: adaptive thresholds keyed on the
+    # outdoor regime — heatwave (≥30) bypasses the indoor check, warm
+    # (24–30) requires T°int ≥ 23, mid-season (20–24) requires
+    # T°int ≥ 24, cool (<20) makes the section non-applicable.
+    dot_comfort = (
+        "{% set t = states('" + temp_indoor + "') %}"
+        "{% set o = states('" + temp_outdoor + "') %}"
+        "{% if not is_number(o) %}⚪"
+        "{% elif o | float >= 30 %}🟢"
+        "{% elif not is_number(t) %}⚪"
+        "{% elif o | float >= 24 %}"
+        "{% if t | float >= 23 %}🟢{% else %}🔴{% endif %}"
+        "{% elif o | float >= 20 %}"
+        "{% if t | float >= 24 %}🟢{% else %}🔴{% endif %}"
+        "{% else %}⚪{% endif %}"
+    )
+    # Heatwave bypass row: this is not a blocking criterion, it just
+    # signals whether the bypass is currently engaged → green when
+    # active, neutral otherwise (it cannot fail the close).
+    dot_heatwave = (
+        "{% set o = states('" + temp_outdoor + "') %}"
+        "{% if not is_number(o) %}⚪"
+        "{% elif o | float >= 30 %}🟢"
+        "{% else %}⚪{% endif %}"
+    )
+
+    # Per-section dots: aggregate the mandatory rows of each section.
+    section_dot_sun = section_dot([
+        (elev_margin, "{v} | float >= 0"),
+        (az_diff, f"{{v}} | float <= {arc}"),
+    ])
+    section_dot_outdoor_temp = dot(temp_outdoor, "{v} | float >= 20")
+    section_dot_lux = dot(lux_margin, "{v} | float >= 0")
+    section_dot_uv = dot(uv_margin, "{v} | float >= 0")
+    section_dot_comfort = dot_comfort   # same logic as the indoor row
+
+    # Configuration table: orientation / arc / min_elevation / min_uv
+    # / target_position are always set when the subentry exists, so
+    # they're always 🟢. The indoor temperature sensor is the only
+    # optional field — ⚪ when unset, 🟢 when configured.
+    dot_indoor_sensor = "🟢" if temp_indoor_entity else "⚪"
+
     # --- État de la décision ------------------------------------------------
     # The current status is rendered as a colored <ha-alert> banner. It is
     # the single most important "why am I in this state?" signal, and
@@ -947,19 +1041,19 @@ def _decision_parameters_markdown(
         f"## {L['close_conditions']}\n\n"
         f"{L['close_conditions_intro']}\n\n"
         # 1. Sun position
-        f"### 1. {L['sun_position_section']}\n\n"
+        f"### 1. {section_dot_sun} {L['sun_position_section']}\n\n"
         f"{L['sun_position_intro']}\n\n"
-        f"| {L['criterion']} | {L['current_value']} | "
+        f"| {L['status_col']} | {L['criterion']} | {L['current_value']} | "
         f"{L['condition']} |\n"
-        f"|---|---|---|\n"
-        f"| {L['elevation_label']} | {num0(elevation)}° | "
+        f"|---|---|---|---|\n"
+        f"| {dot_elev} | {L['elevation_label']} | {num0(elevation)}° | "
         + L['elevation_condition'].format(
             min=min_elevation,
             exit=elev_exit,
             hys=ELEVATION_HYSTERESIS_DEG,
         )
         + " |\n"
-        f"| {L['azimuth_diff_label']} | {num0(az_diff)}° | "
+        f"| {dot_az} | {L['azimuth_diff_label']} | {num0(az_diff)}° | "
         + L['azimuth_diff_condition'].format(
             arc=arc,
             exit=arc_exit,
@@ -967,55 +1061,55 @@ def _decision_parameters_markdown(
         )
         + " |\n\n"
         # 2. Outdoor temperature
-        f"### 2. {L['outdoor_temp_section']}\n\n"
+        f"### 2. {section_dot_outdoor_temp} {L['outdoor_temp_section']}\n\n"
         f"{L['outdoor_temp_intro']}\n\n"
-        f"| {L['criterion']} | {L['current_value']} | "
+        f"| {L['status_col']} | {L['criterion']} | {L['current_value']} | "
         f"{L['condition']} |\n"
-        f"|---|---|---|\n"
-        f"| {L['outdoor_temp_label']} | {num1(temp_outdoor)} °C | "
-        f"{L['outdoor_temp_condition']} |\n"
-        f"| {L['thermal_regime_label']} | "
+        f"|---|---|---|---|\n"
+        f"| {dot_temp_outdoor} | {L['outdoor_temp_label']} | "
+        f"{num1(temp_outdoor)} °C | {L['outdoor_temp_condition']} |\n"
+        f"| — | {L['thermal_regime_label']} | "
         f"{L['thermal_regime_value']} | "
         f"{L['thermal_regime_condition']} |\n\n"
         # 3. Brightness
-        f"### 3. {L['lux_section']}\n\n"
+        f"### 3. {section_dot_lux} {L['lux_section']}\n\n"
         f"{L['lux_intro']}\n\n"
-        f"| {L['criterion']} | {L['current_value']} | "
+        f"| {L['status_col']} | {L['criterion']} | {L['current_value']} | "
         f"{L['condition']} |\n"
-        f"|---|---|---|\n"
-        f"| {L['outdoor_lux_label']} | {num0(lux)} lx | "
+        f"|---|---|---|---|\n"
+        f"| {dot_lux} | {L['outdoor_lux_label']} | {num0(lux)} lx | "
         + L['outdoor_lux_condition'].format(
             threshold_template=lux_threshold_template
         )
         + " |\n"
-        f"| {L['lux_threshold_label']} | "
+        f"| — | {L['lux_threshold_label']} | "
         f"{L['lux_threshold_value']} | "
         f"{L['lux_threshold_condition']} |\n"
-        f"| {L['lux_reopen_label']} | — | "
+        f"| — | {L['lux_reopen_label']} | — | "
         f"{L['lux_reopen_condition']} |\n\n"
         # 4. UV
-        f"### 4. {L['uv_section']}\n\n"
+        f"### 4. {section_dot_uv} {L['uv_section']}\n\n"
         f"{L['uv_intro']}\n\n"
-        f"| {L['criterion']} | {L['current_value']} | "
+        f"| {L['status_col']} | {L['criterion']} | {L['current_value']} | "
         f"{L['condition']} |\n"
-        f"|---|---|---|\n"
-        f"| {L['uv_index_label']} | {num1(uv)} | "
+        f"|---|---|---|---|\n"
+        f"| {dot_uv} | {L['uv_index_label']} | {num1(uv)} | "
         + L['uv_index_condition'].format(min=min_uv)
         + " |\n\n"
         # 5. Indoor comfort
-        f"### 5. {L['comfort_section']}\n\n"
+        f"### 5. {section_dot_comfort} {L['comfort_section']}\n\n"
         f"{L['comfort_intro']}\n\n"
-        f"| {L['criterion']} | {L['current_value']} | "
+        f"| {L['status_col']} | {L['criterion']} | {L['current_value']} | "
         f"{L['condition']} |\n"
-        f"|---|---|---|\n"
-        f"| {L['indoor_temp_label']} | {num1(temp_indoor)} °C | "
-        f"{L['indoor_temp_condition']} |\n"
-        f"| {L['heatwave_bypass_label']} | "
+        f"|---|---|---|---|\n"
+        f"| {dot_comfort} | {L['indoor_temp_label']} | "
+        f"{num1(temp_indoor)} °C | {L['indoor_temp_condition']} |\n"
+        f"| {dot_heatwave} | {L['heatwave_bypass_label']} | "
         f"{L['heatwave_bypass_value']} | "
         f"{L['heatwave_bypass_condition']} |\n"
-        f"| {L['comfort_reopen_label']} | — | "
+        f"| — | {L['comfort_reopen_label']} | — | "
         f"{L['comfort_reopen_condition']} |\n\n"
-        # 6. Timing
+        # 6. Timing — counters only, no per-row blocking criterion
         f"### 6. {L['timing_section']}\n\n"
         f"{L['timing_intro']}\n\n"
         f"| {L['step']} | {L['duration']} | "
@@ -1028,14 +1122,15 @@ def _decision_parameters_markdown(
         # Configuration
         f"## {L['config_section']}\n\n"
         f"{L['config_intro']}\n\n"
-        f"| {L['parameter']} | {L['value']} |\n"
-        f"|---|---|\n"
-        f"| {L['facade_orientation_label']} | {orientation}° |\n"
-        f"| {L['half_arc_label']} | {arc}° |\n"
-        f"| {L['min_elevation_param_label']} | {min_elevation}° |\n"
-        f"| {L['min_uv_param_label']} | {min_uv} |\n"
-        f"| {L['target_position_param_label']} | {target_position} % |\n"
-        f"| {L['indoor_temp_sensor_label']} | {indoor_sensor_repr} |\n"
+        f"| {L['status_col']} | {L['parameter']} | {L['value']} |\n"
+        f"|---|---|---|\n"
+        f"| 🟢 | {L['facade_orientation_label']} | {orientation}° |\n"
+        f"| 🟢 | {L['half_arc_label']} | {arc}° |\n"
+        f"| 🟢 | {L['min_elevation_param_label']} | {min_elevation}° |\n"
+        f"| 🟢 | {L['min_uv_param_label']} | {min_uv} |\n"
+        f"| 🟢 | {L['target_position_param_label']} | {target_position} % |\n"
+        f"| {dot_indoor_sensor} | {L['indoor_temp_sensor_label']} | "
+        f"{indoor_sensor_repr} |\n"
     )
     return {"type": "markdown", "content": content}
 

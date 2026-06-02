@@ -6,6 +6,53 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le pr
 
 ## [Non publié]
 
+## [0.9.13] — 2026-06-01
+
+### Ajouté — voyant coloré par critère dans « Conditions de fermeture »
+
+Suite à un retour utilisateur sur la v0.9.12 : « il était demandé
+des couleurs sur chacun des paramètres participant à la décision,
+pas une bannière globale ».
+
+- **Une nouvelle colonne « État » est ajoutée à chaque table de
+  critères** (sections 1 à 5 de « Conditions de fermeture » et
+  table « Configuration de la sous-entrée »). Chaque ligne porte
+  une pastille calculée live en Jinja à partir des capteurs de
+  marge déjà exposés par le moteur :
+  - 🟢 le critère est satisfait (contribue à fermer) ;
+  - 🔴 le critère bloque actuellement la décision ;
+  - ⚪ le critère n'est pas applicable (capteur optionnel non
+    configuré, valeur indéterminable, ou condition cadre comme
+    « régime canicule » dont la non-activation n'est pas un
+    blocage).
+- **Chaque sous-titre H3 de section porte aussi une pastille
+  agrégée** sur ses lignes obligatoires (par ex.
+  « ### 1. 🟢 Position du soleil »). 🟢 quand toutes les lignes
+  obligatoires sont satisfaites, 🔴 dès qu'au moins une bloque,
+  ⚪ si une donnée requise est indéterminable.
+- **Implémentation**. Les emojis Unicode portent leur propre
+  couleur dans la police, sans CSS — c'est la voie fiable dans
+  une carte Markdown HA (le sanitizer strippe `style`). Les
+  conditions reproduisent la logique du moteur
+  (`__init__.py:_compute_decision`) : marges signées
+  (`elevation_margin ≥ 0`, `lux_margin ≥ 0`, `uv_margin ≥ 0`,
+  `azimuth_diff ≤ arc`), seuil chaleur (`temp_outdoor ≥ 20 °C`)
+  et confort intérieur adaptatif au régime extérieur (canicule
+  ≥ 30 → bypass, chaud 24–30 → T°int ≥ 23, mi-saison 20–24 →
+  T°int ≥ 24).
+- **Section 6 (Temporisation)** garde la même table sans
+  colonne État : ses lignes (compteurs de debounce) ne sont pas
+  des critères bloquants.
+- **Table « Configuration de la sous-entrée »** : 🟢 pour tous
+  les paramètres systématiquement renseignés (orientation,
+  demi-arc, élévation min, UV min, position cible). Le capteur
+  de T° intérieure, seul champ optionnel, est ⚪ quand non
+  configuré.
+- **Deux nouveaux helpers internes** côté `panel.py` :
+  - `dot(state_entity, cond_template)` — un test live sur
+    un capteur.
+  - `section_dot(checks)` — agrégat sur plusieurs critères.
+
 ## [0.9.12] — 2026-06-01
 
 ### Corrigé — couleurs de « État de la décision » désormais visibles
