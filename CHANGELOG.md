@@ -1792,7 +1792,33 @@ Aucun changement de code dans l'intégration. Seules les méta-données (`manife
 - Annulation propre des déclencheurs et des callbacks différés au déchargement / rechargement.
 - Traductions français et anglais.
 
-[Non publié]: https://github.com/scadinot/shutters_management/compare/0.6.1...HEAD
+[Non publié]: https://github.com/scadinot/shutters_management/compare/0.9.17...HEAD
+[0.9.17]: https://github.com/scadinot/shutters_management/compare/0.9.16...0.9.17
+[0.9.16]: https://github.com/scadinot/shutters_management/compare/0.9.15...0.9.16
+[0.9.15]: https://github.com/scadinot/shutters_management/compare/0.9.14...0.9.15
+[0.9.14]: https://github.com/scadinot/shutters_management/compare/0.9.13...0.9.14
+[0.9.13]: https://github.com/scadinot/shutters_management/compare/0.9.12...0.9.13
+[0.9.12]: https://github.com/scadinot/shutters_management/compare/0.9.10...0.9.12
+[0.9.11]: https://github.com/scadinot/shutters_management/compare/0.9.10...0.9.11
+[0.9.10]: https://github.com/scadinot/shutters_management/compare/0.9.9...0.9.10
+[0.9.9]: https://github.com/scadinot/shutters_management/compare/0.9.8...0.9.9
+[0.9.8]: https://github.com/scadinot/shutters_management/compare/0.9.7...0.9.8
+[0.9.7]: https://github.com/scadinot/shutters_management/compare/0.9.6...0.9.7
+[0.9.6]: https://github.com/scadinot/shutters_management/compare/0.9.5...0.9.6
+[0.9.5]: https://github.com/scadinot/shutters_management/compare/0.9.4...0.9.5
+[0.9.4]: https://github.com/scadinot/shutters_management/compare/0.9.3...0.9.4
+[0.9.3]: https://github.com/scadinot/shutters_management/compare/0.9.2...0.9.3
+[0.9.2]: https://github.com/scadinot/shutters_management/compare/0.9.1...0.9.2
+[0.9.1]: https://github.com/scadinot/shutters_management/compare/0.9.0...0.9.1
+[0.9.0]: https://github.com/scadinot/shutters_management/compare/0.8.3...0.9.0
+[0.8.3]: https://github.com/scadinot/shutters_management/compare/0.8.2...0.8.3
+[0.8.2]: https://github.com/scadinot/shutters_management/compare/0.8.1...0.8.2
+[0.8.1]: https://github.com/scadinot/shutters_management/compare/0.8.0...0.8.1
+[0.8.0]: https://github.com/scadinot/shutters_management/compare/0.7.1...0.8.0
+[0.7.1]: https://github.com/scadinot/shutters_management/compare/0.7.0...0.7.1
+[0.7.0]: https://github.com/scadinot/shutters_management/compare/0.6.3...0.7.0
+[0.6.3]: https://github.com/scadinot/shutters_management/compare/0.6.2...0.6.3
+[0.6.2]: https://github.com/scadinot/shutters_management/compare/0.6.1...0.6.2
 [0.6.1]: https://github.com/scadinot/shutters_management/compare/0.6.0...0.6.1
 [0.6.0]: https://github.com/scadinot/shutters_management/compare/0.5.8...0.6.0
 [0.5.8]: https://github.com/scadinot/shutters_management/compare/0.5.7...0.5.8
