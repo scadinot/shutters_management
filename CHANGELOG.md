@@ -6,6 +6,52 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le pr
 
 ## [Non publié]
 
+## [0.9.14] — 2026-06-02
+
+### Modifié — nettoyage visuel de la carte 3D Sun Protection
+
+Sur retour utilisateur (capture annotée), trois éléments
+parasitaient la carte 3D du drill-down Protection solaire :
+
+- **Suppression des 3 tuiles d'état en haut** (« VOLET / Ouvert
+  · 1/1 volet », « SOLEIL / 222° · élévation 57° »,
+  « FAÇADE / 270° · Δ -48° »). L'information était déjà
+  présente ailleurs dans le drill-down (carte « État de la
+  décision » + entités du header) — doublon visuel. Suppression
+  du DOM (`<div class="overlay-top">`), du CSS associé
+  (`.overlay-top`, `.card`, `.label`, `.value`, `.sub`,
+  `.status-*`), des refs `_uiRefs`, et des écritures DOM
+  mortes dans `_updateSun()` (`azValue`, `elValue`,
+  `facadeValue`, `deltaValue`) et `_updateShutter()`
+  (`statusValue`, `statusSub`). `_updateShutter()` se simplifie
+  à ne calculer que `coverage` (le pilote du mesh 3D du volet),
+  l'animation du shutter mesh reste inchangée.
+- **Suppression de la légende souris en bas** (« Glisser :
+  rotation · Molette : zoom · Clic-droit : pan ») — les
+  utilisateurs HA connaissent les conventions Three.js.
+  Suppression du DOM (`<div class="overlay-bottom">`), du CSS,
+  et de la clé `hint` de `DEFAULT_LABELS`.
+- **Correction du trait horizontal débordant sur la base du
+  wedge.** L'outline tube de la base était construit avec une
+  `THREE.CatmullRomCurve3` sur 25 points strictement
+  colinéaires (tous à l'élévation `minElRad`) ; le spline
+  extrapolait alors aux extrémités, produisant un petit
+  débordement de tube hors de l'arc azimutal (visible
+  au-dessus du repère « N » sur la capture). La base est
+  désormais construite avec un `THREE.CurvePath` de
+  `THREE.LineCurve3` segment par segment — pas d'extrapolation
+  spline, le tube s'arrête net aux bornes de l'arc. Le sommet
+  (trajectoire d'été) conserve son `CatmullRomCurve3` puisque
+  ses points suivent une vraie courbe et le rendu y est
+  correct.
+
+`DEFAULT_LABELS` purgé des clés devenues mortes (`shutter`,
+`sun`, `facade`, `hint`, `elevation_prefix`, `closed`,
+`partial_open`, `cover_count_singular`, `cover_count_plural`).
+Les libellés et sous-titres encore consommés par
+`_classifySun()` (qui pilote la teinte du `_coneMesh`) sont
+conservés.
+
 ## [0.9.13] — 2026-06-01
 
 ### Ajouté — voyant coloré par critère dans « Conditions de fermeture »

@@ -32,62 +32,6 @@ const STYLE = `
     inset: 0;
   }
   canvas { display: block; }
-
-  .overlay-top {
-    position: absolute;
-    top: 12px;
-    left: 12px;
-    right: 12px;
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 8px;
-    pointer-events: none;
-    z-index: 10;
-  }
-  .card {
-    background: rgba(28, 28, 30, 0.85);
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
-    border: 0.5px solid rgba(255, 255, 255, 0.12);
-    border-radius: 10px;
-    padding: 8px 12px;
-    color: #ffffff;
-    font-family: var(--paper-font-body1_-_font-family,
-                     -apple-system, BlinkMacSystemFont, sans-serif);
-  }
-  .card .label {
-    font-size: 10px;
-    color: rgba(255, 255, 255, 0.6);
-    text-transform: uppercase;
-    letter-spacing: 0.6px;
-  }
-  .card .value {
-    font-size: 16px;
-    font-weight: 500;
-    margin-top: 2px;
-  }
-  .card .sub {
-    font-size: 11px;
-    color: rgba(255, 255, 255, 0.6);
-    margin-top: 1px;
-  }
-  .status-open  { color: #4ADE80; }
-  .status-warn  { color: #FBBF24; }
-  .status-close { color: #F87171; }
-
-  .overlay-bottom {
-    position: absolute;
-    bottom: 8px;
-    left: 12px;
-    background: rgba(28, 28, 30, 0.85);
-    border: 0.5px solid rgba(255, 255, 255, 0.12);
-    border-radius: 8px;
-    padding: 4px 8px;
-    font-size: 10px;
-    color: rgba(255, 255, 255, 0.6);
-    z-index: 10;
-    pointer-events: none;
-  }
 `;
 
 class ShuttersSun3dCard extends HTMLElement {
@@ -142,36 +86,9 @@ class ShuttersSun3dCard extends HTMLElement {
     const root = this.shadowRoot;
     root.innerHTML = `
       <style>${STYLE}</style>
-      <div id="wrap">
-        <div class="overlay-top">
-          <div class="card">
-            <div class="label">${this._t("shutter")}</div>
-            <div class="value" data-id="statusValue">—</div>
-            <div class="sub" data-id="statusSub">—</div>
-          </div>
-          <div class="card">
-            <div class="label">${this._t("sun")}</div>
-            <div class="value" data-id="azValue">—</div>
-            <div class="sub" data-id="elValue">—</div>
-          </div>
-          <div class="card">
-            <div class="label">${this._t("facade")}</div>
-            <div class="value" data-id="facadeValue">—</div>
-            <div class="sub" data-id="deltaValue">Δ —</div>
-          </div>
-        </div>
-        <div class="overlay-bottom">${this._t("hint")}</div>
-      </div>
+      <div id="wrap"></div>
     `;
     this._wrap = root.getElementById("wrap");
-    this._uiRefs = {
-      statusValue: root.querySelector('[data-id="statusValue"]'),
-      statusSub: root.querySelector('[data-id="statusSub"]'),
-      azValue: root.querySelector('[data-id="azValue"]'),
-      elValue: root.querySelector('[data-id="elValue"]'),
-      facadeValue: root.querySelector('[data-id="facadeValue"]'),
-      deltaValue: root.querySelector('[data-id="deltaValue"]'),
-    };
 
     // The container is sized via CSS but its actual pixel dimensions
     // depend on the layout — defer to a ResizeObserver to apply the
@@ -614,15 +531,38 @@ class ShuttersSun3dCard extends HTMLElement {
       return new THREE.Vector3(Math.sin(az) * r, y, -Math.cos(az) * r);
     };
 
-    for (const useUpper of [false, true]) {
+    // Base outline (constant minElRad) — drawn as a straight polyline
+    // wrapped in a TubeGeometry. The previous CatmullRomCurve3 path
+    // extrapolated slightly past the endpoints when fed collinear
+    // points, producing a horizontal sliver that overshot the wedge
+    // (visible above the « N » marker in v0.9.13). Using a CurvePath
+    // of LineCurve3 segments removes that extrapolation entirely.
+    {
       const arcPts = [];
-      for (let i = 0; i <= segments; i++) arcPts.push(colToVec(i, useUpper));
-      if (arcPts.length < 2) continue;
-      const curve = new THREE.CatmullRomCurve3(arcPts);
-      const geoArc = new THREE.TubeGeometry(
-        curve, segments, tubeRadius, 6, false
-      );
-      this._scene.add(new THREE.Mesh(geoArc, outlineMat));
+      for (let i = 0; i <= segments; i++) arcPts.push(colToVec(i, false));
+      if (arcPts.length >= 2) {
+        const path = new THREE.CurvePath();
+        for (let k = 1; k < arcPts.length; k++) {
+          path.add(new THREE.LineCurve3(arcPts[k - 1], arcPts[k]));
+        }
+        const geoArc = new THREE.TubeGeometry(
+          path, segments, tubeRadius, 6, false
+        );
+        this._scene.add(new THREE.Mesh(geoArc, outlineMat));
+      }
+    }
+    // Top outline (summer-solstice trajectory) — true curve, the
+    // Catmull-Rom spline is appropriate here for a smooth tube.
+    {
+      const arcPts = [];
+      for (let i = 0; i <= segments; i++) arcPts.push(colToVec(i, true));
+      if (arcPts.length >= 2) {
+        const curve = new THREE.CatmullRomCurve3(arcPts);
+        const geoArc = new THREE.TubeGeometry(
+          curve, segments, tubeRadius, 6, false
+        );
+        this._scene.add(new THREE.Mesh(geoArc, outlineMat));
+      }
     }
 
     for (const colIndex of [0, segments]) {
@@ -810,48 +750,14 @@ class ShuttersSun3dCard extends HTMLElement {
         : cls.state === "grazing"
         ? 0.32
         : 0.18;
-
-    const r = this._uiRefs;
-    r.azValue.textContent = Math.round(az) + "°";
-    r.elValue.textContent =
-      this._t("elevation_prefix") + " " + Math.round(el) + "°";
-    r.facadeValue.textContent = this._config.orientation + "°";
-    r.deltaValue.textContent = "Δ " + Math.round(delta) + "°";
   }
 
   _updateShutter(coverState, cls) {
-    // Real cover state wins over the sun-based heuristic. The
-    // classification ``cls`` is only kept as a fallback when no
-    // covers are configured (rare) so the visual still says
-    // something meaningful.
-    let coverage;
-    let label;
-    let sub;
-    let cssClass;
-
-    if (coverState !== null) {
-      coverage = coverState.coverage;
-      const avg = coverState.averagePosition;
-      if (avg >= 95) {
-        label = this._t("open");
-        cssClass = "status-open";
-      } else if (avg <= 5) {
-        label = this._t("closed");
-        cssClass = "status-close";
-      } else {
-        label = this._tFmt("partial_open", { pct: Math.round(avg) });
-        cssClass = avg < 50 ? "status-warn" : "status-open";
-      }
-      sub = this._tFmt(
-        coverState.count > 1 ? "cover_count_plural" : "cover_count_singular",
-        { n: coverState.count, known: coverState.known }
-      );
-    } else {
-      coverage = cls.coverage;
-      label = cls.label;
-      sub = cls.sub;
-      cssClass = cls.cssClass;
-    }
+    // Real cover state wins over the sun-based heuristic; the
+    // classification ``cls.coverage`` is only the fallback when no
+    // cover is configured so the visual still says something useful.
+    const coverage =
+      coverState !== null ? coverState.coverage : cls.coverage;
 
     if (coverage > 0.005) {
       this._shutterMesh.visible = true;
@@ -864,11 +770,6 @@ class ShuttersSun3dCard extends HTMLElement {
     } else {
       this._shutterMesh.visible = false;
     }
-
-    const r = this._uiRefs;
-    r.statusValue.textContent = label;
-    r.statusValue.className = "value " + cssClass;
-    r.statusSub.textContent = sub;
   }
 
   _aggregateCoverState() {
@@ -1040,15 +941,13 @@ class ShuttersSun3dCard extends HTMLElement {
 }
 
 const DEFAULT_LABELS = {
-  shutter: "Volet",
-  sun: "Soleil",
-  facade: "Façade",
+  // West cardinal marker on the horizon ring.
   west: "O",
+  // ``_classifySun`` outputs — referenced only as ``cls.state``
+  // downstream now, but the human labels and sub-captions are kept
+  // intact so the classifier can be re-wired to an overlay later
+  // without a translation regression.
   open: "Ouvert",
-  closed: "Fermé",
-  partial_open: "{pct}% ouvert",
-  cover_count_singular: "{known}/{n} volet",
-  cover_count_plural: "{known}/{n} volets",
   close_high: "Fermer 70%",
   close_low: "Fermer 30%",
   sun_set: "soleil couché",
@@ -1056,8 +955,6 @@ const DEFAULT_LABELS = {
   sun_in_axis: "soleil dans l'axe",
   sun_grazing: "soleil rasant",
   sun_out_of_axis: "hors axe",
-  elevation_prefix: "élévation",
-  hint: "Glisser : rotation · Molette : zoom · Clic-droit : pan",
 };
 
 // ---------------------------------------------------------------------------
