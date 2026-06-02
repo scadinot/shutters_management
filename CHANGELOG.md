@@ -6,6 +6,23 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le pr
 
 ## [Non publié]
 
+## [0.9.15] — 2026-06-02
+
+### Modifié — suppression complète du tube d'outline à la base du wedge 3D
+
+Suite au retour utilisateur après la v0.9.14 (capture annotée
+montrant un quadrilatère parasite au pied de la maison) : même
+borné à l'arc azimutal du wedge, le tube de base se situait
+sur l'anneau d'horizon et, combiné aux deux arêtes latérales,
+formait visuellement un quadrilatère fermé autour de la maison
+au niveau du sol.
+
+Suppression complète du tube de la base (`useUpper = false`) :
+le mesh translucide du wedge matérialise déjà sa propre bordure
+inférieure, et l'arc du sommet (trajectoire d'été) + les deux
+arêtes latérales suffisent à dessiner le contour du wedge sans
+charger visuellement le bas de la scène.
+
 ## [0.9.14] — 2026-06-02
 
 ### Modifié — nettoyage visuel de la carte 3D Sun Protection

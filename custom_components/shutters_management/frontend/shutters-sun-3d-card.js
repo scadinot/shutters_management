@@ -516,10 +516,14 @@ class ShuttersSun3dCard extends HTMLElement {
     this._coneMesh = new THREE.Mesh(geo, mat);
     this._scene.add(this._coneMesh);
 
-    // Outline tubes : bottom + top follow the solstice trajectories
-    // (or sit at constant noon elevations in the fallback path);
-    // the two side edges connect winter to summer at the wedge
+    // Outline tubes: the top edge follows the summer-solstice
+    // trajectory at ``upperElForCol(i)`` (or sits at a constant
+    // noon elevation in the fallback path); the two side edges
+    // climb from ``minElRad`` to that top elevation at the wedge
     // azimuth boundaries, drawn vertically in the dome frame.
+    // The bottom edge (constant ``minElRad``) is intentionally not
+    // rendered as a separate tube — see the comment block on the
+    // top-outline IIFE for the rationale.
     const outlineMat = new THREE.MeshBasicMaterial({ color: 0xffd089 });
     const tubeRadius = 0.05;
 
@@ -531,28 +535,14 @@ class ShuttersSun3dCard extends HTMLElement {
       return new THREE.Vector3(Math.sin(az) * r, y, -Math.cos(az) * r);
     };
 
-    // Base outline (constant minElRad) — drawn as a straight polyline
-    // wrapped in a TubeGeometry. The previous CatmullRomCurve3 path
-    // extrapolated slightly past the endpoints when fed collinear
-    // points, producing a horizontal sliver that overshot the wedge
-    // (visible above the « N » marker in v0.9.13). Using a CurvePath
-    // of LineCurve3 segments removes that extrapolation entirely.
-    {
-      const arcPts = [];
-      for (let i = 0; i <= segments; i++) arcPts.push(colToVec(i, false));
-      if (arcPts.length >= 2) {
-        const path = new THREE.CurvePath();
-        for (let k = 1; k < arcPts.length; k++) {
-          path.add(new THREE.LineCurve3(arcPts[k - 1], arcPts[k]));
-        }
-        const geoArc = new THREE.TubeGeometry(
-          path, segments, tubeRadius, 6, false
-        );
-        this._scene.add(new THREE.Mesh(geoArc, outlineMat));
-      }
-    }
     // Top outline (summer-solstice trajectory) — true curve, the
-    // Catmull-Rom spline is appropriate here for a smooth tube.
+    // Catmull-Rom spline is appropriate here for a smooth tube. The
+    // base outline (constant ``minElRad``) is intentionally NOT drawn:
+    // even bounded to the azimuth window in v0.9.14, the separate
+    // base tube sat right against the horizon ring and combined with
+    // the two side edges to form a visually heavy quadrilateral at
+    // ground level around the house. The translucent wedge mesh
+    // already shows its own lower edge — the tube is redundant.
     {
       const arcPts = [];
       for (let i = 0; i <= segments; i++) arcPts.push(colToVec(i, true));
