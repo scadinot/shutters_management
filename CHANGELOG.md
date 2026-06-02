@@ -6,6 +6,47 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le pr
 
 ## [Non publié]
 
+## [0.9.18] — 2026-06-02
+
+### Modifié — fix le vrai trait parasite : extrapolation du top outline du wedge
+
+Retour utilisateur après la v0.9.17 (capture annotée) : le
+contour du wedge marqué en rouge est correct et doit être
+**conservé**, mais un trait parasite continuait à partir du
+bord du wedge vers l'extérieur (visible sortant à gauche de la
+scène). Et l'utilisateur a précisé : « remet le day path ».
+
+**Nouvelle cause racine** : le **top outline** du wedge
+(trajectoire d'été) et les deux **arêtes latérales** utilisaient
+encore un `THREE.CatmullRomCurve3`. Le spline Catmull-Rom
+extrapole tangentiellement aux extrémités — il continue la
+courbe quelques fractions de degré au-delà du premier et du
+dernier point. Pour le top outline c'était particulièrement
+visible : la trajectoire d'été tangente à l'horizon dans le
+plan azimutal au bord du wedge produisait une « queue » qui
+sortait du wedge en ligne quasi horizontale.
+
+**Fix appliqué** :
+
+- **Top outline du wedge** : remplacement du
+  `THREE.CatmullRomCurve3` par un `THREE.CurvePath` de
+  `THREE.LineCurve3` segments. Plus d'extrapolation, le tube
+  s'arrête net aux bornes azimutales du wedge. Les 25 samples
+  conservent un rendu visuellement lisse.
+- **Arêtes latérales du wedge** : même fix pour cohérence —
+  pas d'extrapolation au-dessus / en dessous des bornes
+  `[minElRad, upperElForCol(colIndex)]`.
+- **`_buildDayPath` restauré** (annule la v0.9.17) avec deux
+  améliorations héritées de la v0.9.16 + un raffinement :
+  - `CurvePath` de `LineCurve3` (déjà v0.9.16) pour supprimer
+    l'extrapolation spline.
+  - Filtre d'élévation passé de `>= 0` à **`>= 1°`** pour
+    qu'aux extrémités (lever / coucher du soleil) le centre du
+    tube soit à `y ≈ 0.192` (au lieu de `0.058` à 0.3°
+    d'élévation), suffisamment au-dessus du sol pour que le
+    bord du tube (rayon 0.07 m) ne dépasse plus le disque
+    vert.
+
 ## [0.9.17] — 2026-06-02
 
 ### Modifié — suppression complète du day path sur la vue 3D
@@ -1792,7 +1833,8 @@ Aucun changement de code dans l'intégration. Seules les méta-données (`manife
 - Annulation propre des déclencheurs et des callbacks différés au déchargement / rechargement.
 - Traductions français et anglais.
 
-[Non publié]: https://github.com/scadinot/shutters_management/compare/0.9.17...HEAD
+[Non publié]: https://github.com/scadinot/shutters_management/compare/0.9.18...HEAD
+[0.9.18]: https://github.com/scadinot/shutters_management/compare/0.9.17...0.9.18
 [0.9.17]: https://github.com/scadinot/shutters_management/compare/0.9.16...0.9.17
 [0.9.16]: https://github.com/scadinot/shutters_management/compare/0.9.15...0.9.16
 [0.9.15]: https://github.com/scadinot/shutters_management/compare/0.9.14...0.9.15
