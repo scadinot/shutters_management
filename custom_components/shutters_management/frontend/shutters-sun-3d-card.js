@@ -540,7 +540,23 @@ class ShuttersSun3dCard extends HTMLElement {
     // first and last sample, producing a sliver that overshoots the
     // azimuth window at both ends; a CurvePath of LineCurve3
     // segments removes that extrapolation entirely.
-    {
+    //
+    // The base tube is skipped when the wedge has degenerated to
+    // nearly flat (max vertical extent below 10°). This happens
+    // typically for north-facing façades at temperate latitudes,
+    // where the summer trajectory barely grazes the wedge azimuth
+    // window — the base tube then collapses against the horizon
+    // ring and reads as a parasitic ground-level line. The wedge
+    // mesh's own bottom edge still conveys the (very limited)
+    // acceptance zone in that case.
+    let maxVerticalExtent = 0;
+    for (let i = 0; i <= segments; i++) {
+      const extent = upperElForCol(i) - lowerElForCol(i);
+      if (extent > maxVerticalExtent) maxVerticalExtent = extent;
+    }
+    const baseOutlineWorthDrawing =
+      maxVerticalExtent >= THREE.MathUtils.degToRad(10);
+    if (baseOutlineWorthDrawing) {
       const arcPts = [];
       for (let i = 0; i <= segments; i++) arcPts.push(colToVec(i, false));
       if (arcPts.length >= 2) {

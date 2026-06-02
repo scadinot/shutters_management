@@ -6,6 +6,43 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le pr
 
 ## [Non publié]
 
+## [0.9.19] — 2026-06-02
+
+### Corrigé — tube de base du wedge conditionnel selon l'extent vertical
+
+Retour utilisateur (capture annotée) après la v0.9.18 sur une
+configuration **façade orientée Nord** : le tube de base du
+wedge apparaît comme un trait horizontal parasite au sol côté
+N.
+
+**Pourquoi cette config est particulière** : à une latitude
+tempérée (~49.5°), la trajectoire solaire d'été ne traverse pas
+vraiment la fenêtre azimutale d'un wedge N-facing (NW-N-NE,
+arc 60°) — sauf très brièvement au tout début / tout fin de
+journée. `upperElForCol(i)` clampe alors à `minElRad` pour
+quasiment tous les `i`, le wedge mesh devient (presque)
+entièrement aplati à hauteur de `min_elevation`, et le tube de
+base se confond visuellement avec l'anneau d'horizon en
+formant un trait parasite.
+
+Pour les façades S / E / W bien exposées, le wedge a une
+étendue verticale importante (~50° à midi pour une façade sud)
+et son tube de base sert de repère visuel utile à hauteur
+`min_elevation` — il faut le conserver dans ce cas nominal
+(cf. v0.9.15 où sa suppression inconditionnelle avait été
+rejetée par l'utilisateur).
+
+**Fix** : le tube de base du wedge est désormais conditionnel
+à l'étendue verticale du wedge. Si
+`max(upperElForCol(i) - lowerElForCol(i)) < 10°`, le tube est
+omis (le wedge mesh translucide continue à matérialiser sa
+propre bordure inférieure). Sinon le tube est dessiné comme
+avant (`CurvePath` + `LineCurve3` v0.9.14).
+
+Le seuil de 10° couvre largement les façades S/E/W bien
+exposées (étendue verticale en général > 30°) et exclut les
+façades N à latitudes tempérées (étendue verticale ≈ 0-5°).
+
 ## [0.9.18] — 2026-06-02
 
 ### Modifié — fix le vrai trait parasite : extrapolation du top outline du wedge
@@ -1833,7 +1870,8 @@ Aucun changement de code dans l'intégration. Seules les méta-données (`manife
 - Annulation propre des déclencheurs et des callbacks différés au déchargement / rechargement.
 - Traductions français et anglais.
 
-[Non publié]: https://github.com/scadinot/shutters_management/compare/0.9.18...HEAD
+[Non publié]: https://github.com/scadinot/shutters_management/compare/0.9.19...HEAD
+[0.9.19]: https://github.com/scadinot/shutters_management/compare/0.9.18...0.9.19
 [0.9.18]: https://github.com/scadinot/shutters_management/compare/0.9.17...0.9.18
 [0.9.17]: https://github.com/scadinot/shutters_management/compare/0.9.16...0.9.17
 [0.9.16]: https://github.com/scadinot/shutters_management/compare/0.9.15...0.9.16
