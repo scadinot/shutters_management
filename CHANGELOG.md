@@ -6,6 +6,38 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le pr
 
 ## [Non publié]
 
+## [0.9.16] — 2026-06-02
+
+### Corrigé — la « mauvaise ligne » sur la vue 3D était le day path, pas la base du wedge
+
+Reprise après le retour utilisateur sur la v0.9.15 : « tu as
+enlevé la mauvaise ligne ». Re-analyse des captures montrant
+le trait qui dépasse :
+
+- **Vrai coupable** : le **day path** (trajectoire du soleil
+  sur la journée courante, tracée par `_buildDayPath`) utilisait
+  un `THREE.CatmullRomCurve3`. Les points sources sont filtrés à
+  `elevation >= 0`, donc les extrémités (premier et dernier
+  point conservés) se trouvent juste au-dessus de l'horizon, à
+  une élévation très basse. Le spline Catmull-Rom **extrapole
+  alors aux extrémités** et plonge sous l'horizon (élévation
+  négative), produisant un petit débordement de tube qui sort
+  par le disque vert près du lever et du coucher du soleil —
+  exactement le « trait horizontal qui dépasse à la base » de
+  la v0.9.13, et la « mauvaise ligne » de la v0.9.15.
+- **Fix appliqué au day path** : remplacement du
+  `CatmullRomCurve3` par un `THREE.CurvePath` de
+  `THREE.LineCurve3` segments — pas d'extrapolation, la tube
+  s'arrête net juste au-dessus de l'horizon des deux côtés. Les
+  ≈96 échantillons (15 min de pas) gardent un rendu polyligne
+  visuellement lisse.
+- **Restauration de l'outline de base du wedge** (annule la
+  v0.9.15) dans sa forme v0.9.14, c'est-à-dire en `CurvePath`
+  de `LineCurve3` (bornes strictes, sans extrapolation). C'est
+  un repère visuel utile pour localiser le seuil
+  `min_elevation` ; la suppression complète en v0.9.15 était
+  une mauvaise direction.
+
 ## [0.9.15] — 2026-06-02
 
 ### Modifié — suppression complète du tube d'outline à la base du wedge 3D

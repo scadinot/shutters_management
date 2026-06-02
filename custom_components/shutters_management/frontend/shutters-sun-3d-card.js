@@ -516,14 +516,12 @@ class ShuttersSun3dCard extends HTMLElement {
     this._coneMesh = new THREE.Mesh(geo, mat);
     this._scene.add(this._coneMesh);
 
-    // Outline tubes: the top edge follows the summer-solstice
-    // trajectory at ``upperElForCol(i)`` (or sits at a constant
-    // noon elevation in the fallback path); the two side edges
-    // climb from ``minElRad`` to that top elevation at the wedge
-    // azimuth boundaries, drawn vertically in the dome frame.
-    // The bottom edge (constant ``minElRad``) is intentionally not
-    // rendered as a separate tube — see the comment block on the
-    // top-outline IIFE for the rationale.
+    // Outline tubes: bottom + top of the wedge plus the two side
+    // edges. The top follows the summer-solstice trajectory at
+    // ``upperElForCol(i)`` (or sits at a constant noon elevation in
+    // the fallback path); the bottom sits at ``minElRad``; the side
+    // edges climb from ``minElRad`` to the top at the wedge azimuth
+    // boundaries, drawn vertically in the dome frame.
     const outlineMat = new THREE.MeshBasicMaterial({ color: 0xffd089 });
     const tubeRadius = 0.05;
 
@@ -535,14 +533,28 @@ class ShuttersSun3dCard extends HTMLElement {
       return new THREE.Vector3(Math.sin(az) * r, y, -Math.cos(az) * r);
     };
 
+    // Base outline (constant ``minElRad``) — built as a straight
+    // polyline wrapped in a TubeGeometry. A naive CatmullRomCurve3 on
+    // these 25 collinear points would extrapolate slightly past the
+    // endpoints and produce a horizontal sliver overshooting the
+    // azimuth window; a CurvePath of LineCurve3 segments removes
+    // that extrapolation entirely.
+    {
+      const arcPts = [];
+      for (let i = 0; i <= segments; i++) arcPts.push(colToVec(i, false));
+      if (arcPts.length >= 2) {
+        const path = new THREE.CurvePath();
+        for (let k = 1; k < arcPts.length; k++) {
+          path.add(new THREE.LineCurve3(arcPts[k - 1], arcPts[k]));
+        }
+        const geoArc = new THREE.TubeGeometry(
+          path, segments, tubeRadius, 6, false
+        );
+        this._scene.add(new THREE.Mesh(geoArc, outlineMat));
+      }
+    }
     // Top outline (summer-solstice trajectory) — true curve, the
-    // Catmull-Rom spline is appropriate here for a smooth tube. The
-    // base outline (constant ``minElRad``) is intentionally NOT drawn:
-    // even bounded to the azimuth window in v0.9.14, the separate
-    // base tube sat right against the horizon ring and combined with
-    // the two side edges to form a visually heavy quadrilateral at
-    // ground level around the house. The translucent wedge mesh
-    // already shows its own lower edge — the tube is redundant.
+    // Catmull-Rom spline is appropriate here for a smooth tube.
     {
       const arcPts = [];
       for (let i = 0; i <= segments; i++) arcPts.push(colToVec(i, true));
@@ -635,10 +647,20 @@ class ShuttersSun3dCard extends HTMLElement {
     }
     if (pts.length < 2) return;
     // Day path as a tube so the trace stands out against the dome
-    // grid; CatmullRom keeps the curve smooth between the 15-min
-    // sample points.
-    const curve = new THREE.CatmullRomCurve3(pts);
-    const tubeGeo = new THREE.TubeGeometry(curve, pts.length * 2, 0.07, 8, false);
+    // grid. The samples are filtered to ``elevation >= 0`` so the
+    // first/last points sit just above the horizon. A naive
+    // CatmullRomCurve3 would then extrapolate slightly past sunrise
+    // / sunset and dip below the disc, producing a visible sliver
+    // sticking out of the ground near the eastern and western
+    // bounds (the « mauvaise ligne » reported on v0.9.15). A
+    // CurvePath of LineCurve3 segments wraps the same points
+    // without spline extrapolation; 96-ish samples at 15 min keep
+    // the polyline visually smooth.
+    const path = new THREE.CurvePath();
+    for (let k = 1; k < pts.length; k++) {
+      path.add(new THREE.LineCurve3(pts[k - 1], pts[k]));
+    }
+    const tubeGeo = new THREE.TubeGeometry(path, pts.length * 2, 0.07, 8, false);
     this._scene.add(
       new THREE.Mesh(
         tubeGeo,
