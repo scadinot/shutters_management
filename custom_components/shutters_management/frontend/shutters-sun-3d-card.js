@@ -98,6 +98,7 @@ class ShuttersSun3dCard extends HTMLElement {
     this._buildSky();
     this._buildSun();
     this._buildIncidenceCone();
+    this._buildDayPath();
 
     this._resizeObserver = new ResizeObserver(() => this._handleResize());
     this._resizeObserver.observe(this._wrap);
@@ -553,20 +554,31 @@ class ShuttersSun3dCard extends HTMLElement {
         this._scene.add(new THREE.Mesh(geoArc, outlineMat));
       }
     }
-    // Top outline (summer-solstice trajectory) — true curve, the
-    // Catmull-Rom spline is appropriate here for a smooth tube.
+    // Top outline (summer-solstice trajectory) — built as a polyline
+    // wrapped in a TubeGeometry. A CatmullRomCurve3 would extrapolate
+    // tangentially past the first and last sample, producing a tail
+    // that sticks out beyond the wedge azimuth window (e.g. a stray
+    // tube going off toward « N » when the façade is south-east).
+    // A CurvePath of LineCurve3 segments stops the tube right at
+    // the bounds; 25 samples keep the polyline visually smooth.
     {
       const arcPts = [];
       for (let i = 0; i <= segments; i++) arcPts.push(colToVec(i, true));
       if (arcPts.length >= 2) {
-        const curve = new THREE.CatmullRomCurve3(arcPts);
+        const path = new THREE.CurvePath();
+        for (let k = 1; k < arcPts.length; k++) {
+          path.add(new THREE.LineCurve3(arcPts[k - 1], arcPts[k]));
+        }
         const geoArc = new THREE.TubeGeometry(
-          curve, segments, tubeRadius, 6, false
+          path, segments, tubeRadius, 6, false
         );
         this._scene.add(new THREE.Mesh(geoArc, outlineMat));
       }
     }
 
+    // Side edges at the two azimuth bounds — same polyline trick as
+    // the top outline, so the tube stops exactly at ``minElRad`` /
+    // ``upperElForCol(colIndex)`` without spline extrapolation.
     for (const colIndex of [0, segments]) {
       const lowEl = lowerElForCol(colIndex);
       const highEl = upperElForCol(colIndex);
@@ -580,9 +592,12 @@ class ShuttersSun3dCard extends HTMLElement {
         edgePts.push(new THREE.Vector3(Math.sin(az) * r, y, -Math.cos(az) * r));
       }
       if (edgePts.length < 2) continue;
-      const edgeCurve = new THREE.CatmullRomCurve3(edgePts);
+      const edgePath = new THREE.CurvePath();
+      for (let k = 1; k < edgePts.length; k++) {
+        edgePath.add(new THREE.LineCurve3(edgePts[k - 1], edgePts[k]));
+      }
       const edgeGeo = new THREE.TubeGeometry(
-        edgeCurve, edgeSegs, tubeRadius, 6, false
+        edgePath, edgeSegs, tubeRadius, 6, false
       );
       this._scene.add(new THREE.Mesh(edgeGeo, outlineMat));
     }
@@ -620,6 +635,58 @@ class ShuttersSun3dCard extends HTMLElement {
     });
     this._rayLine = new THREE.Line(rayGeo, this._rayMat);
     this._scene.add(this._rayLine);
+  }
+
+  _buildDayPath() {
+    if (this._config.latitude === null || this._config.latitude === undefined) {
+      return;
+    }
+    const today = new Date();
+    const pts = [];
+    for (let h = 0; h <= 24 * 4; h++) {
+      const t = new Date(
+        today.getFullYear(),
+        today.getMonth(),
+        today.getDate(),
+        0,
+        h * 15,
+        0
+      );
+      const sp = solarPosition(
+        t,
+        this._config.latitude,
+        this._config.longitude || 0
+      );
+      // Filter to ``elevation >= 1°`` (instead of >= 0) so that the
+      // tube body — radius 0.07 m on a DOME_R = 11 dome — stays clear
+      // of the green ground disc at the sunrise/sunset endpoints. At
+      // 0.3° elevation the tube center sat at y ≈ 0.058 and its bottom
+      // edge dipped to y ≈ -0.012 (under the disc); at 1° the centre
+      // is at y ≈ 0.192, comfortably above ground.
+      if (sp.elevation < 1) continue;
+      pts.push(azElToVec3(sp.azimuth, sp.elevation, DOME_R));
+    }
+    if (pts.length < 2) return;
+    // Day path as a tube so the trace stands out against the dome
+    // grid. A CurvePath of LineCurve3 segments (rather than the
+    // original CatmullRomCurve3) wraps the samples without spline
+    // extrapolation past sunrise/sunset; the ≈96 samples at 15 min
+    // keep the polyline visually smooth.
+    const path = new THREE.CurvePath();
+    for (let k = 1; k < pts.length; k++) {
+      path.add(new THREE.LineCurve3(pts[k - 1], pts[k]));
+    }
+    const tubeGeo = new THREE.TubeGeometry(path, pts.length * 2, 0.07, 8, false);
+    this._scene.add(
+      new THREE.Mesh(
+        tubeGeo,
+        new THREE.MeshBasicMaterial({
+          color: 0xffaa44,
+          transparent: true,
+          opacity: 0.7,
+        })
+      )
+    );
   }
 
   // ----------------------------------------------------------------
