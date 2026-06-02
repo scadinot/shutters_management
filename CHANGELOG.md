@@ -6,6 +6,41 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le pr
 
 ## [Non publié]
 
+## [0.9.17] — 2026-06-02
+
+### Modifié — suppression complète du day path sur la vue 3D
+
+Quatrième et dernière itération sur le « trait parasite »
+signalé depuis la v0.9.13. Captures successives annotées par
+l'utilisateur :
+
+- v0.9.14 : bornage du tube de base du wedge — sans effet sur
+  le trait pointé.
+- v0.9.15 : suppression du tube de base — « tu as enlevé la
+  mauvaise ligne », donc le tube de base est utile, on l'a
+  restauré en v0.9.16.
+- v0.9.16 : remplacement du `CatmullRomCurve3` du day path par
+  un `CurvePath` de `LineCurve3` (élimination de l'extrapolation
+  spline) — sans effet visible sur le trait pointé.
+
+**Cause racine identifiée** : même sans extrapolation spline,
+le **rayon de 0.07 m** du tube du day path le faisait visuellement
+**déborder sous le disque vert** près du lever / coucher du
+soleil. Les premiers et derniers points conservés par
+`_buildDayPath` étaient à ≈ 0.3° d'élévation, soit y ≈ 0.058
+sur la dome — le rayon du tube descendait alors jusqu'à
+y ≈ -0.012, sous le disque (y = 0). Pour le wedge base, le
+seuil `min_elevation` (≥ 5°, typiquement 15°) gardait au
+contraire le tube bien au-dessus du sol.
+
+**Fix retenu** : **suppression complète** du `_buildDayPath`
+(appel dans `_build()` + définition de la méthode). Le day
+path n'apportait aucune information décisionnelle — le wedge
+matérialise déjà la zone d'acceptance, et la position courante
+du soleil reste visible via la sphère `_sunSphere`. Plutôt
+qu'un nouveau correctif géométrique fragile (filtre
+d'élévation > 1°, troncature, etc.), retrait pur et simple.
+
 ## [0.9.16] — 2026-06-02
 
 ### Corrigé — la « mauvaise ligne » sur la vue 3D était le day path, pas la base du wedge
@@ -1757,7 +1792,33 @@ Aucun changement de code dans l'intégration. Seules les méta-données (`manife
 - Annulation propre des déclencheurs et des callbacks différés au déchargement / rechargement.
 - Traductions français et anglais.
 
-[Non publié]: https://github.com/scadinot/shutters_management/compare/0.6.1...HEAD
+[Non publié]: https://github.com/scadinot/shutters_management/compare/0.9.17...HEAD
+[0.9.17]: https://github.com/scadinot/shutters_management/compare/0.9.16...0.9.17
+[0.9.16]: https://github.com/scadinot/shutters_management/compare/0.9.15...0.9.16
+[0.9.15]: https://github.com/scadinot/shutters_management/compare/0.9.14...0.9.15
+[0.9.14]: https://github.com/scadinot/shutters_management/compare/0.9.13...0.9.14
+[0.9.13]: https://github.com/scadinot/shutters_management/compare/0.9.12...0.9.13
+[0.9.12]: https://github.com/scadinot/shutters_management/compare/0.9.10...0.9.12
+[0.9.11]: https://github.com/scadinot/shutters_management/compare/0.9.10...0.9.11
+[0.9.10]: https://github.com/scadinot/shutters_management/compare/0.9.9...0.9.10
+[0.9.9]: https://github.com/scadinot/shutters_management/compare/0.9.8...0.9.9
+[0.9.8]: https://github.com/scadinot/shutters_management/compare/0.9.7...0.9.8
+[0.9.7]: https://github.com/scadinot/shutters_management/compare/0.9.6...0.9.7
+[0.9.6]: https://github.com/scadinot/shutters_management/compare/0.9.5...0.9.6
+[0.9.5]: https://github.com/scadinot/shutters_management/compare/0.9.4...0.9.5
+[0.9.4]: https://github.com/scadinot/shutters_management/compare/0.9.3...0.9.4
+[0.9.3]: https://github.com/scadinot/shutters_management/compare/0.9.2...0.9.3
+[0.9.2]: https://github.com/scadinot/shutters_management/compare/0.9.1...0.9.2
+[0.9.1]: https://github.com/scadinot/shutters_management/compare/0.9.0...0.9.1
+[0.9.0]: https://github.com/scadinot/shutters_management/compare/0.8.3...0.9.0
+[0.8.3]: https://github.com/scadinot/shutters_management/compare/0.8.2...0.8.3
+[0.8.2]: https://github.com/scadinot/shutters_management/compare/0.8.1...0.8.2
+[0.8.1]: https://github.com/scadinot/shutters_management/compare/0.8.0...0.8.1
+[0.8.0]: https://github.com/scadinot/shutters_management/compare/0.7.1...0.8.0
+[0.7.1]: https://github.com/scadinot/shutters_management/compare/0.7.0...0.7.1
+[0.7.0]: https://github.com/scadinot/shutters_management/compare/0.6.3...0.7.0
+[0.6.3]: https://github.com/scadinot/shutters_management/compare/0.6.2...0.6.3
+[0.6.2]: https://github.com/scadinot/shutters_management/compare/0.6.1...0.6.2
 [0.6.1]: https://github.com/scadinot/shutters_management/compare/0.6.0...0.6.1
 [0.6.0]: https://github.com/scadinot/shutters_management/compare/0.5.8...0.6.0
 [0.5.8]: https://github.com/scadinot/shutters_management/compare/0.5.7...0.5.8

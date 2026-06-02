@@ -98,7 +98,6 @@ class ShuttersSun3dCard extends HTMLElement {
     this._buildSky();
     this._buildSun();
     this._buildIncidenceCone();
-    this._buildDayPath();
 
     this._resizeObserver = new ResizeObserver(() => this._handleResize());
     this._resizeObserver.observe(this._wrap);
@@ -621,57 +620,6 @@ class ShuttersSun3dCard extends HTMLElement {
     });
     this._rayLine = new THREE.Line(rayGeo, this._rayMat);
     this._scene.add(this._rayLine);
-  }
-
-  _buildDayPath() {
-    if (this._config.latitude === null || this._config.latitude === undefined) {
-      return;
-    }
-    const today = new Date();
-    const pts = [];
-    for (let h = 0; h <= 24 * 4; h++) {
-      const t = new Date(
-        today.getFullYear(),
-        today.getMonth(),
-        today.getDate(),
-        0,
-        h * 15,
-        0
-      );
-      const sp = solarPosition(
-        t,
-        this._config.latitude,
-        this._config.longitude || 0
-      );
-      if (sp.elevation < 0) continue;
-      pts.push(azElToVec3(sp.azimuth, sp.elevation, DOME_R));
-    }
-    if (pts.length < 2) return;
-    // Day path as a tube so the trace stands out against the dome
-    // grid. The samples are filtered to ``elevation >= 0`` so the
-    // first/last points sit just above the horizon. A naive
-    // CatmullRomCurve3 would then extrapolate slightly past sunrise
-    // / sunset and dip below the disc, producing a visible sliver
-    // sticking out of the ground near the eastern and western
-    // bounds (the « mauvaise ligne » reported on v0.9.15). A
-    // CurvePath of LineCurve3 segments wraps the same points
-    // without spline extrapolation; 96-ish samples at 15 min keep
-    // the polyline visually smooth.
-    const path = new THREE.CurvePath();
-    for (let k = 1; k < pts.length; k++) {
-      path.add(new THREE.LineCurve3(pts[k - 1], pts[k]));
-    }
-    const tubeGeo = new THREE.TubeGeometry(path, pts.length * 2, 0.07, 8, false);
-    this._scene.add(
-      new THREE.Mesh(
-        tubeGeo,
-        new THREE.MeshBasicMaterial({
-          color: 0xffaa44,
-          transparent: true,
-          opacity: 0.7,
-        })
-      )
-    );
   }
 
   // ----------------------------------------------------------------
