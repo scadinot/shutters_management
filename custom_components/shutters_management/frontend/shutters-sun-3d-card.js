@@ -516,10 +516,14 @@ class ShuttersSun3dCard extends HTMLElement {
     this._coneMesh = new THREE.Mesh(geo, mat);
     this._scene.add(this._coneMesh);
 
-    // Outline tubes : bottom + top follow the solstice trajectories
-    // (or sit at constant noon elevations in the fallback path);
-    // the two side edges connect winter to summer at the wedge
+    // Outline tubes: the top edge follows the summer-solstice
+    // trajectory at ``upperElForCol(i)`` (or sits at a constant
+    // noon elevation in the fallback path); the two side edges
+    // climb from ``minElRad`` to that top elevation at the wedge
     // azimuth boundaries, drawn vertically in the dome frame.
+    // The bottom edge (constant ``minElRad``) is intentionally not
+    // rendered as a separate tube — see the comment block on the
+    // top-outline IIFE for the rationale.
     const outlineMat = new THREE.MeshBasicMaterial({ color: 0xffd089 });
     const tubeRadius = 0.05;
 

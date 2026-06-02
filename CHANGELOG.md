@@ -12,8 +12,8 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le pr
 
 Suite au retour utilisateur après la v0.9.14 (capture annotée
 montrant un quadrilatère parasite au pied de la maison) : même
-borné à l'arc azimutal du wedge, le tube de base sittait sur
-l'anneau d'horizon et, combiné aux deux arêtes latérales,
+borné à l'arc azimutal du wedge, le tube de base se situait
+sur l'anneau d'horizon et, combiné aux deux arêtes latérales,
 formait visuellement un quadrilatère fermé autour de la maison
 au niveau du sol.
 
