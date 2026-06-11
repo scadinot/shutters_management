@@ -66,6 +66,7 @@ from .const import (
     CONF_TTS_WHEN_AWAY_ONLY,
     CONF_TYPE,
     COVER_ACTION_TIMEOUT_SECONDS,
+    COVER_SEQUENCE_TRIGGER_PERCENT,
     DAYS,
     DEFAULT_CLOSE_MODE,
     DEFAULT_CLOSE_OFFSET,
@@ -1718,9 +1719,12 @@ class ShuttersScheduler:
         * **Parallel** (default): one batched ``cover.<service>`` call on
           the whole list; HA dispatches immediately, no waiting.
         * **Sequential**: shuffle the list, then for each cover issue
-          its own ``blocking=True`` call and wait for the cover state
-          to reach the action's target (``open`` / ``closed``) before
-          moving on. A per-cover timeout
+          its own ``blocking=True`` call and wait for the cover to
+          either report half its travel (``current_position`` past
+          ``COVER_SEQUENCE_TRIGGER_PERCENT``) or reach the action's
+          terminal state (``open`` / ``closed``) before moving on.
+          Drivers that don't publish ``current_position`` fall back to
+          waiting for the terminal state. A per-cover timeout
           (``COVER_ACTION_TIMEOUT_SECONDS``) prevents a stuck or
           stateless cover from blocking the queue indefinitely.
 
@@ -1789,49 +1793,73 @@ class ShuttersScheduler:
                 blocking=True,
             )
             _LOGGER.info("Called cover.%s on %s", service, entity_id)
-            await self._async_wait_for_cover_state(entity_id, target_state)
+            await self._async_wait_for_cover_progress(entity_id, target_state)
 
-    async def _async_wait_for_cover_state(
+    async def _async_wait_for_cover_progress(
         self, entity_id: str, target_state: str
     ) -> None:
-        """Wait until ``entity_id`` reaches ``target_state`` or times out.
+        """Wait until ``entity_id`` is far enough along to release the queue.
+
+        Returns as soon as **either**:
+
+        - the cover's state equals ``target_state`` (it finished its
+          travel early, or it was already in position), or
+        - the cover's ``current_position`` attribute has crossed
+          ``COVER_SEQUENCE_TRIGGER_PERCENT`` in the direction of travel
+          (``>= 50`` when opening, ``<= 50`` when closing).
+
+        Drivers that never publish ``current_position`` fall back to
+        the terminal-state condition transparently.
 
         Subscribes to state-change events first, *then* re-reads the
         current state. This ordering closes the (theoretical, on
         cooperative scheduling) race window where the cover could flip
-        to its target between the read and the subscribe — anything
-        that happens before subscribe still triggers a fresh state
-        snapshot here, anything after fires the listener.
+        between the read and the subscribe.
 
         Times out after ``COVER_ACTION_TIMEOUT_SECONDS`` if the cover
-        never publishes a final state (some minimalist drivers don't);
-        the timeout is logged at warning level and the queue moves on
-        to the next cover.
+        never publishes a usable progress signal (some minimalist
+        drivers don't); the timeout is logged at warning level and the
+        queue moves on to the next cover.
         """
         finished = asyncio.Event()
 
+        def _position_threshold_reached(position) -> bool:
+            if not isinstance(position, (int, float)):
+                return False
+            if target_state == STATE_OPEN:
+                return position >= COVER_SEQUENCE_TRIGGER_PERCENT
+            return position <= COVER_SEQUENCE_TRIGGER_PERCENT
+
+        def _is_done(state_obj) -> bool:
+            if state_obj is None:
+                return False
+            if state_obj.state == target_state:
+                return True
+            return _position_threshold_reached(
+                state_obj.attributes.get("current_position")
+            )
+
         @callback
         def _on_state_change(event) -> None:
-            new_state = event.data.get("new_state")
-            if new_state is not None and new_state.state == target_state:
+            if _is_done(event.data.get("new_state")):
                 finished.set()
 
         unsub = async_track_state_change_event(
             self.hass, [entity_id], _on_state_change
         )
         try:
-            current = self.hass.states.get(entity_id)
-            if current is not None and current.state == target_state:
+            if _is_done(self.hass.states.get(entity_id)):
                 return
             await asyncio.wait_for(
                 finished.wait(), timeout=COVER_ACTION_TIMEOUT_SECONDS
             )
         except TimeoutError:
             _LOGGER.warning(
-                "Cover %s did not reach state %s within %s seconds; "
-                "continuing with the next cover",
+                "Cover %s did not report state %s or position past %s%% "
+                "within %s seconds; continuing with the next cover",
                 entity_id,
                 target_state,
+                COVER_SEQUENCE_TRIGGER_PERCENT,
                 COVER_ACTION_TIMEOUT_SECONDS,
             )
         finally:

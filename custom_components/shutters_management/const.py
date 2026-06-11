@@ -120,6 +120,13 @@ DEFAULT_TTS_MODE = MODE_DISABLED
 # slow models and prevents a stuck cover from blocking the queue.
 COVER_ACTION_TIMEOUT_SECONDS = 90
 
+# In sequential mode, advance to the next cover as soon as the current
+# one has travelled this percentage of its course (as reported by the
+# cover's ``current_position`` attribute, 0=closed / 100=open). Drivers
+# that don't publish ``current_position`` fall back to waiting for the
+# terminal state (``open`` / ``closed``).
+COVER_SEQUENCE_TRIGGER_PERCENT = 50
+
 MODE_FIXED = "fixed"
 MODE_SUNRISE = "sunrise"
 MODE_SUNSET = "sunset"
