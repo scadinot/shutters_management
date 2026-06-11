@@ -6,6 +6,39 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le pr
 
 ## [Non publié]
 
+## [0.9.20] — 2026-06-11
+
+### Modifié — mode séquentiel : avancer dès 50 % de course du volet en cours
+
+En mode séquentiel (`CONF_SEQUENTIAL_COVERS = True`),
+l'intégration attendait jusqu'ici que **chaque** volet atteigne
+son état terminal (`open` / `closed`) avant de lancer le suivant.
+Pour 3 volets à course 25 s, la séquence durait donc ~75 s.
+
+Le mode séquentiel garde son comportement d'enchaînement, mais
+le **trigger d'avancement** devient hybride **position-OU-état** :
+on libère la queue dès que **l'une** des conditions est vraie :
+
+- `state == target_state` (le volet a fini, par ex. trajet
+  instantané ou volet déjà en position), **ou**
+- `current_position` a franchi le seuil `COVER_SEQUENCE_TRIGGER_PERCENT = 50`
+  dans le bon sens : `>= 50` à l'ouverture, `<= 50` à la fermeture.
+
+Pour 3 volets à course 25 s, la séquence dure désormais
+~50 s au lieu de ~75 s (~33 % de gain) tout en gardant l'effet
+visuel d'enchaînement (les volets ne partent pas tous en même
+temps).
+
+Les drivers minimalistes qui ne publient pas `current_position`
+(ex. RFY sans feedback) continuent de fonctionner sur le
+fallback état terminal — comportement v0.9.19 préservé. Le
+timeout `COVER_ACTION_TIMEOUT_SECONDS = 90 s` reste actif pour
+les drivers muets.
+
+Côté code, `_async_wait_for_cover_state` devient
+`_async_wait_for_cover_progress` pour refléter sa nouvelle
+sémantique.
+
 ## [0.9.19] — 2026-06-02
 
 ### Corrigé — tube de base du wedge conditionnel selon l'extent vertical
@@ -1870,7 +1903,8 @@ Aucun changement de code dans l'intégration. Seules les méta-données (`manife
 - Annulation propre des déclencheurs et des callbacks différés au déchargement / rechargement.
 - Traductions français et anglais.
 
-[Non publié]: https://github.com/scadinot/shutters_management/compare/0.9.19...HEAD
+[Non publié]: https://github.com/scadinot/shutters_management/compare/0.9.20...HEAD
+[0.9.20]: https://github.com/scadinot/shutters_management/compare/0.9.19...0.9.20
 [0.9.19]: https://github.com/scadinot/shutters_management/compare/0.9.18...0.9.19
 [0.9.18]: https://github.com/scadinot/shutters_management/compare/0.9.17...0.9.18
 [0.9.17]: https://github.com/scadinot/shutters_management/compare/0.9.16...0.9.17

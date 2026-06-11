@@ -194,3 +194,122 @@ async def test_sequential_mode_uses_close_target_state(
     await hass.async_block_till_done()
 
     assert len(calls) == len(COVERS)
+
+
+async def test_sequential_advances_at_50_percent_when_opening(
+    hass: HomeAssistant, base_config
+) -> None:
+    """Opening advances as soon as ``current_position`` crosses 50%.
+
+    The first cover starts at ``closed`` / position 0. A bump to
+    position 30 must not release the queue (still below threshold).
+    A bump to position 60 (state still ``opening``, not yet ``open``)
+    must release it and trigger the second cover.
+    """
+    import asyncio
+
+    calls = async_mock_service(hass, "cover", SERVICE_OPEN_COVER)
+    # Only the first cover needs to start mid-travel; the remaining
+    # covers are pre-set to the target state so their wait returns
+    # immediately and the test isolates the 50% release on COVERS[0]
+    # (otherwise we'd block on the per-cover timeout for COVERS[1/2]).
+    hass.states.async_set(COVERS[0], "closed", {"current_position": 0})
+    hass.states.async_set(COVERS[1], "open", {"current_position": 100})
+    hass.states.async_set(COVERS[2], "open", {"current_position": 100})
+
+    scheduler = await _setup(hass, base_config, sequential=True)
+    with patch(
+        "custom_components.shutters_management.random.shuffle",
+        side_effect=lambda seq: None,
+    ):
+        task = hass.async_create_task(scheduler.async_run_now(ACTION_OPEN))
+
+        for _ in range(5):
+            await asyncio.sleep(0)
+        assert len(calls) == 1
+        assert calls[0].data["entity_id"] == COVERS[0]
+
+        # Below threshold: queue stays blocked.
+        hass.states.async_set(COVERS[0], "opening", {"current_position": 30})
+        for _ in range(5):
+            await asyncio.sleep(0)
+        assert len(calls) == 1
+
+        # Crossing the 50% threshold (still mid-travel, not ``open``):
+        # the queue must release and call the next cover.
+        hass.states.async_set(COVERS[0], "opening", {"current_position": 60})
+        await task
+        await hass.async_block_till_done()
+
+    targeted = [call.data["entity_id"] for call in calls]
+    assert targeted == COVERS
+
+
+async def test_sequential_advances_at_50_percent_when_closing(
+    hass: HomeAssistant, base_config
+) -> None:
+    """Closing advances as soon as ``current_position`` drops below 50%."""
+    import asyncio
+
+    calls = async_mock_service(hass, "cover", SERVICE_CLOSE_COVER)
+    # Only the first cover needs to start mid-travel; the remaining
+    # covers are pre-set to the target state so their wait returns
+    # immediately (see opening-variant for the rationale).
+    hass.states.async_set(COVERS[0], "open", {"current_position": 100})
+    hass.states.async_set(COVERS[1], "closed", {"current_position": 0})
+    hass.states.async_set(COVERS[2], "closed", {"current_position": 0})
+
+    scheduler = await _setup(hass, base_config, sequential=True)
+    with patch(
+        "custom_components.shutters_management.random.shuffle",
+        side_effect=lambda seq: None,
+    ):
+        task = hass.async_create_task(scheduler.async_run_now(ACTION_CLOSE))
+
+        for _ in range(5):
+            await asyncio.sleep(0)
+        assert len(calls) == 1
+        assert calls[0].data["entity_id"] == COVERS[0]
+
+        # Above threshold: queue stays blocked.
+        hass.states.async_set(COVERS[0], "closing", {"current_position": 70})
+        for _ in range(5):
+            await asyncio.sleep(0)
+        assert len(calls) == 1
+
+        # Dropping past 50% (still mid-travel): release the queue.
+        hass.states.async_set(COVERS[0], "closing", {"current_position": 40})
+        await task
+        await hass.async_block_till_done()
+
+    targeted = [call.data["entity_id"] for call in calls]
+    assert targeted == COVERS
+
+
+async def test_sequential_immediate_pass_when_already_past_threshold(
+    hass: HomeAssistant, base_config
+) -> None:
+    """A cover already past the 50% mark doesn't block at all.
+
+    Strategy: state is ``opening`` (so the simple terminal-state check
+    wouldn't return immediately), but ``current_position`` is already
+    80. The synchronous pre-check inside
+    ``_async_wait_for_cover_progress`` should see this and return at
+    once, so the next cover is called without us having to publish any
+    new state.
+    """
+    calls = async_mock_service(hass, "cover", SERVICE_OPEN_COVER)
+    hass.states.async_set(COVERS[0], "opening", {"current_position": 80})
+    hass.states.async_set(COVERS[1], "open", {"current_position": 100})
+    hass.states.async_set(COVERS[2], "open", {"current_position": 100})
+
+    scheduler = await _setup(hass, base_config, sequential=True)
+    with patch(
+        "custom_components.shutters_management.random.shuffle",
+        side_effect=lambda seq: None,
+    ):
+        await scheduler.async_run_now(ACTION_OPEN)
+        await hass.async_block_till_done()
+
+    targeted = [call.data["entity_id"] for call in calls]
+    assert targeted == COVERS
