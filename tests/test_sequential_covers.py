@@ -209,9 +209,13 @@ async def test_sequential_advances_at_50_percent_when_opening(
     import asyncio
 
     calls = async_mock_service(hass, "cover", SERVICE_OPEN_COVER)
+    # Only the first cover needs to start mid-travel; the remaining
+    # covers are pre-set to the target state so their wait returns
+    # immediately and the test isolates the 50% release on COVERS[0]
+    # (otherwise we'd block on the per-cover timeout for COVERS[1/2]).
     hass.states.async_set(COVERS[0], "closed", {"current_position": 0})
-    hass.states.async_set(COVERS[1], "closed", {"current_position": 0})
-    hass.states.async_set(COVERS[2], "closed", {"current_position": 0})
+    hass.states.async_set(COVERS[1], "open", {"current_position": 100})
+    hass.states.async_set(COVERS[2], "open", {"current_position": 100})
 
     scheduler = await _setup(hass, base_config, sequential=True)
     with patch(
@@ -248,9 +252,12 @@ async def test_sequential_advances_at_50_percent_when_closing(
     import asyncio
 
     calls = async_mock_service(hass, "cover", SERVICE_CLOSE_COVER)
+    # Only the first cover needs to start mid-travel; the remaining
+    # covers are pre-set to the target state so their wait returns
+    # immediately (see opening-variant for the rationale).
     hass.states.async_set(COVERS[0], "open", {"current_position": 100})
-    hass.states.async_set(COVERS[1], "open", {"current_position": 100})
-    hass.states.async_set(COVERS[2], "open", {"current_position": 100})
+    hass.states.async_set(COVERS[1], "closed", {"current_position": 0})
+    hass.states.async_set(COVERS[2], "closed", {"current_position": 0})
 
     scheduler = await _setup(hass, base_config, sequential=True)
     with patch(

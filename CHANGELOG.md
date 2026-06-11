@@ -1903,7 +1903,7 @@ Aucun changement de code dans l'intégration. Seules les méta-données (`manife
 - Annulation propre des déclencheurs et des callbacks différés au déchargement / rechargement.
 - Traductions français et anglais.
 
-[Non publié]: https://github.com/scadinot/shutters_management/compare/0.9.19...HEAD
+[Non publié]: https://github.com/scadinot/shutters_management/compare/0.9.20...HEAD
 [0.9.20]: https://github.com/scadinot/shutters_management/compare/0.9.19...0.9.20
 [0.9.19]: https://github.com/scadinot/shutters_management/compare/0.9.18...0.9.19
 [0.9.18]: https://github.com/scadinot/shutters_management/compare/0.9.17...0.9.18

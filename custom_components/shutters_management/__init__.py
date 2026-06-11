@@ -1806,7 +1806,8 @@ class ShuttersScheduler:
           travel early, or it was already in position), or
         - the cover's ``current_position`` attribute has crossed
           ``COVER_SEQUENCE_TRIGGER_PERCENT`` in the direction of travel
-          (``>= 50`` when opening, ``<= 50`` when closing).
+          (``>=`` the threshold when opening, ``<=`` the threshold when
+          closing).
 
         Drivers that never publish ``current_position`` fall back to
         the terminal-state condition transparently.
