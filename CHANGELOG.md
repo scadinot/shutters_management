@@ -6,6 +6,26 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le pr
 
 ## [Non publié]
 
+## [0.9.27] — 2026-09-13
+
+### Corrigé — seuils du panneau synchronisés avec `const.py`
+
+Le tableau « Paramètres de décision » de la vue protection solaire
+affichait ses seuils **écrits en dur** dans les libellés FR et EN
+(20 / 24 / 30 °C, 70 000 / 50 000 / 35 000 lx, 25 000 lx, 23 / 24 °C,
+21 / 22 °C, 10 et 20 min) et dans les pastilles de couleur calculées
+en Jinja (`>= 20`, `>= 30`, `>= 24`, `>= 23`). Toute modification
+d'une constante dans `const.py` laissait le panneau afficher — et
+colorer — d'anciennes valeurs, en contradiction avec le comportement
+réel du moteur.
+
+Les libellés sont désormais des gabarits (`{t_no_protect}`,
+`{lux_mild}`, `{close_minutes}`…) remplis à la construction du
+tableau depuis les constantes, et les pastilles Jinja lisent les
+mêmes constantes. Le texte affiché est inchangé avec les valeurs
+actuelles, à une précision près : la réouverture indique séparément
+la durée lux et la durée UV.
+
 ## [0.9.26] — 2026-09-13
 
 ### Corrigé — restauration des volets arrêtés à une position approchée
