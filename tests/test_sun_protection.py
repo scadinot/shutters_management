@@ -50,6 +50,7 @@ from custom_components.shutters_management.const import (
     OVERRIDE_RESET_HOUR,
     SUBENTRY_TYPE_SUN_PROTECTION,
     TYPE_HUB,
+    UV_OPEN_DEBOUNCE_SEC,
 )
 from custom_components.shutters_management import ShuttersSunProtectionManager
 
@@ -386,8 +387,8 @@ async def test_uv_combined_with_lux_both_must_pass(hass: HomeAssistant) -> None:
     assert cover_calls == []
 
 
-async def test_uv_drop_during_sun_mode_triggers_exit(hass: HomeAssistant) -> None:
-    """In sun mode, UV drops below threshold → immediate exit."""
+async def _enter_uv_only_sun_mode(hass: HomeAssistant):
+    """UV-only group (no lux debounce): enters sun mode on setup."""
     async_mock_service(hass, "cover", "set_cover_position")
     hass.states.async_set("cover.living_room", "open", {"current_position": 80})
     _set_sun(hass, azimuth=180, elevation=30)
@@ -407,13 +408,56 @@ async def test_uv_drop_during_sun_mode_triggers_exit(hass: HomeAssistant) -> Non
 
     # Simulate cover landing at applied target.
     hass.states.async_set("cover.living_room", "open", {"current_position": 50})
+    return manager
 
-    restore_calls = async_mock_service(hass, "cover", "set_cover_position")
-    hass.states.async_set("sensor.uv", "1")
-    await manager.async_evaluate()
+
+async def test_uv_drop_during_sun_mode_exits_after_debounce(
+    hass: HomeAssistant,
+) -> None:
+    """In sun mode, UV below min_uv only exits once it has lasted
+    UV_OPEN_DEBOUNCE_SEC — a brief dip must not reopen the covers."""
+    base = datetime(2026, 6, 15, 14, 0, tzinfo=dt_util.UTC)
+    with freeze_time(base) as frozen:
+        manager = await _enter_uv_only_sun_mode(hass)
+        restore_calls = async_mock_service(hass, "cover", "set_cover_position")
+
+        hass.states.async_set("sensor.uv", "1")
+        await manager.async_evaluate()
+        assert manager.is_active  # debounce arming, not yet exit
+        assert manager.pending_seconds == UV_OPEN_DEBOUNCE_SEC
+        assert restore_calls == []
+
+        frozen.tick(timedelta(seconds=UV_OPEN_DEBOUNCE_SEC + 1))
+        await manager.async_evaluate()
 
     assert not manager.is_active
+    assert manager.status == "uv_too_low"
     assert any(c.data.get("position") == 80 for c in restore_calls)
+
+
+async def test_uv_recovering_within_debounce_keeps_sun_mode(
+    hass: HomeAssistant,
+) -> None:
+    """UV back above min_uv before the debounce expires cancels the exit."""
+    base = datetime(2026, 6, 15, 14, 0, tzinfo=dt_util.UTC)
+    with freeze_time(base) as frozen:
+        manager = await _enter_uv_only_sun_mode(hass)
+        restore_calls = async_mock_service(hass, "cover", "set_cover_position")
+
+        hass.states.async_set("sensor.uv", "2")
+        await manager.async_evaluate()
+        assert manager.pending_seconds == UV_OPEN_DEBOUNCE_SEC
+
+        frozen.tick(timedelta(seconds=UV_OPEN_DEBOUNCE_SEC // 2))
+        hass.states.async_set("sensor.uv", "4")
+        await manager.async_evaluate()
+        assert manager.pending_seconds == 0
+
+        frozen.tick(timedelta(seconds=UV_OPEN_DEBOUNCE_SEC // 2 + 1))
+        await manager.async_evaluate()
+
+    assert manager.is_active
+    assert restore_calls == []
 
 
 # ---------------------------------------------------------------------------
@@ -486,31 +530,22 @@ async def test_uv_unavailable_blocks_close(hass: HomeAssistant) -> None:
     assert cover_calls == []
 
 
-async def test_uv_unavailable_during_sun_mode_triggers_exit(
+async def test_uv_unavailable_during_sun_mode_exits_after_debounce(
     hass: HomeAssistant,
 ) -> None:
-    """If the UV sensor disappears while in sun mode, exit immediately
-    (UV has no debounce — a lost reading is treated as a failed gate)."""
-    async_mock_service(hass, "cover", "set_cover_position")
-    hass.states.async_set("cover.living_room", "open", {"current_position": 80})
-    _set_sun(hass, azimuth=180, elevation=30)
-    hass.states.async_set("sensor.uv", "5")
+    """A lost UV reading still ends sun mode (no freezing closed), but
+    only once it has lasted UV_OPEN_DEBOUNCE_SEC: a transient dropout
+    must not reopen the covers."""
+    base = datetime(2026, 6, 15, 14, 0, tzinfo=dt_util.UTC)
+    with freeze_time(base) as frozen:
+        manager = await _enter_uv_only_sun_mode(hass)
 
-    entry = _build_hub_with_sun_protection(
-        covers=["cover.living_room"],
-        lux_entity="",
-        uv_entity="sensor.uv",
-        temp_outdoor_entity="",
-        min_uv=3,
-        target_position=50,
-    )
-    subentry_id = await _setup(hass, entry)
-    manager = hass.data[DOMAIN][subentry_id]
-    assert manager.is_active
+        hass.states.async_set("sensor.uv", "unavailable")
+        await manager.async_evaluate()
+        assert manager.is_active  # debounce arming, not yet exit
 
-    hass.states.async_set("cover.living_room", "open", {"current_position": 50})
-    hass.states.async_set("sensor.uv", "unavailable")
-    await manager.async_evaluate()
+        frozen.tick(timedelta(seconds=UV_OPEN_DEBOUNCE_SEC + 1))
+        await manager.async_evaluate()
 
     assert not manager.is_active
 

@@ -114,6 +114,7 @@ from .const import (
     LUX_HEATWAVE,
     LUX_MILD,
     LUX_OPEN_DEBOUNCE_SEC,
+    UV_OPEN_DEBOUNCE_SEC,
     LUX_REOPEN,
     LUX_STANDARD,
     OVERRIDE_RESET_HOUR,
@@ -1007,6 +1008,7 @@ class ShuttersSunProtectionManager:
         self._override_until: datetime | None = None
         self._lux_above_since: datetime | None = None
         self._lux_below_since: datetime | None = None
+        self._uv_below_since: datetime | None = None
         self._last_status: str = "disabled"
         self._restore_state()
 
@@ -1183,18 +1185,25 @@ class ShuttersSunProtectionManager:
         """Remaining seconds in the active debounce, 0 when none.
 
         Either the close-debounce (lux above threshold, waiting for
-        ``LUX_CLOSE_DEBOUNCE_SEC``) or the open-debounce (lux below
-        ``LUX_REOPEN``, waiting for ``LUX_OPEN_DEBOUNCE_SEC``) — the two
-        cannot be active at the same time so we surface a single value.
+        ``LUX_CLOSE_DEBOUNCE_SEC``) or the open-debounces (lux below
+        ``LUX_REOPEN`` for ``LUX_OPEN_DEBOUNCE_SEC``, UV below ``min_uv``
+        for ``UV_OPEN_DEBOUNCE_SEC``). Close and open debounces cannot
+        run at the same time; when both open debounces run, the first
+        one to expire ends sun mode, so its remaining time is surfaced.
         """
         now = dt_util.now()
         if self._lux_above_since is not None:
             elapsed = (now - self._lux_above_since).total_seconds()
             return max(0, int(LUX_CLOSE_DEBOUNCE_SEC - elapsed))
-        if self._lux_below_since is not None:
-            elapsed = (now - self._lux_below_since).total_seconds()
-            return max(0, int(LUX_OPEN_DEBOUNCE_SEC - elapsed))
-        return 0
+        remaining = [
+            max(0, int(delay - (now - since).total_seconds()))
+            for since, delay in (
+                (self._lux_below_since, LUX_OPEN_DEBOUNCE_SEC),
+                (self._uv_below_since, UV_OPEN_DEBOUNCE_SEC),
+            )
+            if since is not None
+        ]
+        return min(remaining, default=0)
 
     # ------------------------------------------------------------------
     # Adaptive thresholds (close)
@@ -1375,11 +1384,13 @@ class ShuttersSunProtectionManager:
         if not self._enabled:
             self._lux_above_since = None
             self._lux_below_since = None
+            self._uv_below_since = None
             return ("disabled", False, self._in_sun_mode)
 
         if self._override_active(now):
             self._lux_above_since = None
             self._lux_below_since = None
+            self._uv_below_since = None
             return ("override", False, False)
 
         lux_entity = self.hub_entry.data.get(CONF_LUX_ENTITY) or ""
@@ -1391,6 +1402,7 @@ class ShuttersSunProtectionManager:
             # is actually sunny vs. just geometrically aligned.
             self._lux_above_since = None
             self._lux_below_since = None
+            self._uv_below_since = None
             return ("no_sensor", False, self._in_sun_mode)
 
         sun_state = self.hass.states.get(SUN_ENTITY)
@@ -1401,6 +1413,7 @@ class ShuttersSunProtectionManager:
             # indefinitely.
             self._lux_above_since = None
             self._lux_below_since = None
+            self._uv_below_since = None
             return ("below_horizon", False, self._in_sun_mode)
 
         elevation = float(sun_state.attributes.get("elevation", 0) or 0)
@@ -1425,9 +1438,11 @@ class ShuttersSunProtectionManager:
             self._lux_above_since = None
             if elevation < min_elevation - ELEVATION_HYSTERESIS_DEG:
                 self._lux_below_since = None
+                self._uv_below_since = None
                 return ("below_horizon", False, True)
             if diff > arc + ARC_HYSTERESIS_DEG:
                 self._lux_below_since = None
+                self._uv_below_since = None
                 return ("out_of_arc", False, True)
             # Lux exit (debounced) — also fires when the configured lux
             # sensor goes unknown/unavailable, so we don't stay stuck
@@ -1440,18 +1455,29 @@ class ShuttersSunProtectionManager:
                         now - self._lux_below_since
                     ).total_seconds() >= LUX_OPEN_DEBOUNCE_SEC:
                         self._lux_below_since = None
+                        self._uv_below_since = None
                         return ("lux_too_low", False, True)
                 else:
                     self._lux_below_since = None
             else:
                 # No lux gate at all — the timer must not linger.
                 self._lux_below_since = None
-            # UV exit — no debounce, UV index changes slowly enough. A
-            # missing reading (sensor unknown/unavailable) is treated as
-            # a failed gate so we exit rather than freezing closed.
+            # UV exit (debounced like lux). A missing reading (sensor
+            # unknown/unavailable) counts as "too low" so a lost sensor
+            # still ends sun mode instead of freezing closed, but only
+            # once it has lasted UV_OPEN_DEBOUNCE_SEC: a transient dropout
+            # or an index hovering around min_uv no longer reopens.
             if uv_entity and (uv is None or uv < min_uv):
-                self._lux_below_since = None
-                return ("uv_too_low", False, True)
+                if self._uv_below_since is None:
+                    self._uv_below_since = now
+                if (
+                    now - self._uv_below_since
+                ).total_seconds() >= UV_OPEN_DEBOUNCE_SEC:
+                    self._lux_below_since = None
+                    self._uv_below_since = None
+                    return ("uv_too_low", False, True)
+            else:
+                self._uv_below_since = None
             # Comfort exit: room cool AND outdoor cool together.
             if (
                 t_indoor is not None
@@ -1460,6 +1486,7 @@ class ShuttersSunProtectionManager:
                 and t_ext < T_OUTDOOR_REOPEN
             ):
                 self._lux_below_since = None
+                self._uv_below_since = None
                 return ("room_too_cool", False, True)
             return ("active", False, False)
 
@@ -1468,6 +1495,7 @@ class ShuttersSunProtectionManager:
         # timer is irrelevant here, clear it once.
         # ------------------------------------------------------------------
         self._lux_below_since = None
+        self._uv_below_since = None
         if elevation < min_elevation:
             self._lux_above_since = None
             return ("below_horizon", False, False)
@@ -1652,6 +1680,7 @@ class ShuttersSunProtectionManager:
         self._applied_positions.clear()
         self._lux_above_since = None
         self._lux_below_since = None
+        self._uv_below_since = None
         self._last_status = "override"
         self._async_persist_state()
         _LOGGER.debug(

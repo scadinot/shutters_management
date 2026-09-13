@@ -6,6 +6,29 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le pr
 
 ## [Non publié]
 
+## [0.9.24] — 2026-09-13
+
+### Corrigé — le capteur UV ne fait plus sortir du mode soleil au moindre écart
+
+En mode soleil, la sortie sur l'indice UV était **immédiate** :
+
+- une indisponibilité passagère du capteur UV (`unknown` /
+  `unavailable`, redémarrage de l'intégration météo, perte réseau)
+  rouvrait aussitôt les volets ;
+- un indice qui oscille autour de `min_uv` (par ex. 2,9 / 3,0 pour un
+  seuil de 3) faisait faire le yo-yo aux volets.
+
+La sortie UV est désormais temporisée comme la sortie lux : l'indice
+doit rester sous `min_uv` (ou le capteur indisponible) pendant
+`UV_OPEN_DEBOUNCE_SEC = 20 min` avant de rouvrir. Un retour au-dessus
+du seuil pendant ce délai annule la sortie. Un capteur UV perdu
+durablement termine toujours le mode soleil (les volets ne restent
+pas bloqués baissés).
+
+Le capteur `pending_seconds` (« Debounce restant ») affiche le délai
+de réouverture le plus court en cours (lux ou UV). La fermeture sur
+UV (sans capteur lux) reste immédiate.
+
 ## [0.9.23] — 2026-09-13
 
 ### Corrigé — un rechargement ne rouvre plus les volets en mode soleil

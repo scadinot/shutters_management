@@ -79,6 +79,7 @@ T_OUTDOOR_REOPEN = 22
 # --- Debouncing (absorb passing clouds / brief sun bursts) ---
 LUX_CLOSE_DEBOUNCE_SEC = 10 * 60  # 10 min sustained high lux to close
 LUX_OPEN_DEBOUNCE_SEC = 20 * 60   # 20 min sustained low lux to reopen
+UV_OPEN_DEBOUNCE_SEC = 20 * 60    # 20 min sustained low / missing UV to reopen
 
 # --- Override (manual move pauses the façade until next morning) ---
 OVERRIDE_RESET_HOUR = 4  # daily reset at 04:00 local time
