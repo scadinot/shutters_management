@@ -565,6 +565,15 @@ Le délai en attente est perdu (comportement standard de
 `async_call_later`). Le prochain déclenchement programmé reprend
 normalement.
 
+**Qu'est-ce qui est conservé après un redémarrage de Home Assistant ?**
+Depuis v0.9.21 : la pause de chaque planification / simulation, l'état
+du switch de chaque protection solaire, l'override manuel en cours et,
+si les volets étaient baissés par la protection solaire, les positions
+à restaurer à la sortie du mode soleil (`.storage/shutters_management.state`).
+La protection solaire attend la fin du démarrage de Home Assistant
+avant de réévaluer quoi que ce soit, pour ne pas rouvrir les volets à
+cause d'un capteur encore indisponible.
+
 ## Limitations connues
 
 - Les services `shutters_management.run_now` / `pause` / `resume`
@@ -616,6 +625,7 @@ shutters_management/
 │       ├── manifest.json
 │       ├── sensor.py          # next_open / next_close +
 │       │                      #   14 sensors diagnostic Sun Protection
+│       ├── state_store.py     # état persisté (pause, switch, mode soleil)
 │       ├── strings.json
 │       ├── switch.py          # simulation_active + sun_protection
 │       └── translations/

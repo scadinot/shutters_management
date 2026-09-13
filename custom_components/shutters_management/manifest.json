@@ -1,6 +1,7 @@
 {
   "domain": "shutters_management",
   "name": "Shutters Management",
+  "after_dependencies": ["sun"],
   "codeowners": ["@scadinot"],
   "config_flow": true,
   "dependencies": ["http", "lovelace"],
