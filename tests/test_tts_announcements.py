@@ -327,8 +327,11 @@ async def test_no_tts_if_scheduler_unloaded_mid_call(
     subentry_id = get_only_subentry_id(entry)
     scheduler = hass.data[DOMAIN][subentry_id]
 
+    # Report the cover as actioned so the empty-list short-circuit
+    # can't mask a missing presence check.
     async def _evict(*_args, **_kwargs):
         hass.data[DOMAIN].pop(subentry_id, None)
+        return ["cover.a"]
 
     with patch.object(
         scheduler, "_async_call_sequential", side_effect=_evict
