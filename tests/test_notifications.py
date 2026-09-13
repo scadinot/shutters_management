@@ -202,9 +202,12 @@ async def test_no_notification_if_scheduler_unloaded_mid_call(
     # Stand-in for "scheduler unloaded mid-sequence": we replace the
     # sequential helper with a stub that drops the scheduler from
     # hass.data without doing any cover work. The post-call presence
-    # check in _async_call must then drop the notification.
+    # check in _async_call must then drop the notification. The stub
+    # reports the cover as actioned so the empty-list short-circuit
+    # can't mask a missing presence check.
     async def _evict(*_args, **_kwargs):
         hass.data[DOMAIN].pop(subentry_id, None)
+        return ["cover.a"]
 
     with patch.object(
         scheduler, "_async_call_sequential", side_effect=_evict
