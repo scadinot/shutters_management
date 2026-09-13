@@ -85,6 +85,12 @@ OVERRIDE_RESET_HOUR = 4  # daily reset at 04:00 local time
 
 SUN_ENTITY = "sun.sun"
 
+# --- Runtime state persisted across restarts (v0.9.22) ---
+# Pause flags, sun-protection switch, sun-mode snapshots and override.
+STORAGE_KEY = f"{DOMAIN}.state"
+STORAGE_VERSION = 1
+STORAGE_SAVE_DELAY = 10  # seconds; pending saves are flushed on shutdown
+
 CONF_NOTIFY_SERVICES = "notify_services"
 CONF_NOTIFY_WHEN_AWAY_ONLY = "notify_when_away_only"  # kept for v3→v4 migration
 CONF_NOTIFY_MODE = "notify_mode"

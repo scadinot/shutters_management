@@ -24,7 +24,7 @@ from homeassistant.const import (
     SUN_EVENT_SUNRISE,
     SUN_EVENT_SUNSET,
 )
-from homeassistant.core import HomeAssistant, ServiceCall, callback
+from homeassistant.core import CoreState, HomeAssistant, ServiceCall, callback
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.dispatcher import async_dispatcher_send
@@ -35,10 +35,12 @@ from homeassistant.helpers.event import (
     async_track_sunset,
     async_track_time_change,
 )
+from homeassistant.helpers.start import async_at_started
 from homeassistant.helpers.sun import get_astral_event_next
 from homeassistant.util import dt as dt_util
 
 from .panel import async_register_panel, async_unregister_panel
+from .state_store import ShuttersStateStore
 from .const import (
     ACTION_CLOSE,
     ACTION_OPEN,
@@ -138,6 +140,21 @@ _LOGGER = logging.getLogger(__name__)
 # up fields removed from DeviceInfo). Used by the one-time migration in
 # `async_setup_entry`.
 _RESIDUAL_DEVICE_MODELS = frozenset({"Presence schedule", "Sun protection"})
+
+# Kept outside ``hass.data[DOMAIN]``, which only holds per-subentry
+# managers, and survives reloads of the hub entry.
+_STATE_STORE_KEY = f"{DOMAIN}_state_store"
+
+
+def _restored_positions(raw: Any) -> dict[str, int]:
+    """Validate a persisted ``{entity_id: position}`` mapping."""
+    if not isinstance(raw, dict):
+        return {}
+    return {
+        str(entity_id): int(position)
+        for entity_id, position in raw.items()
+        if isinstance(position, (int, float))
+    }
 
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
@@ -535,13 +552,22 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         if device.model in _RESIDUAL_DEVICE_MODELS:
             device_registry.async_update_device(device.id, model=None)
 
+    state_store: ShuttersStateStore | None = hass.data.get(_STATE_STORE_KEY)
+    if state_store is None:
+        state_store = ShuttersStateStore(hass)
+        await state_store.async_load()
+        hass.data[_STATE_STORE_KEY] = state_store
+    state_store.async_prune(entry.subentries)
+
     for subentry in entry.subentries.values():
         if subentry.subentry_type in (SUBENTRY_TYPE_INSTANCE, SUBENTRY_TYPE_PRESENCE_SIM):
-            scheduler = ShuttersScheduler(hass, entry, subentry)
+            scheduler = ShuttersScheduler(hass, entry, subentry, state_store)
             scheduler.async_schedule()
             hass.data[DOMAIN][subentry.subentry_id] = scheduler
         elif subentry.subentry_type == SUBENTRY_TYPE_SUN_PROTECTION:
-            manager = ShuttersSunProtectionManager(hass, entry, subentry)
+            manager = ShuttersSunProtectionManager(
+                hass, entry, subentry, state_store
+            )
             await manager.async_setup()
             hass.data[DOMAIN][subentry.subentry_id] = manager
 
@@ -576,6 +602,22 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         _async_unregister_services(hass)
 
     return True
+
+
+async def async_remove_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    """Delete the persisted runtime state when the hub itself is removed.
+
+    Legacy (pre-hub) entries deleted by the v2→v3 migration never owned
+    the store, so they must not wipe it.
+    """
+    if entry.data.get(CONF_TYPE) != TYPE_HUB:
+        return
+    state_store: ShuttersStateStore | None = hass.data.pop(
+        _STATE_STORE_KEY, None
+    )
+    if state_store is None:
+        state_store = ShuttersStateStore(hass)
+    await state_store.async_remove()
 
 
 async def _async_update_listener(hass: HomeAssistant, entry: ConfigEntry) -> None:
@@ -875,10 +917,12 @@ class ShuttersSunProtectionManager:
         hass: HomeAssistant,
         hub_entry: ConfigEntry,
         subentry: ConfigSubentry,
+        state_store: ShuttersStateStore,
     ) -> None:
         self.hass = hass
         self.hub_entry = hub_entry
         self.subentry = subentry
+        self._state_store = state_store
         self._enabled = True
         self._in_sun_mode = False
         self._snapshots: dict[str, int] = {}
@@ -888,6 +932,44 @@ class ShuttersSunProtectionManager:
         self._lux_above_since: datetime | None = None
         self._lux_below_since: datetime | None = None
         self._last_status: str = "disabled"
+        self._restore_state()
+
+    # ------------------------------------------------------------------
+    # Persistence
+    # ------------------------------------------------------------------
+    def _restore_state(self) -> None:
+        """Reload switch, sun-mode snapshot and override saved before a restart."""
+        saved = self._state_store.get(self.subentry_id)
+        self._enabled = bool(saved.get("enabled", True))
+        self._in_sun_mode = bool(saved.get("in_sun_mode", False))
+        self._snapshots = _restored_positions(saved.get("snapshots"))
+        self._applied_positions = _restored_positions(
+            saved.get("applied_positions")
+        )
+        override = saved.get("override_until")
+        self._override_until = (
+            dt_util.parse_datetime(override)
+            if isinstance(override, str)
+            else None
+        )
+
+    @callback
+    def _async_persist_state(self) -> None:
+        """Save the state that must survive a restart."""
+        self._state_store.async_set(
+            self.subentry_id,
+            {
+                "enabled": self._enabled,
+                "in_sun_mode": self._in_sun_mode,
+                "snapshots": dict(self._snapshots),
+                "applied_positions": dict(self._applied_positions),
+                "override_until": (
+                    self._override_until.isoformat()
+                    if self._override_until is not None
+                    else None
+                ),
+            },
+        )
 
     # ------------------------------------------------------------------
     # Public properties
@@ -1117,12 +1199,22 @@ class ShuttersSunProtectionManager:
                 second=0,
             )
         )
-        # Run the initial evaluate inline so callers can rely on the
-        # manager's status / decision state being up-to-date right after
-        # ``async_setup`` returns. (``async_call_later(0, …)`` was
-        # previously used here, but that path is not deterministic under
-        # ``freezegun`` in tests.)
-        await self.async_evaluate()
+        # At boot, wait for Home Assistant to be fully started: sun.sun
+        # and the light / temperature sensors may not have reported yet,
+        # and a restored sun mode would otherwise be exited (covers
+        # reopened) on a transient "unavailable".
+        #
+        # When already running (reload, tests) run the initial evaluate
+        # inline so callers can rely on the manager's status / decision
+        # state being up-to-date right after ``async_setup`` returns.
+        # (``async_call_later(0, …)`` was previously used here, but that
+        # path is not deterministic under ``freezegun`` in tests.)
+        if self.hass.state is CoreState.running:
+            await self.async_evaluate()
+        else:
+            self._unsubs.append(
+                async_at_started(self.hass, self._async_on_started)
+            )
 
     async def async_unload(self) -> None:
         """Cancel subscriptions and restore positions if in sun mode."""
@@ -1131,6 +1223,9 @@ class ShuttersSunProtectionManager:
         self._unsubs.clear()
         if self._in_sun_mode:
             await self._async_exit_sun_mode()
+
+    async def _async_on_started(self, _hass: HomeAssistant) -> None:
+        await self.async_evaluate()
 
     async def _async_on_state_change(self, event: Any) -> None:
         await self.async_evaluate()
@@ -1142,6 +1237,7 @@ class ShuttersSunProtectionManager:
                 self.subentry_id,
             )
             self._override_until = None
+            self._async_persist_state()
             await self.async_evaluate()
 
     # ------------------------------------------------------------------
@@ -1165,6 +1261,11 @@ class ShuttersSunProtectionManager:
     # ------------------------------------------------------------------
     async def async_evaluate(self) -> None:
         """Recompute whether sun protection should be active and act."""
+        if self.hass.state is not CoreState.running:
+            # Startup (sensors not ready yet) or shutdown (sensors going
+            # unavailable): never drive covers from a partial picture.
+            # ``_async_on_started`` runs the first evaluation at boot.
+            return
         now = dt_util.now()
         new_status, want_close, want_open = self._compute_decision(now)
         self._last_status = new_status
@@ -1365,6 +1466,7 @@ class ShuttersSunProtectionManager:
             processed.append(cover_id)
 
         self._in_sun_mode = True
+        self._async_persist_state()
         _LOGGER.debug(
             "Sun protection %s: entered sun mode (target=%s%%)",
             self.subentry_id,
@@ -1407,6 +1509,7 @@ class ShuttersSunProtectionManager:
         self._in_sun_mode = False
         self._snapshots.clear()
         self._applied_positions.clear()
+        self._async_persist_state()
         _LOGGER.debug("Sun protection %s: exited sun mode", self.subentry_id)
 
         if processed:
@@ -1438,7 +1541,9 @@ class ShuttersSunProtectionManager:
         ``OVERRIDE_RESET_HOUR`` and exit sun mode without re-driving the
         covers (the user just expressed a preference).
         """
-        if not self._in_sun_mode:
+        if not self._in_sun_mode or self.hass.state is not CoreState.running:
+            # Cover states flicker while integrations load or unload:
+            # never read those transitions as manual moves.
             return
         cover_id = event.data.get("entity_id")
         if cover_id not in self._applied_positions:
@@ -1485,6 +1590,7 @@ class ShuttersSunProtectionManager:
         self._lux_above_since = None
         self._lux_below_since = None
         self._last_status = "override"
+        self._async_persist_state()
         _LOGGER.debug(
             "Sun protection %s: manual move detected, override until %s",
             self.subentry_id,
@@ -1497,6 +1603,7 @@ class ShuttersSunProtectionManager:
     def set_enabled(self, enabled: bool) -> None:
         """Toggle the group on/off (called by the switch entity)."""
         self._enabled = enabled
+        self._async_persist_state()
         self.hass.async_create_task(self.async_evaluate())
 
 
@@ -1508,11 +1615,15 @@ class ShuttersScheduler:
         hass: HomeAssistant,
         hub_entry: ConfigEntry,
         subentry: ConfigSubentry,
+        state_store: ShuttersStateStore,
     ) -> None:
         self.hass = hass
         self.hub_entry = hub_entry
         self.subentry = subentry
-        self.paused = False
+        self._state_store = state_store
+        self.paused = bool(
+            state_store.get(subentry.subentry_id).get("paused", False)
+        )
         self._unsubs: list[Callable[[], None]] = []
         self._pending_unsubs: list[Callable[[], None]] = []
 
@@ -1991,5 +2102,6 @@ class ShuttersScheduler:
         if self.paused == paused:
             return
         self.paused = paused
+        self._state_store.async_set(self.subentry_id, {"paused": paused})
         _LOGGER.info("Simulation %s", "paused" if paused else "resumed")
         async_dispatcher_send(self.hass, signal_state_update(self.subentry_id))

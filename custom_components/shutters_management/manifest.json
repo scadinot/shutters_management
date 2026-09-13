@@ -1,6 +1,7 @@
 {
   "domain": "shutters_management",
   "name": "Shutters Management",
+  "after_dependencies": ["sun"],
   "codeowners": ["@scadinot"],
   "config_flow": true,
   "dependencies": ["http", "lovelace"],
@@ -10,5 +11,5 @@
   "issue_tracker": "https://github.com/scadinot/shutters_management/issues",
   "requirements": [],
   "single_config_entry": true,
-  "version": "0.9.21"
+  "version": "0.9.22"
 }

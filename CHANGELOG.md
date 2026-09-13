@@ -6,6 +6,43 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le pr
 
 ## [Non publié]
 
+## [0.9.22] — 2026-09-13
+
+### Ajouté — l'état survit aux redémarrages de Home Assistant
+
+Constaté en production : après le redémarrage de Home Assistant du
+12/09 à 10:59, tous les switches de l'intégration avaient été
+réinitialisés. Jusqu'ici tout l'état d'exécution vivait en mémoire.
+Après un redémarrage :
+
+- une planification / simulation **mise en pause** reprenait toute
+  seule ;
+- une protection solaire **désactivée** se réactivait ;
+- l'**override manuel** (jusqu'à 04 h) était oublié ;
+- si les volets étaient baissés par la protection solaire, les
+  **positions d'origine** étaient perdues : à la sortie du mode
+  soleil, rien n'était restauré (ou la position baissée était
+  re-mémorisée comme « position d'origine »).
+
+Ces informations sont désormais persistées dans
+`.storage/shutters_management.state` (un document par hub, indexé
+par sous-entrée, écriture différée de 10 s et vidée à l'arrêt de
+HA) et rechargées au démarrage : `paused` pour les planifications ;
+`enabled`, `in_sun_mode`, positions mémorisées / appliquées et
+`override_until` pour chaque protection solaire. L'état des
+sous-entrées supprimées est purgé au rechargement, et le document est
+supprimé avec le hub.
+
+Pour qu'un mode soleil restauré ne soit pas quitté à tort (volets
+rouverts) sur un capteur encore `unavailable` au boot :
+
+- la protection solaire n'évalue plus rien tant que Home Assistant
+  n'a pas fini de démarrer (première évaluation sur
+  `homeassistant_started`), ni pendant l'arrêt ;
+- les changements d'état des volets pendant ces phases ne sont plus
+  interprétés comme un mouvement manuel ;
+- `sun` est déclaré en `after_dependencies` dans le manifest.
+
 ## [0.9.21] — 2026-09-13
 
 ### Corrigé — mode séquentiel : une erreur sur un volet n'interrompt plus la séquence
