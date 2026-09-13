@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from types import MappingProxyType
 from typing import Any
+from unittest.mock import patch
 
 from homeassistant.components import frontend
 from homeassistant.config_entries import ConfigSubentryData
@@ -23,9 +24,12 @@ from custom_components.shutters_management.const import (
     DOMAIN,
     HUB_TITLE,
     HUB_UNIQUE_ID,
+    LUX_MILD,
     SUBENTRY_TYPE_INSTANCE,
     SUBENTRY_TYPE_PRESENCE_SIM,
     SUBENTRY_TYPE_SUN_PROTECTION,
+    T_OUTDOOR_HEATWAVE,
+    T_OUTDOOR_NO_PROTECT,
     TYPE_HUB,
 )
 from custom_components.shutters_management.panel import (
@@ -580,6 +584,62 @@ async def test_sun_protection_view_has_decision_state_markdown(
     # Reset note only appears inside the override active branch
     # (no longer next to « Aucun »).
     assert content.count("Aucun") + content.count("None") >= 1
+
+
+def _decision_markdown(hass: HomeAssistant) -> str:
+    """Build the dashboard and return the decision-parameters markdown."""
+    entry = _hub_with_subentries(
+        subentries=[_sun_sub("Salon Sud", "salon_sud")]
+    )
+    entry.add_to_hass(hass)
+    config = build_dashboard_config(hass, entry)
+    sun_view = next(v for v in config["views"] if v["path"] == "salon_sud")
+    return next(
+        c["content"]
+        for c in _flatten_cards(sun_view["cards"])
+        if c.get("type") == "markdown"
+        and (
+            "État de la décision" in c.get("content", "")
+            or "Decision state" in c.get("content", "")
+        )
+    )
+
+
+async def test_decision_markdown_renders_thresholds_from_constants(
+    hass: HomeAssistant,
+) -> None:
+    """Thresholds shown in the decision table come from ``const.py``,
+    with no template placeholder left unformatted."""
+    content = _decision_markdown(hass)
+
+    assert f"≥ {T_OUTDOOR_NO_PROTECT} °C" in content
+    assert f"{LUX_MILD:,}".replace(",", " ") + " lx" in content
+    assert f"float >= {T_OUTDOOR_HEATWAVE}" in content
+    for placeholder in ("{t_", "{lux_", "_minutes}"):
+        assert placeholder not in content
+
+
+async def test_decision_markdown_follows_changed_constants(
+    hass: HomeAssistant,
+) -> None:
+    """Changing a constant changes both the text and the Jinja dots:
+    nothing in the panel is written out by hand anymore."""
+    with patch.multiple(
+        "custom_components.shutters_management.panel",
+        T_OUTDOOR_NO_PROTECT=18,
+        T_OUTDOOR_HEATWAVE=33,
+        LUX_REOPEN=12345,
+        LUX_CLOSE_DEBOUNCE_SEC=15 * 60,
+    ):
+        content = _decision_markdown(hass)
+
+    assert "≥ 18 °C" in content
+    assert "12 345 lx" in content
+    assert "15 min" in content
+    assert "float >= 18" in content
+    assert "float >= 33" in content
+    assert "float >= 30" not in content
+    assert "float >= 20" not in content
 
 
 async def test_scheduler_view_header_links_back_to_cockpit(

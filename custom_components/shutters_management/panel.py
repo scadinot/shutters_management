@@ -52,12 +52,25 @@ from .const import (
     DOMAIN,
     ELEVATION_HYSTERESIS_DEG,
     HUB_TITLE,
+    LUX_CLOSE_DEBOUNCE_SEC,
+    LUX_HEATWAVE,
     LUX_MILD,
+    LUX_OPEN_DEBOUNCE_SEC,
+    LUX_REOPEN,
+    LUX_STANDARD,
     SERVICE_PAUSE,
     SERVICE_RESUME,
     SUBENTRY_TYPE_INSTANCE,
     SUBENTRY_TYPE_PRESENCE_SIM,
     SUBENTRY_TYPE_SUN_PROTECTION,
+    T_INDOOR_MILD_MIN,
+    T_INDOOR_REOPEN,
+    T_INDOOR_STANDARD_MIN,
+    T_OUTDOOR_HEATWAVE,
+    T_OUTDOOR_NO_PROTECT,
+    T_OUTDOOR_REOPEN,
+    T_OUTDOOR_STANDARD,
+    UV_OPEN_DEBOUNCE_SEC,
 )
 
 
@@ -184,44 +197,49 @@ _LABELS_FR: dict[str, str] = {
         "≤ {arc}° (sortie à {exit}°, hystérésis +{hys}°)"
     ),
     "outdoor_temp_label": "T° extérieure",
-    "outdoor_temp_condition": "≥ 20 °C pour activer la protection",
+    "outdoor_temp_condition": "≥ {t_no_protect} °C pour activer la protection",
     "thermal_regime_label": "Régime adaptatif",
     "thermal_regime_value": "dépend de la T° extérieure",
     "thermal_regime_condition": (
-        "mi-saison (20–24 °C) · chaud (24–30 °C) · "
-        "canicule (≥ 30 °C)"
+        "mi-saison ({t_no_protect}–{t_standard} °C) · "
+        "chaud ({t_standard}–{t_heatwave} °C) · canicule (≥ {t_heatwave} °C)"
     ),
     "outdoor_lux_label": "Luminosité extérieure",
     "outdoor_lux_condition": "≥ {threshold_template} lx",
     "lux_threshold_label": "Seuil adaptatif",
     "lux_threshold_value": "dépend de la T° extérieure",
     "lux_threshold_condition": (
-        "mi-saison : 70 000 lx · chaud : 50 000 lx · "
-        "canicule : 35 000 lx"
+        "mi-saison : {lux_mild} lx · chaud : {lux_standard} lx · "
+        "canicule : {lux_heatwave} lx"
     ),
     "lux_reopen_label": "Réouverture",
     "lux_reopen_condition": (
-        "redescend sous 25 000 lx pendant 20 min"
+        "redescend sous {lux_reopen} lx pendant {lux_open_minutes} min"
     ),
     "uv_index_label": "Indice UV",
     "uv_index_condition": "≥ {min} (seuil configuré)",
     "indoor_temp_label": "T° intérieure",
     "indoor_temp_condition": (
-        "≥ 23 °C en régime chaud / 24 °C en mi-saison"
+        "≥ {t_indoor_standard} °C en régime chaud / "
+        "{t_indoor_mild} °C en mi-saison"
     ),
     "heatwave_bypass_label": "Régime canicule",
-    "heatwave_bypass_value": "T°ext ≥ 30 °C",
+    "heatwave_bypass_value": "T°ext ≥ {t_heatwave} °C",
     "heatwave_bypass_condition": (
         "bypass : on ferme même si la pièce est fraîche"
     ),
     "comfort_reopen_label": "Réouverture confort",
     "comfort_reopen_condition": (
-        "T°int < 21 °C ET T°ext < 22 °C simultanément"
+        "T°int < {t_indoor_reopen} °C ET T°ext < {t_outdoor_reopen} °C "
+        "simultanément"
     ),
     "close_step_label": "Avant fermeture",
-    "close_step_duration": "10 min de conditions favorables",
+    "close_step_duration": "{close_minutes} min de conditions favorables",
     "open_step_label": "Avant réouverture",
-    "open_step_duration": "20 min de luminosité ou d'UV insuffisants",
+    "open_step_duration": (
+        "{lux_open_minutes} min de luminosité ou "
+        "{uv_open_minutes} min d'UV insuffisants"
+    ),
     "facade_orientation_label": "Orientation de la façade",
     "half_arc_label": "Demi-arc accepté",
     "min_elevation_param_label": "Élévation minimale",
@@ -347,42 +365,49 @@ _LABELS_EN: dict[str, str] = {
         "≤ {arc}° (exit at {exit}°, hysteresis +{hys}°)"
     ),
     "outdoor_temp_label": "Outdoor T°",
-    "outdoor_temp_condition": "≥ 20 °C to enable protection",
+    "outdoor_temp_condition": "≥ {t_no_protect} °C to enable protection",
     "thermal_regime_label": "Thermal regime",
     "thermal_regime_value": "depends on outdoor T°",
     "thermal_regime_condition": (
-        "mid-season (20–24 °C) · warm (24–30 °C) · "
-        "heatwave (≥ 30 °C)"
+        "mid-season ({t_no_protect}–{t_standard} °C) · "
+        "warm ({t_standard}–{t_heatwave} °C) · heatwave (≥ {t_heatwave} °C)"
     ),
     "outdoor_lux_label": "Outdoor brightness",
     "outdoor_lux_condition": "≥ {threshold_template} lx",
     "lux_threshold_label": "Adaptive threshold",
     "lux_threshold_value": "depends on outdoor T°",
     "lux_threshold_condition": (
-        "mid-season: 70 000 lx · warm: 50 000 lx · "
-        "heatwave: 35 000 lx"
+        "mid-season: {lux_mild} lx · warm: {lux_standard} lx · "
+        "heatwave: {lux_heatwave} lx"
     ),
     "lux_reopen_label": "Reopen",
-    "lux_reopen_condition": "drops below 25 000 lx for 20 min",
+    "lux_reopen_condition": (
+        "drops below {lux_reopen} lx for {lux_open_minutes} min"
+    ),
     "uv_index_label": "UV index",
     "uv_index_condition": "≥ {min} (configured threshold)",
     "indoor_temp_label": "Indoor T°",
     "indoor_temp_condition": (
-        "≥ 23 °C in warm regime / 24 °C in mid-season"
+        "≥ {t_indoor_standard} °C in warm regime / "
+        "{t_indoor_mild} °C in mid-season"
     ),
     "heatwave_bypass_label": "Heatwave regime",
-    "heatwave_bypass_value": "Outdoor T° ≥ 30 °C",
+    "heatwave_bypass_value": "Outdoor T° ≥ {t_heatwave} °C",
     "heatwave_bypass_condition": (
         "bypass: close even if the room is cool"
     ),
     "comfort_reopen_label": "Comfort reopen",
     "comfort_reopen_condition": (
-        "Indoor < 21 °C AND outdoor < 22 °C simultaneously"
+        "Indoor < {t_indoor_reopen} °C AND outdoor < {t_outdoor_reopen} °C "
+        "simultaneously"
     ),
     "close_step_label": "Before close",
-    "close_step_duration": "10 min of favourable conditions",
+    "close_step_duration": "{close_minutes} min of favourable conditions",
     "open_step_label": "Before reopen",
-    "open_step_duration": "20 min of insufficient brightness or UV",
+    "open_step_duration": (
+        "{lux_open_minutes} min of insufficient brightness or "
+        "{uv_open_minutes} min of insufficient UV"
+    ),
     "facade_orientation_label": "Façade orientation",
     "half_arc_label": "Accepted half-arc",
     "min_elevation_param_label": "Minimum elevation",
@@ -399,6 +424,36 @@ _LABELS_EN: dict[str, str] = {
     # v0.9.13 — per-row / per-section indicator
     "status_col": "State",
 }
+
+
+def _threshold_values() -> dict[str, int | str]:
+    """Decision constants rendered into the decision-parameters labels.
+
+    Keeps the dashboard text in sync with ``const.py``: the thresholds
+    used to be written out in the labels and silently went stale
+    whenever a constant changed. Lux values get a space as thousands
+    separator (``70 000``), durations are expressed in minutes.
+    """
+
+    def lux(value: int) -> str:
+        return f"{value:,}".replace(",", " ")
+
+    return {
+        "t_no_protect": T_OUTDOOR_NO_PROTECT,
+        "t_standard": T_OUTDOOR_STANDARD,
+        "t_heatwave": T_OUTDOOR_HEATWAVE,
+        "lux_mild": lux(LUX_MILD),
+        "lux_standard": lux(LUX_STANDARD),
+        "lux_heatwave": lux(LUX_HEATWAVE),
+        "lux_reopen": lux(LUX_REOPEN),
+        "t_indoor_mild": T_INDOOR_MILD_MIN,
+        "t_indoor_standard": T_INDOOR_STANDARD_MIN,
+        "t_indoor_reopen": T_INDOOR_REOPEN,
+        "t_outdoor_reopen": T_OUTDOOR_REOPEN,
+        "close_minutes": LUX_CLOSE_DEBOUNCE_SEC // 60,
+        "lux_open_minutes": LUX_OPEN_DEBOUNCE_SEC // 60,
+        "uv_open_minutes": UV_OPEN_DEBOUNCE_SEC // 60,
+    }
 
 
 def _labels(hass: HomeAssistant) -> dict[str, str]:
@@ -863,6 +918,7 @@ def _decision_parameters_markdown(
     override = f"sensor.{prefix}_sun_protection_override_until"
 
     L = labels
+    thr = _threshold_values()
     sep = L["decimal_sep"]
     elev_exit = max(0, min_elevation - ELEVATION_HYSTERESIS_DEG)
     arc_exit = arc + ARC_HYSTERESIS_DEG
@@ -933,23 +989,29 @@ def _decision_parameters_markdown(
 
     dot_elev = dot(elev_margin, "{v} | float >= 0")
     dot_az = dot(az_diff, f"{{v}} | float <= {arc}")
-    dot_temp_outdoor = dot(temp_outdoor, "{v} | float >= 20")
+    dot_temp_outdoor = dot(
+        temp_outdoor, f"{{v}} | float >= {T_OUTDOOR_NO_PROTECT}"
+    )
     dot_lux = dot(lux_margin, "{v} | float >= 0")
     dot_uv = dot(uv_margin, "{v} | float >= 0")
     # Indoor comfort criterion: adaptive thresholds keyed on the
-    # outdoor regime — heatwave (≥30) bypasses the indoor check, warm
-    # (24–30) requires T°int ≥ 23, mid-season (20–24) requires
-    # T°int ≥ 24, cool (<20) makes the section non-applicable.
+    # outdoor regime, mirroring ``_close_indoor_min`` — heatwave
+    # (≥ T_OUTDOOR_HEATWAVE) bypasses the indoor check, warm requires
+    # T°int ≥ T_INDOOR_STANDARD_MIN, mid-season requires
+    # T°int ≥ T_INDOOR_MILD_MIN, cool (< T_OUTDOOR_NO_PROTECT) makes
+    # the section non-applicable.
     dot_comfort = (
         "{% set t = states('" + temp_indoor + "') %}"
         "{% set o = states('" + temp_outdoor + "') %}"
         "{% if not is_number(o) %}⚪"
-        "{% elif o | float >= 30 %}🟢"
+        f"{{% elif o | float >= {T_OUTDOOR_HEATWAVE} %}}🟢"
         "{% elif not is_number(t) %}⚪"
-        "{% elif o | float >= 24 %}"
-        "{% if t | float >= 23 %}🟢{% else %}🔴{% endif %}"
-        "{% elif o | float >= 20 %}"
-        "{% if t | float >= 24 %}🟢{% else %}🔴{% endif %}"
+        f"{{% elif o | float >= {T_OUTDOOR_STANDARD} %}}"
+        f"{{% if t | float >= {T_INDOOR_STANDARD_MIN} %}}🟢"
+        "{% else %}🔴{% endif %}"
+        f"{{% elif o | float >= {T_OUTDOOR_NO_PROTECT} %}}"
+        f"{{% if t | float >= {T_INDOOR_MILD_MIN} %}}🟢"
+        "{% else %}🔴{% endif %}"
         "{% else %}⚪{% endif %}"
     )
     # Heatwave bypass row: this is not a blocking criterion, it just
@@ -958,7 +1020,7 @@ def _decision_parameters_markdown(
     dot_heatwave = (
         "{% set o = states('" + temp_outdoor + "') %}"
         "{% if not is_number(o) %}⚪"
-        "{% elif o | float >= 30 %}🟢"
+        f"{{% elif o | float >= {T_OUTDOOR_HEATWAVE} %}}🟢"
         "{% else %}⚪{% endif %}"
     )
 
@@ -967,7 +1029,9 @@ def _decision_parameters_markdown(
         (elev_margin, "{v} | float >= 0"),
         (az_diff, f"{{v}} | float <= {arc}"),
     ])
-    section_dot_outdoor_temp = dot(temp_outdoor, "{v} | float >= 20")
+    section_dot_outdoor_temp = dot(
+        temp_outdoor, f"{{v}} | float >= {T_OUTDOOR_NO_PROTECT}"
+    )
     section_dot_lux = dot(lux_margin, "{v} | float >= 0")
     section_dot_uv = dot(uv_margin, "{v} | float >= 0")
     section_dot_comfort = dot_comfort   # same logic as the indoor row
@@ -1067,10 +1131,11 @@ def _decision_parameters_markdown(
         f"{L['condition']} |\n"
         f"|---|---|---|---|\n"
         f"| {dot_temp_outdoor} | {L['outdoor_temp_label']} | "
-        f"{num1(temp_outdoor)} °C | {L['outdoor_temp_condition']} |\n"
+        f"{num1(temp_outdoor)} °C | "
+        f"{L['outdoor_temp_condition'].format(**thr)} |\n"
         f"| — | {L['thermal_regime_label']} | "
         f"{L['thermal_regime_value']} | "
-        f"{L['thermal_regime_condition']} |\n\n"
+        f"{L['thermal_regime_condition'].format(**thr)} |\n\n"
         # 3. Brightness
         f"### 3. {section_dot_lux} {L['lux_section']}\n\n"
         f"{L['lux_intro']}\n\n"
@@ -1084,9 +1149,9 @@ def _decision_parameters_markdown(
         + " |\n"
         f"| — | {L['lux_threshold_label']} | "
         f"{L['lux_threshold_value']} | "
-        f"{L['lux_threshold_condition']} |\n"
+        f"{L['lux_threshold_condition'].format(**thr)} |\n"
         f"| — | {L['lux_reopen_label']} | — | "
-        f"{L['lux_reopen_condition']} |\n\n"
+        f"{L['lux_reopen_condition'].format(**thr)} |\n\n"
         # 4. UV
         f"### 4. {section_dot_uv} {L['uv_section']}\n\n"
         f"{L['uv_intro']}\n\n"
@@ -1103,12 +1168,13 @@ def _decision_parameters_markdown(
         f"{L['condition']} |\n"
         f"|---|---|---|---|\n"
         f"| {dot_comfort} | {L['indoor_temp_label']} | "
-        f"{num1(temp_indoor)} °C | {L['indoor_temp_condition']} |\n"
+        f"{num1(temp_indoor)} °C | "
+        f"{L['indoor_temp_condition'].format(**thr)} |\n"
         f"| {dot_heatwave} | {L['heatwave_bypass_label']} | "
-        f"{L['heatwave_bypass_value']} | "
+        f"{L['heatwave_bypass_value'].format(**thr)} | "
         f"{L['heatwave_bypass_condition']} |\n"
         f"| — | {L['comfort_reopen_label']} | — | "
-        f"{L['comfort_reopen_condition']} |\n\n"
+        f"{L['comfort_reopen_condition'].format(**thr)} |\n\n"
         # 6. Timing — counters only, no per-row blocking criterion
         f"### 6. {L['timing_section']}\n\n"
         f"{L['timing_intro']}\n\n"
@@ -1116,9 +1182,9 @@ def _decision_parameters_markdown(
         f"{L['current_counter']} |\n"
         f"|---|---|---|\n"
         f"| {L['close_step_label']} | "
-        f"{L['close_step_duration']} | {num0(pending)} s |\n"
+        f"{L['close_step_duration'].format(**thr)} | {num0(pending)} s |\n"
         f"| {L['open_step_label']} | "
-        f"{L['open_step_duration']} | {num0(pending)} s |\n\n"
+        f"{L['open_step_duration'].format(**thr)} | {num0(pending)} s |\n\n"
         # Configuration
         f"## {L['config_section']}\n\n"
         f"{L['config_intro']}\n\n"
