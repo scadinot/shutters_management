@@ -6,6 +6,24 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le pr
 
 ## [Non publié]
 
+## [0.9.25] — 2026-09-13
+
+### Corrigé — la protection solaire agit à l'expiration du debounce
+
+Le moteur ne réévaluait la situation qu'aux **changements d'état** des
+entités surveillées (`sun.sun`, lux, UV, températures). Quand un
+debounce arrivait à son terme alors que les capteurs restaient
+stables — luminosité constante, capteur UV toujours indisponible —
+la fermeture ou la réouverture attendait la mise à jour suivante,
+parfois plusieurs minutes plus tard.
+
+Après chaque évaluation, un minuteur est désormais programmé sur
+l'échéance du debounce le plus proche (fermeture lux, réouverture
+lux, réouverture UV), avec une marge d'une seconde, et relance
+l'évaluation à son expiration. Il est annulé dès qu'aucun debounce
+n'est en cours, à l'armement de l'override manuel, au déchargement
+de l'intégration et à l'arrêt de Home Assistant.
+
 ## [0.9.24] — 2026-09-13
 
 ### Corrigé — le capteur UV ne fait plus sortir du mode soleil au moindre écart

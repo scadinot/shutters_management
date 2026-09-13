@@ -24,7 +24,13 @@ from homeassistant.const import (
     SUN_EVENT_SUNRISE,
     SUN_EVENT_SUNSET,
 )
-from homeassistant.core import CoreState, HomeAssistant, ServiceCall, callback
+from homeassistant.core import (
+    CoreState,
+    HassJob,
+    HomeAssistant,
+    ServiceCall,
+    callback,
+)
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.dispatcher import async_dispatcher_send
@@ -115,6 +121,7 @@ from .const import (
     LUX_MILD,
     LUX_OPEN_DEBOUNCE_SEC,
     UV_OPEN_DEBOUNCE_SEC,
+    DEBOUNCE_RECHECK_MARGIN_SEC,
     LUX_REOPEN,
     LUX_STANDARD,
     OVERRIDE_RESET_HOUR,
@@ -1009,6 +1016,12 @@ class ShuttersSunProtectionManager:
         self._lux_above_since: datetime | None = None
         self._lux_below_since: datetime | None = None
         self._uv_below_since: datetime | None = None
+        self._debounce_job = HassJob(
+            self._async_on_debounce_expired,
+            "shutters_management sun protection debounce",
+            cancel_on_shutdown=True,
+        )
+        self._debounce_unsub: Callable[[], None] | None = None
         self._last_status: str = "disabled"
         self._restore_state()
 
@@ -1311,6 +1324,7 @@ class ShuttersSunProtectionManager:
         for unsub in self._unsubs:
             unsub()
         self._unsubs.clear()
+        self._async_cancel_debounce_check()
         if restore_covers and self._in_sun_mode:
             await self._async_exit_sun_mode()
 
@@ -1319,6 +1333,45 @@ class ShuttersSunProtectionManager:
 
     async def _async_on_state_change(self, event: Any) -> None:
         await self.async_evaluate()
+
+    async def _async_on_debounce_expired(self, _now: datetime) -> None:
+        self._debounce_unsub = None
+        await self.async_evaluate()
+
+    @callback
+    def _async_schedule_debounce_check(self, now: datetime) -> None:
+        """Re-evaluate when the earliest running debounce expires.
+
+        The engine otherwise only reacts to state changes of the watched
+        entities: a debounce reaching its term while sensors stay steady
+        (constant lux, UV sensor still unavailable) would wait for the
+        next unrelated update before closing or reopening.
+        """
+        self._async_cancel_debounce_check()
+        deadlines = [
+            since + timedelta(seconds=delay)
+            for since, delay in (
+                (self._lux_above_since, LUX_CLOSE_DEBOUNCE_SEC),
+                (self._lux_below_since, LUX_OPEN_DEBOUNCE_SEC),
+                (self._uv_below_since, UV_OPEN_DEBOUNCE_SEC),
+            )
+            if since is not None
+        ]
+        if not deadlines:
+            return
+        delay = (
+            max(0.0, (min(deadlines) - now).total_seconds())
+            + DEBOUNCE_RECHECK_MARGIN_SEC
+        )
+        self._debounce_unsub = async_call_later(
+            self.hass, delay, self._debounce_job
+        )
+
+    @callback
+    def _async_cancel_debounce_check(self) -> None:
+        if self._debounce_unsub is not None:
+            self._debounce_unsub()
+            self._debounce_unsub = None
 
     async def _async_daily_reset(self, _now: datetime) -> None:
         if self._override_until is not None:
@@ -1359,6 +1412,7 @@ class ShuttersSunProtectionManager:
         now = dt_util.now()
         new_status, want_close, want_open = self._compute_decision(now)
         self._last_status = new_status
+        self._async_schedule_debounce_check(now)
 
         if want_close and not self._in_sun_mode:
             await self._async_enter_sun_mode()
@@ -1681,6 +1735,7 @@ class ShuttersSunProtectionManager:
         self._lux_above_since = None
         self._lux_below_since = None
         self._uv_below_since = None
+        self._async_cancel_debounce_check()
         self._last_status = "override"
         self._async_persist_state()
         _LOGGER.debug(
