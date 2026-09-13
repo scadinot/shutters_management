@@ -156,6 +156,49 @@ def _restored_positions(raw: Any) -> dict[str, int]:
         if isinstance(position, (int, float))
     }
 
+
+async def _async_restore_cover_positions(
+    hass: HomeAssistant,
+    snapshots: Mapping[str, int],
+    applied_positions: Mapping[str, int],
+) -> list[str]:
+    """Send each snapshotted cover back to its position before sun mode.
+
+    Iterates the snapshots rather than the configured covers, so a cover
+    removed from the group while lowered is still restored. Covers moved
+    away from the applied target since (manual move) are left alone. A
+    failing call is logged and skipped so one unreachable cover doesn't
+    keep the others lowered. Returns the restored covers.
+    """
+    restored: list[str] = []
+    for cover_id, snapshot in snapshots.items():
+        state = hass.states.get(cover_id)
+        current_pos = None
+        if state is not None:
+            raw = state.attributes.get("current_position")
+            if raw is not None:
+                current_pos = int(raw)
+        if current_pos is not None and current_pos != applied_positions.get(
+            cover_id
+        ):
+            continue
+        try:
+            await hass.services.async_call(
+                "cover",
+                "set_cover_position",
+                {"entity_id": cover_id, "position": snapshot},
+            )
+        except Exception as err:  # noqa: BLE001 — restore the other covers
+            _LOGGER.warning(
+                "Failed to restore %s to position %s: %s",
+                cover_id,
+                snapshot,
+                err,
+            )
+            continue
+        restored.append(cover_id)
+    return restored
+
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
 RUN_NOW_SCHEMA = vol.Schema(
@@ -582,19 +625,40 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    """Unload a hub entry and tear down all of its subentry schedulers."""
+    """Unload a hub entry and tear down all of its subentry managers.
+
+    Managers are looked up in ``hass.data`` rather than through
+    ``entry.subentries``: when a subentry is deleted, the reload that
+    follows already sees it gone, and its manager would otherwise stay
+    subscribed (and keep driving covers) until the next restart.
+
+    A sun-protection group in sun mode keeps its covers lowered across a
+    plain reload (e.g. reconfiguring another subentry): its state is
+    persisted and picked up by the manager created on setup. Covers are
+    only restored when the group itself goes away: subentry deleted or
+    hub disabled. Hub removal is handled by ``async_remove_entry``.
+    """
     unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     if not unload_ok:
         return False
 
-    for subentry in entry.subentries.values():
-        manager = hass.data.get(DOMAIN, {}).pop(subentry.subentry_id, None)
-        if manager is None:
-            continue
+    domain_data = hass.data.get(DOMAIN, {})
+    owned = [
+        subentry_id
+        for subentry_id, manager in domain_data.items()
+        if manager.hub_entry is entry
+    ]
+    for subentry_id in owned:
+        manager = domain_data.pop(subentry_id)
         if isinstance(manager, ShuttersScheduler):
             manager.async_unschedule()
         elif isinstance(manager, ShuttersSunProtectionManager):
-            await manager.async_unload()
+            await manager.async_unload(
+                restore_covers=(
+                    subentry_id not in entry.subentries
+                    or entry.disabled_by is not None
+                )
+            )
 
     async_unregister_panel(hass)
 
@@ -605,7 +669,11 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
 
 async def async_remove_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
-    """Delete the persisted runtime state when the hub itself is removed.
+    """Restore lowered covers and delete the persisted state with the hub.
+
+    Unloading keeps a sun mode persisted (see ``async_unload_entry``):
+    with the hub gone nothing would ever raise those covers again, so
+    they are restored here from the saved snapshots.
 
     Legacy (pre-hub) entries deleted by the v2→v3 migration never owned
     the store, so they must not wipe it.
@@ -617,6 +685,14 @@ async def async_remove_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
     )
     if state_store is None:
         state_store = ShuttersStateStore(hass)
+        await state_store.async_load()
+    for saved in state_store.all().values():
+        if saved.get("in_sun_mode"):
+            await _async_restore_cover_positions(
+                hass,
+                _restored_positions(saved.get("snapshots")),
+                _restored_positions(saved.get("applied_positions")),
+            )
     await state_store.async_remove()
 
 
@@ -1216,12 +1292,17 @@ class ShuttersSunProtectionManager:
                 async_at_started(self.hass, self._async_on_started)
             )
 
-    async def async_unload(self) -> None:
-        """Cancel subscriptions and restore positions if in sun mode."""
+    async def async_unload(self, *, restore_covers: bool) -> None:
+        """Cancel subscriptions; exit sun mode only when asked to.
+
+        On a plain reload the sun mode and the positions to restore are
+        already persisted: the manager created on setup picks them up and
+        the covers stay where they are.
+        """
         for unsub in self._unsubs:
             unsub()
         self._unsubs.clear()
-        if self._in_sun_mode:
+        if restore_covers and self._in_sun_mode:
             await self._async_exit_sun_mode()
 
     async def _async_on_started(self, _hass: HomeAssistant) -> None:
@@ -1484,27 +1565,9 @@ class ShuttersSunProtectionManager:
 
     async def _async_exit_sun_mode(self) -> None:
         """Restore cover positions, skipping any that were manually moved."""
-        covers = list(self.subentry.data.get(CONF_COVERS, []))
-
-        processed: list[str] = []
-        for cover_id in covers:
-            applied = self._applied_positions.get(cover_id)
-            snapshot = self._snapshots.get(cover_id)
-            if snapshot is None:
-                continue
-            state = self.hass.states.get(cover_id)
-            current_pos = None
-            if state is not None:
-                raw = state.attributes.get("current_position")
-                if raw is not None:
-                    current_pos = int(raw)
-            if current_pos is None or current_pos == applied:
-                await self.hass.services.async_call(
-                    "cover",
-                    "set_cover_position",
-                    {"entity_id": cover_id, "position": snapshot},
-                )
-                processed.append(cover_id)
+        processed = await _async_restore_cover_positions(
+            self.hass, self._snapshots, self._applied_positions
+        )
 
         self._in_sun_mode = False
         self._snapshots.clear()
