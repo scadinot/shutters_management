@@ -1,4 +1,4 @@
-"""Tests for the runtime state persisted across restarts (v0.9.21).
+"""Tests for the runtime state persisted across restarts (v0.9.22).
 
 A "restart" is simulated by seeding the mocked ``.storage`` document
 before the hub entry is set up.

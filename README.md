@@ -566,7 +566,7 @@ Le délai en attente est perdu (comportement standard de
 normalement.
 
 **Qu'est-ce qui est conservé après un redémarrage de Home Assistant ?**
-Depuis v0.9.21 : la pause de chaque planification / simulation, l'état
+Depuis v0.9.22 : la pause de chaque planification / simulation, l'état
 du switch de chaque protection solaire, l'override manuel en cours et,
 si les volets étaient baissés par la protection solaire, les positions
 à restaurer à la sortie du mode soleil (`.storage/shutters_management.state`).
