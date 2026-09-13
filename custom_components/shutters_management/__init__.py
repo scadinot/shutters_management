@@ -1636,7 +1636,15 @@ class ShuttersScheduler:
         return _handle
 
     async def _async_trigger(self, service: str, now: datetime) -> None:
-        """Decide whether to run the service for this trigger."""
+        """Decide whether to run the service for this trigger.
+
+        The trigger that just fired is now in the past, so the
+        next-trigger sensors are refreshed first, whatever happens next.
+        Otherwise a skipped trigger (inactive day, presence at home), a
+        randomized delay or a deferred call dropped at re-check would
+        leave them advertising a past datetime until the next action.
+        """
+        async_dispatcher_send(self.hass, signal_state_update(self.subentry_id))
         if not self._conditions_met(service, now):
             return
 

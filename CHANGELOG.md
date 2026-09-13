@@ -30,6 +30,24 @@ Désormais, chaque appel `cover.<service>` est isolé :
 Côté code, `_async_call_sequential` retourne maintenant la liste des
 volets actionnés. Le mode groupé (non séquentiel) est inchangé.
 
+### Corrigé — capteurs « Prochaine ouverture / fermeture » figés
+
+Retour terrain : les capteurs `sensor.<nom>_next_open` /
+`sensor.<nom>_next_close` d'une simulation de présence affichaient
+une heure déjà passée pendant des heures.
+
+Les capteurs ne se rafraîchissaient que sur le signal émis après
+une action réellement exécutée (ou une pause / reprise). Un
+déclenchement **ignoré** (jour inactif, présence à la maison en mode
+« uniquement en absence »), **différé** par le décalage aléatoire,
+ou abandonné à la revérification ne publiait rien : le capteur
+gardait l'échéance qui venait de passer jusqu'à la prochaine action
+effective.
+
+Désormais, `_async_trigger` émet le signal de mise à jour dès que le
+déclencheur se produit, quelle que soit la suite : les capteurs
+basculent immédiatement sur l'échéance suivante.
+
 ## [0.9.20] — 2026-06-11
 
 ### Modifié — mode séquentiel : avancer dès 50 % de course du volet en cours

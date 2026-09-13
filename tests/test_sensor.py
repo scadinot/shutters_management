@@ -1,13 +1,24 @@
 """Tests for the next_open / next_close timestamp sensors."""
 from __future__ import annotations
 
-from homeassistant.const import STATE_UNKNOWN
+from datetime import datetime, timedelta, timezone
+
+from freezegun import freeze_time
+from homeassistant.const import SERVICE_OPEN_COVER, STATE_UNKNOWN
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
-from pytest_homeassistant_custom_component.common import MockConfigEntry
+from homeassistant.util import dt as dt_util
+from pytest_homeassistant_custom_component.common import (
+    MockConfigEntry,
+    async_fire_time_changed,
+    async_mock_service,
+)
 
 from custom_components.shutters_management.const import (
+    CONF_ONLY_WHEN_AWAY,
+    CONF_OPEN_TIME,
+    CONF_PRESENCE_ENTITY,
     DOMAIN,
     SUBENTRY_TYPE_PRESENCE_SIM,
 )
@@ -140,3 +151,47 @@ async def test_presence_simulation_sensors_use_dedicated_device(
     assert open_entity is not None and close_entity is not None
     assert open_entity.device_info["translation_key"] == "presence_simulation"
     assert close_entity.device_info["translation_key"] == "presence_simulation"
+
+
+async def test_next_open_sensor_refreshes_when_trigger_is_skipped(
+    hass: HomeAssistant, base_config
+) -> None:
+    """A skipped trigger must not leave the sensor on a past datetime.
+
+    Reproduces a real-world report: a presence simulation whose opening
+    was skipped because someone was home kept advertising the skipped
+    time until the next executed action.
+    """
+    await hass.config.async_set_time_zone("UTC")
+    hass.states.async_set("person.someone", "home")
+    calls = async_mock_service(hass, "cover", SERVICE_OPEN_COVER)
+    base_config[CONF_OPEN_TIME] = "12:00:00"
+    base_config[CONF_ONLY_WHEN_AWAY] = True
+    entry = build_hub_with_instance(
+        instance_data=base_config,
+        hub_data={CONF_PRESENCE_ENTITY: ["person.someone"]},
+        subentry_type=SUBENTRY_TYPE_PRESENCE_SIM,
+    )
+
+    fake_now = datetime(2026, 4, 27, 11, 59, 0, tzinfo=timezone.utc)
+    with freeze_time(fake_now) as frozen:
+        entry.add_to_hass(hass)
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+
+        open_id = _entity_id_for(
+            hass, get_only_subentry_id(entry), "next_open"
+        )
+        assert dt_util.parse_datetime(hass.states.get(open_id).state) == (
+            datetime(2026, 4, 27, 12, 0, 0, tzinfo=timezone.utc)
+        )
+
+        trigger_time = fake_now + timedelta(seconds=60)
+        frozen.move_to(trigger_time)
+        async_fire_time_changed(hass, trigger_time)
+        await hass.async_block_till_done()
+
+        assert calls == []
+        assert dt_util.parse_datetime(hass.states.get(open_id).state) == (
+            datetime(2026, 4, 28, 12, 0, 0, tzinfo=timezone.utc)
+        )
