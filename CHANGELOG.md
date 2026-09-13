@@ -6,6 +6,31 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le pr
 
 ## [Non publié]
 
+## [0.9.26] — 2026-09-13
+
+### Corrigé — restauration des volets arrêtés à une position approchée
+
+À la sortie du mode soleil, un volet n'était remis à sa position
+d'origine que s'il signalait **exactement** la position cible
+appliquée ; sinon il était considéré comme déplacé à la main et
+laissé en place. Or beaucoup de volets motorisés s'arrêtent à un
+point ou deux de la valeur demandée (estimation au temps de course,
+arrondis, calibration) : un volet envoyé à 50 % qui s'arrête à 49 %
+**restait baissé toute la soirée**, sans que personne n'y ait touché.
+
+La même comparaison stricte affectait la détection des mouvements
+manuels : un volet arrêté à 49 % n'était jamais vu comme « arrivé à
+la cible », et un vrai mouvement manuel ultérieur à l'intérieur de la
+plage de trajet n'armait pas l'override.
+
+Une tolérance `POSITION_TOLERANCE_PCT = 3` s'applique désormais :
+
+- **restauration** : un volet à ±3 points de la cible est restauré ;
+- **détection manuelle** : un volet à ±3 points de la cible est
+  considéré comme arrivé ; seul un écart supérieur est un mouvement
+  manuel (les petites oscillations de position sont ignorées) ; la
+  plage de trajet est élargie de la même marge.
+
 ## [0.9.25] — 2026-09-13
 
 ### Corrigé — la protection solaire agit à l'expiration du debounce
