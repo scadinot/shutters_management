@@ -4,13 +4,15 @@ from __future__ import annotations
 from unittest.mock import patch
 
 from homeassistant.const import SERVICE_CLOSE_COVER, SERVICE_OPEN_COVER
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, ServiceCall
+from homeassistant.exceptions import HomeAssistantError
 from pytest_homeassistant_custom_component.common import async_mock_service
 
 from custom_components.shutters_management.const import (
     ACTION_CLOSE,
     ACTION_OPEN,
     CONF_COVERS,
+    CONF_NOTIFY_SERVICES,
     CONF_SEQUENTIAL_COVERS,
     DOMAIN,
 )
@@ -27,12 +29,13 @@ async def _setup(
     *,
     sequential: bool,
     covers: list[str] | None = None,
+    hub_data: dict | None = None,
 ):
     """Build a hub with sequential_covers set, return its only scheduler."""
     base_config[CONF_COVERS] = covers if covers is not None else list(COVERS)
     entry = build_hub_with_instance(
         instance_data=base_config,
-        hub_data={CONF_SEQUENTIAL_COVERS: sequential},
+        hub_data={CONF_SEQUENTIAL_COVERS: sequential, **(hub_data or {})},
     )
     entry.add_to_hass(hass)
     assert await hass.config_entries.async_setup(entry.entry_id)
@@ -313,3 +316,97 @@ async def test_sequential_immediate_pass_when_already_past_threshold(
 
     targeted = [call.data["entity_id"] for call in calls]
     assert targeted == COVERS
+
+
+def _register_failing_cover_service(
+    hass: HomeAssistant, service: str, failing: set[str]
+) -> list[str]:
+    """Register ``cover.<service>`` raising for ``failing`` entity ids.
+
+    Returns the list of targeted entity ids, in call order (failed calls
+    included).
+    """
+    targeted: list[str] = []
+
+    async def _handler(call: ServiceCall) -> None:
+        entity_id = call.data["entity_id"]
+        targeted.append(entity_id)
+        if entity_id in failing:
+            raise HomeAssistantError("Device communication error")
+
+    hass.services.async_register("cover", service, _handler)
+    return targeted
+
+
+async def test_sequential_mode_continues_after_cover_error(
+    hass: HomeAssistant, base_config
+) -> None:
+    """A cover whose service call raises doesn't abort the queue.
+
+    Reproduces a real-world failure: a device communication error on one
+    shutter used to propagate out of ``async_run_now`` and leave every
+    later cover in the shuffled order untouched.
+    """
+    targeted = _register_failing_cover_service(
+        hass, SERVICE_OPEN_COVER, {COVERS[1]}
+    )
+    _set_all(hass, COVERS, "open")
+
+    scheduler = await _setup(hass, base_config, sequential=True)
+    with patch(
+        "custom_components.shutters_management.random.shuffle",
+        side_effect=lambda seq: None,
+    ):
+        await scheduler.async_run_now(ACTION_OPEN)
+        await hass.async_block_till_done()
+
+    assert targeted == COVERS
+
+
+async def test_sequential_notification_skips_failed_cover(
+    hass: HomeAssistant, base_config
+) -> None:
+    """The notification still fires and lists only the actioned covers."""
+    notify_calls = async_mock_service(hass, "notify", "iphone")
+    _register_failing_cover_service(hass, SERVICE_CLOSE_COVER, {COVERS[1]})
+    _set_all(hass, COVERS, "closed")
+
+    scheduler = await _setup(
+        hass,
+        base_config,
+        sequential=True,
+        hub_data={CONF_NOTIFY_SERVICES: ["notify.iphone"]},
+    )
+    with patch(
+        "custom_components.shutters_management.random.shuffle",
+        side_effect=lambda seq: None,
+    ):
+        await scheduler.async_run_now(ACTION_CLOSE)
+        await hass.async_block_till_done()
+
+    assert len(notify_calls) == 1
+    lines = notify_calls[0].data["message"].split("\n")
+    assert lines[1:] == [COVERS[0], COVERS[2]]
+
+
+async def test_sequential_no_notification_when_every_cover_fails(
+    hass: HomeAssistant, base_config
+) -> None:
+    """No empty « Volets ouverts : » message when nothing was actioned."""
+    notify_calls = async_mock_service(hass, "notify", "iphone")
+    targeted = _register_failing_cover_service(
+        hass, SERVICE_OPEN_COVER, set(COVERS)
+    )
+    _set_all(hass, COVERS, "closed")
+
+    scheduler = await _setup(
+        hass,
+        base_config,
+        sequential=True,
+        hub_data={CONF_NOTIFY_SERVICES: ["notify.iphone"]},
+    )
+    await scheduler.async_run_now(ACTION_OPEN)
+    await hass.async_block_till_done()
+
+    assert sorted(targeted) == sorted(COVERS)
+    assert notify_calls == []

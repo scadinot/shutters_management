@@ -1729,7 +1729,10 @@ class ShuttersScheduler:
           stateless cover from blocking the queue indefinitely.
 
         In both modes, notifications fire **once** at the end (one
-        message for the whole batch, not one per cover).
+        message for the whole batch, not one per cover). In sequential
+        mode a cover whose service call fails is skipped and left out of
+        the notification; no notification is sent when every cover
+        failed.
         """
         covers = self._settings.get(CONF_COVERS, [])
         if not covers:
@@ -1740,12 +1743,12 @@ class ShuttersScheduler:
         )
 
         if sequential:
-            processed = list(covers)
-            random.shuffle(processed)
+            ordered = list(covers)
+            random.shuffle(ordered)
             _LOGGER.debug(
-                "Sequential cover.%s on %s (random order)", service, processed
+                "Sequential cover.%s on %s (random order)", service, ordered
             )
-            await self._async_call_sequential(service, processed)
+            processed = await self._async_call_sequential(service, ordered)
         else:
             processed = list(covers)
             await self.hass.services.async_call(
@@ -1763,21 +1766,30 @@ class ShuttersScheduler:
         if self.hass.data.get(DOMAIN, {}).get(self.subentry_id) is not self:
             return
 
-        await self._async_send_notifications(service, processed)
+        if processed:
+            await self._async_send_notifications(service, processed)
         async_dispatcher_send(self.hass, signal_state_update(self.subentry_id))
 
     async def _async_call_sequential(
         self, service: str, ordered: list[str]
-    ) -> None:
+    ) -> list[str]:
         """Run ``cover.<service>`` on each cover in the given order, in turn.
 
         ``ordered`` is the already-shuffled list; the caller owns the
-        shuffling so it can pass the same list down to the notification
-        hook (so the body lists covers in processing order).
+        shuffling. Returns the covers whose service call succeeded, in
+        processing order, so the notification body only lists covers
+        that were actually actioned.
+
+        A failing call (``HomeAssistantError`` such as a device
+        communication error, or any exception raised by the cover
+        driver) is logged and the queue moves on to the next cover: one
+        unreachable shutter must not leave the rest of the house
+        untouched.
         """
         target_state = (
             STATE_OPEN if service == SERVICE_OPEN_COVER else STATE_CLOSED
         )
+        actioned: list[str] = []
         for entity_id in ordered:
             # If the scheduler was unloaded mid-sequence (entry remove,
             # HA shutdown, ...), bail out cleanly.
@@ -1785,15 +1797,27 @@ class ShuttersScheduler:
                 _LOGGER.debug(
                     "Aborting sequential cover sequence: scheduler unloaded"
                 )
-                return
-            await self.hass.services.async_call(
-                "cover",
-                service,
-                {ATTR_ENTITY_ID: entity_id},
-                blocking=True,
-            )
+                return actioned
+            try:
+                await self.hass.services.async_call(
+                    "cover",
+                    service,
+                    {ATTR_ENTITY_ID: entity_id},
+                    blocking=True,
+                )
+            except Exception as err:  # noqa: BLE001 — never block the queue
+                _LOGGER.warning(
+                    "Failed to call cover.%s on %s: %s; "
+                    "continuing with the next cover",
+                    service,
+                    entity_id,
+                    err,
+                )
+                continue
             _LOGGER.info("Called cover.%s on %s", service, entity_id)
+            actioned.append(entity_id)
             await self._async_wait_for_cover_progress(entity_id, target_state)
+        return actioned
 
     async def _async_wait_for_cover_progress(
         self, entity_id: str, target_state: str
