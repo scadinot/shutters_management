@@ -122,6 +122,7 @@ from .const import (
     LUX_OPEN_DEBOUNCE_SEC,
     UV_OPEN_DEBOUNCE_SEC,
     DEBOUNCE_RECHECK_MARGIN_SEC,
+    POSITION_TOLERANCE_PCT,
     LUX_REOPEN,
     LUX_STANDARD,
     OVERRIDE_RESET_HOUR,
@@ -165,6 +166,21 @@ def _restored_positions(raw: Any) -> dict[str, int]:
     }
 
 
+def _position_matches(position: int | None, target: int | None) -> bool:
+    """Whether a reported cover position counts as being at ``target``.
+
+    Motorised covers rarely stop exactly on the requested percentage: a
+    cover sent to 50 % commonly reports 49 or 51. A strict comparison
+    made such a cover look manually moved, so it was never restored on
+    sun-mode exit and later real manual moves went undetected.
+    """
+    return (
+        position is not None
+        and target is not None
+        and abs(position - target) <= POSITION_TOLERANCE_PCT
+    )
+
+
 async def _async_restore_cover_positions(
     hass: HomeAssistant,
     snapshots: Mapping[str, int],
@@ -174,9 +190,10 @@ async def _async_restore_cover_positions(
 
     Iterates the snapshots rather than the configured covers, so a cover
     removed from the group while lowered is still restored. Covers moved
-    away from the applied target since (manual move) are left alone. A
-    failing call is logged and skipped so one unreachable cover doesn't
-    keep the others lowered. Returns the restored covers.
+    away from the applied target since (by more than
+    ``POSITION_TOLERANCE_PCT``: manual move) are left alone. A failing
+    call is logged and skipped so one unreachable cover doesn't keep the
+    others lowered. Returns the restored covers.
     """
     restored: list[str] = []
     for cover_id, snapshot in snapshots.items():
@@ -186,8 +203,8 @@ async def _async_restore_cover_positions(
             raw = state.attributes.get("current_position")
             if raw is not None:
                 current_pos = int(raw)
-        if current_pos is not None and current_pos != applied_positions.get(
-            cover_id
+        if current_pos is not None and not _position_matches(
+            current_pos, applied_positions.get(cover_id)
         ):
             continue
         try:
@@ -1675,12 +1692,17 @@ class ShuttersSunProtectionManager:
         "manual" if either:
 
         * the cover has already **settled at the applied target** (its
-          previous state had ``current_position == applied``) and now
-          changed — it could only change because the user pressed a
+          previous ``current_position`` was within
+          ``POSITION_TOLERANCE_PCT`` of ``applied``) and now moved beyond
+          that tolerance — it could only move because the user pressed a
           remote / app button, OR
-        * the new position lands **outside the transit range** (the
-          cover is e.g. opening past ``snapshot`` or closing past
-          ``applied``).
+        * the new position lands **outside the transit range**, widened
+          by the same tolerance (the cover is e.g. opening past
+          ``snapshot`` or closing past ``applied``).
+
+        The tolerance absorbs covers that stop a point or two away from
+        the requested percentage and the small jitter they report once
+        settled.
 
         In either case we arm the per-façade override until the next
         ``OVERRIDE_RESET_HOUR`` and exit sun mode without re-driving the
@@ -1711,17 +1733,19 @@ class ShuttersSunProtectionManager:
                 old_pos = int(raw_old)
 
         # Settled-at-target heuristic: if the cover was at the applied
-        # target and now isn't, it's a manual change.
-        settled_then_moved = (
-            applied is not None
-            and old_pos is not None
-            and old_pos == applied
-            and new_pos_int != applied
-        )
+        # target (within tolerance) and now clearly isn't, it's a manual
+        # change.
+        settled_then_moved = _position_matches(
+            old_pos, applied
+        ) and not _position_matches(new_pos_int, applied)
         out_of_transit = (
             applied is not None
             and snapshot is not None
-            and not (min(snapshot, applied) <= new_pos_int <= max(snapshot, applied))
+            and not (
+                min(snapshot, applied) - POSITION_TOLERANCE_PCT
+                <= new_pos_int
+                <= max(snapshot, applied) + POSITION_TOLERANCE_PCT
+            )
         )
 
         if not (settled_then_moved or out_of_transit):

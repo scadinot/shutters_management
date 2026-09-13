@@ -84,6 +84,13 @@ UV_OPEN_DEBOUNCE_SEC = 20 * 60    # 20 min sustained low / missing UV to reopen
 # so the evaluation it triggers sees the debounce as fully elapsed.
 DEBOUNCE_RECHECK_MARGIN_SEC = 1
 
+# --- Cover position tolerance (sun-mode restore / manual-move detection) ---
+# Motorised covers rarely stop exactly on the requested percentage
+# (travel-time estimation, rounding, calibration drift): a reported
+# position within this many points of the applied target counts as
+# "at the target".
+POSITION_TOLERANCE_PCT = 3
+
 # --- Override (manual move pauses the façade until next morning) ---
 OVERRIDE_RESET_HOUR = 4  # daily reset at 04:00 local time
 
