@@ -15,6 +15,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta
 from types import MappingProxyType
 from typing import Any
+from unittest.mock import patch
 
 from freezegun import freeze_time
 from homeassistant.config_entries import ConfigSubentryData
@@ -38,6 +39,7 @@ from custom_components.shutters_management.const import (
     CONF_TEMP_OUTDOOR_ENTITY,
     CONF_TYPE,
     CONF_UV_ENTITY,
+    DEBOUNCE_RECHECK_MARGIN_SEC,
     DEFAULT_ARC,
     DEFAULT_MIN_ELEVATION,
     DEFAULT_MIN_UV,
@@ -548,6 +550,108 @@ async def test_uv_unavailable_during_sun_mode_exits_after_debounce(
         await manager.async_evaluate()
 
     assert not manager.is_active
+
+
+# ---------------------------------------------------------------------------
+# Re-evaluation when a debounce expires (v0.9.25)
+# ---------------------------------------------------------------------------
+
+_CALL_LATER = "custom_components.shutters_management.async_call_later"
+
+
+async def test_close_debounce_reevaluates_at_expiry(hass: HomeAssistant) -> None:
+    """A close debounce reaching its term acts without any sensor update.
+
+    Before v0.9.25 the engine only re-evaluated on state changes: with a
+    steady lux reading the close waited for the next unrelated update.
+    """
+    cover_calls = async_mock_service(hass, "cover", "set_cover_position")
+    _set_sun(hass, azimuth=180, elevation=30)
+    _set_lux(hass, 80000)
+    _set_temp(hass, 26, "sensor.t_ext")
+
+    base = datetime(2026, 6, 15, 14, 0, tzinfo=dt_util.UTC)
+    with freeze_time(base) as frozen, patch(_CALL_LATER) as call_later:
+        entry = _build_hub_with_sun_protection(covers=["cover.living_room"])
+        subentry_id = await _setup(hass, entry)
+        manager = hass.data[DOMAIN][subentry_id]
+        assert manager.status == "pending_close"
+
+        _, delay, job = call_later.call_args.args
+        assert delay == LUX_CLOSE_DEBOUNCE_SEC + DEBOUNCE_RECHECK_MARGIN_SEC
+        assert cover_calls == []
+
+        # No sensor update: only the scheduled re-check runs.
+        frozen.tick(timedelta(seconds=delay))
+        await job.target(dt_util.utcnow())
+
+    assert manager.is_active
+    assert len(cover_calls) == 1
+
+
+async def test_uv_open_debounce_reevaluates_at_expiry(
+    hass: HomeAssistant,
+) -> None:
+    """A UV sensor that stays unavailable ends sun mode at the debounce
+    term, even though it never reports again."""
+    base = datetime(2026, 6, 15, 14, 0, tzinfo=dt_util.UTC)
+    with freeze_time(base) as frozen:
+        manager = await _enter_uv_only_sun_mode(hass)
+        restore_calls = async_mock_service(hass, "cover", "set_cover_position")
+
+        with patch(_CALL_LATER) as call_later:
+            hass.states.async_set("sensor.uv", "unavailable")
+            await manager.async_evaluate()
+            _, delay, job = call_later.call_args.args
+            assert delay == UV_OPEN_DEBOUNCE_SEC + DEBOUNCE_RECHECK_MARGIN_SEC
+
+            frozen.tick(timedelta(seconds=delay))
+            await job.target(dt_util.utcnow())
+
+    assert not manager.is_active
+    assert any(c.data.get("position") == 80 for c in restore_calls)
+
+
+async def test_debounce_check_cancelled_when_debounce_clears(
+    hass: HomeAssistant,
+) -> None:
+    async_mock_service(hass, "cover", "set_cover_position")
+    _set_sun(hass, azimuth=180, elevation=30)
+    _set_lux(hass, 80000)
+    _set_temp(hass, 26, "sensor.t_ext")
+
+    with patch(_CALL_LATER) as call_later:
+        entry = _build_hub_with_sun_protection(covers=["cover.living_room"])
+        subentry_id = await _setup(hass, entry)
+        manager = hass.data[DOMAIN][subentry_id]
+        assert manager.status == "pending_close"
+        scheduled = call_later.call_count
+        cancel = call_later.return_value
+
+        _set_lux(hass, 10000)  # below the close threshold
+        await manager.async_evaluate()
+
+    assert manager.status == "lux_too_low"
+    cancel.assert_called()
+    assert call_later.call_count == scheduled
+
+
+async def test_unload_cancels_debounce_check(hass: HomeAssistant) -> None:
+    async_mock_service(hass, "cover", "set_cover_position")
+    _set_sun(hass, azimuth=180, elevation=30)
+    _set_lux(hass, 80000)
+    _set_temp(hass, 26, "sensor.t_ext")
+
+    with patch(_CALL_LATER) as call_later:
+        entry = _build_hub_with_sun_protection(covers=["cover.living_room"])
+        subentry_id = await _setup(hass, entry)
+        assert hass.data[DOMAIN][subentry_id].status == "pending_close"
+        cancel = call_later.return_value
+
+        assert await hass.config_entries.async_unload(entry.entry_id)
+        await hass.async_block_till_done()
+
+    cancel.assert_called()
 
 
 async def test_indoor_unavailable_blocks_close(hass: HomeAssistant) -> None:

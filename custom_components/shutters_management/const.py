@@ -80,6 +80,9 @@ T_OUTDOOR_REOPEN = 22
 LUX_CLOSE_DEBOUNCE_SEC = 10 * 60  # 10 min sustained high lux to close
 LUX_OPEN_DEBOUNCE_SEC = 20 * 60   # 20 min sustained low lux to reopen
 UV_OPEN_DEBOUNCE_SEC = 20 * 60    # 20 min sustained low / missing UV to reopen
+# Margin added to the timer that re-evaluates when a debounce expires,
+# so the evaluation it triggers sees the debounce as fully elapsed.
+DEBOUNCE_RECHECK_MARGIN_SEC = 1
 
 # --- Override (manual move pauses the façade until next morning) ---
 OVERRIDE_RESET_HOUR = 4  # daily reset at 04:00 local time
