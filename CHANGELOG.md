@@ -6,6 +6,40 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le pr
 
 ## [Non publié]
 
+## [0.9.23] — 2026-09-13
+
+### Corrigé — un rechargement ne rouvre plus les volets en mode soleil
+
+Toute modification d'une sous-entrée recharge le hub. Au
+déchargement, chaque protection solaire quittait le mode soleil et
+**rouvrait ses volets**, qui se refermaient ~10 min plus tard après
+le debounce.
+
+Depuis la persistance de l'état (0.9.22), le mode soleil et les
+positions à restaurer survivent au rechargement : le manager recréé
+les reprend et les volets restent baissés. Les volets ne sont
+désormais restaurés que lorsque le groupe disparaît vraiment :
+
+- **sous-entrée supprimée** → restauration au déchargement ;
+- **intégration désactivée** → restauration au déchargement ;
+- **intégration supprimée** → restauration depuis l'état persisté
+  (`async_remove_entry`), puis suppression du document.
+
+### Corrigé — manager d'une sous-entrée supprimée laissé actif
+
+Le déchargement parcourait `entry.subentries`, qui ne contient déjà
+plus la sous-entrée supprimée au moment du rechargement : son
+planificateur / manager restait abonné et pouvait continuer à
+actionner les volets jusqu'au redémarrage de Home Assistant. Le
+déchargement parcourt désormais tous les managers du hub.
+
+### Modifié — restauration des positions
+
+La restauration parcourt les volets **mémorisés** (et non la liste
+configurée) : un volet retiré du groupe pendant le mode soleil est
+bien restauré. Un volet dont la commande échoue est journalisé en
+`WARNING` et n'empêche plus la restauration des autres.
+
 ## [0.9.22] — 2026-09-13
 
 ### Ajouté — l'état survit aux redémarrages de Home Assistant

@@ -40,6 +40,10 @@ class ShuttersStateStore:
             if isinstance(value, dict)
         }
 
+    def all(self) -> dict[str, dict[str, Any]]:
+        """Return a copy of every subentry's saved state."""
+        return {key: dict(value) for key, value in self._data.items()}
+
     def get(self, subentry_id: str) -> dict[str, Any]:
         """Return a copy of the state saved for ``subentry_id`` (empty if none)."""
         return dict(self._data.get(subentry_id, {}))
