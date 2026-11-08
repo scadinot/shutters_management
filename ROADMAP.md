@@ -15,8 +15,8 @@ utilisateurs.
 
 | Horizon | Objectif principal | Effort estimé |
 |---|---|---|
-| [Statut actuel](#statut-actuel) | Version courante v0.9.27 — voir CHANGELOG pour l'historique | livré |
-| [Court terme](#court-terme--dette-technique) | Découpage de `__init__.py`, chargement de la carte 3D, ciblage des services par sous-entrée | quelques jours par lot |
+| [Statut actuel](#statut-actuel) | Version courante v0.9.28 — voir CHANGELOG pour l'historique | livré |
+| [Court terme](#court-terme--dette-technique) | Découpage interne du moteur de protection solaire, chargement de la carte 3D, ciblage des services par sous-entrée | quelques jours par lot |
 | [Moyen terme](#moyen-terme--prochaines-versions) | Profils horaires, réglages avancés du décalage aléatoire | quelques jours par lot |
 | [Long terme](#long-terme--stabilisation-v100) | Groupes de volets, templates Jinja, statistiques d'exécution, API publique stabilisée | plusieurs semaines |
 | [Pistes exploratoires](#pistes-exploratoires) | Météo, jours fériés, réglages fins de la protection solaire, notifications avancées | à évaluer au cas par cas |
@@ -25,7 +25,7 @@ utilisateurs.
 
 ## Statut actuel
 
-La version courante est **v0.9.27**. Pour la liste des fonctionnalités
+La version courante est **v0.9.28**. Pour la liste des fonctionnalités
 déjà disponibles, voir la section [Fonctionnalités](README.md#fonctionnalités)
 du README. Pour l'historique détaillé des versions livrées, voir le
 [CHANGELOG.md](CHANGELOG.md).
@@ -58,6 +58,7 @@ Faits marquants depuis v0.7.1 :
 - **v0.9.26** — tolérance de ±3 points sur la position des volets
   (restauration et détection des mouvements manuels).
 - **v0.9.27** — seuils du panneau lus depuis `const.py`.
+- **v0.9.28** — découpage d'`__init__.py` en modules dédiés.
 
 Le présent document décrit uniquement les évolutions **à venir**.
 
@@ -65,24 +66,24 @@ Le présent document décrit uniquement les évolutions **à venir**.
 
 ## Court terme — dette technique
 
-### T1. Découpage de `__init__.py`
+### T1. Découpage interne de `ShuttersSunProtectionManager`
 
-**Motivation.** `__init__.py` dépasse 2 000 lignes et mélange des
-responsabilités indépendantes : migrations v2 → v8, notifications et
-TTS, services, planificateur, moteur de protection solaire,
-persistance et enregistrement du frontend. Les revues et les
-évolutions de la protection solaire en sont plus lentes, et chaque
-PR touche le même fichier.
+*Le découpage d'`__init__.py` est livré en v0.9.28 : le code est réparti en huit
+modules dédiés et `__init__.py` ne garde que le cycle de vie de l'entrée.*
 
-**Piste technique.** Déplacer le code sans changer le comportement
-dans des modules dédiés : `scheduler.py` (`ShuttersScheduler`),
-`sun_protection.py` (`ShuttersSunProtectionManager` et restauration
-des positions), `notifications.py`, `migrations.py`. `__init__.py` ne
-garde que le cycle de vie de l'entrée (setup, unload, remove,
-services). Attention aux tests qui patchent des symboles par leur
-chemin (`custom_components.shutters_management.random.shuffle`,
-`…async_call_later`) : ils devront viser le nouveau module, dans la
-même PR.
+**Motivation.** `sun_protection.py` fait environ 1 000 lignes, dont une classe
+de 785. Elle mêle le moteur de décision (seuils de lux, UV et température,
+hystérésis, anti-rebond, dérogation manuelle) et la commande des volets
+(descente, remontée, détection d'un mouvement manuel, restauration des
+positions mémorisées).
+
+**Piste technique.** Séparer la décision de la commande : un objet qui, à partir
+des capteurs et de l'état courant, répond « fermer / ouvrir / ne rien faire »,
+et un second qui exécute. Contrairement au découpage d'`__init__.py`, ce n'est
+pas un déplacement pur : la frontière entre les deux doit être inventée, et une
+erreur se traduirait par des volets qui bougent au mauvais moment. À traiter
+avec sa propre spec et sa propre campagne de vérification en conditions
+réelles, un jour chaud et ensoleillé.
 
 ### T2. Chargement de la carte 3D à la demande
 
