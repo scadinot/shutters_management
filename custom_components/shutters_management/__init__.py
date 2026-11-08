@@ -19,8 +19,6 @@ from homeassistant.const import (
     SERVICE_OPEN_COVER,
     STATE_CLOSED,
     STATE_OPEN,
-    STATE_UNAVAILABLE,
-    STATE_UNKNOWN,
     SUN_EVENT_SUNRISE,
     SUN_EVENT_SUNSET,
 )
@@ -46,12 +44,12 @@ from homeassistant.helpers.sun import get_astral_event_next
 from homeassistant.util import dt as dt_util
 
 from .panel import async_register_panel, async_unregister_panel
+from .presence import _is_away_for
 from .state_store import ShuttersStateStore
 from .const import (
     ACTION_CLOSE,
     ACTION_OPEN,
     ATTR_ACTION,
-    AWAY_STATES,
     CONF_CLOSE_MODE,
     CONF_CLOSE_OFFSET,
     CONF_CLOSE_TIME,
@@ -333,50 +331,6 @@ def _next_datetime_for(
 def _strip_name(data: dict[str, Any]) -> dict[str, Any]:
     """Drop CONF_NAME from a payload destined to ``ConfigSubentry.data``."""
     return {k: v for k, v in data.items() if k != CONF_NAME}
-
-
-def _is_away_for(hass: HomeAssistant, hub_data: Mapping[str, Any]) -> bool:
-    """Return True when every configured presence entity reports away.
-
-    The hub stores ``presence_entity`` as a list of person/group entity
-    ids since v0.7.1. We treat the household as away when every listed
-    entity reports an away state. Entities whose state is unavailable
-    are skipped (logged at warning); if every configured entity is
-    unavailable we fall back to scanning ``person.*``. With no
-    configured list and no ``person.*`` entities the function assumes
-    away — the safest default for callers like the presence simulation
-    where running is preferred to skipping.
-    """
-    raw = hub_data.get(CONF_PRESENCE_ENTITY) or []
-    entity_ids = [raw] if isinstance(raw, str) else list(raw)
-    entity_ids = [e for e in entity_ids if e]
-    if entity_ids:
-        usable_states = []
-        for entity_id in entity_ids:
-            state = hass.states.get(entity_id)
-            if state is None or state.state in (
-                STATE_UNAVAILABLE,
-                STATE_UNKNOWN,
-            ):
-                _LOGGER.warning(
-                    "Presence entity %s is unavailable", entity_id
-                )
-                continue
-            usable_states.append(state)
-        if usable_states:
-            return all(s.state in AWAY_STATES for s in usable_states)
-        _LOGGER.warning(
-            "All configured presence entities are unavailable; "
-            "falling back to person.* scan"
-        )
-    persons = hass.states.async_all("person")
-    if not persons:
-        _LOGGER.warning(
-            "Presence-aware mode requested but no presence entity is "
-            "configured and no person.* exists; assuming away"
-        )
-        return True
-    return all(p.state in AWAY_STATES for p in persons)
 
 
 async def _async_dispatch_notifications(
