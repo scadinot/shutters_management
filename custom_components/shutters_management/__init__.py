@@ -3,13 +3,10 @@ from __future__ import annotations
 
 import logging
 
-import voluptuous as vol
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import (
     HomeAssistant,
-    ServiceCall,
-    callback,
 )
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import device_registry as dr
@@ -17,6 +14,7 @@ from homeassistant.helpers import device_registry as dr
 from .migrations import _async_migrate_legacy_entries, async_migrate_entry
 from .panel import async_register_panel, async_unregister_panel
 from .scheduler import ShuttersScheduler
+from .services import _async_register_services, _async_unregister_services
 from .sun_protection import (
     ShuttersSunProtectionManager,
     _async_restore_cover_positions,
@@ -24,15 +22,9 @@ from .sun_protection import (
 )
 from .state_store import ShuttersStateStore
 from .const import (
-    ACTION_CLOSE,
-    ACTION_OPEN,
-    ATTR_ACTION,
     CONF_TYPE,
     DOMAIN,
     PLATFORMS,
-    SERVICE_PAUSE,
-    SERVICE_RESUME,
-    SERVICE_RUN_NOW,
     SUBENTRY_TYPE_INSTANCE,
     SUBENTRY_TYPE_PRESENCE_SIM,
     SUBENTRY_TYPE_SUN_PROTECTION,
@@ -64,11 +56,6 @@ _STATE_STORE_KEY = f"{DOMAIN}_state_store"
 
 
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
-
-RUN_NOW_SCHEMA = vol.Schema(
-    {vol.Required(ATTR_ACTION): vol.In([ACTION_OPEN, ACTION_CLOSE])}
-)
-
 
 async def async_setup(hass: HomeAssistant, config: dict) -> bool:
     """Set up the integration (YAML not supported).
@@ -280,44 +267,3 @@ async def _async_register_frontend_resources(hass: HomeAssistant) -> None:
     hass.data.setdefault(DATA_EXTRA_MODULE_URL, set())
     add_extra_js_url(hass, _CARD_URL)
     hass.data[_FRONTEND_REGISTERED_FLAG] = True
-
-
-@callback
-def _async_register_services(hass: HomeAssistant) -> None:
-    """Register integration-level services (idempotent)."""
-    if hass.services.has_service(DOMAIN, SERVICE_RUN_NOW):
-        return
-
-    def _schedulers() -> list[ShuttersScheduler]:
-        return [
-            m
-            for m in hass.data.get(DOMAIN, {}).values()
-            if isinstance(m, ShuttersScheduler)
-        ]
-
-    async def _handle_run_now(call: ServiceCall) -> None:
-        action = call.data[ATTR_ACTION]
-        for scheduler in _schedulers():
-            await scheduler.async_run_now(action)
-
-    async def _handle_pause(call: ServiceCall) -> None:
-        for scheduler in _schedulers():
-            await scheduler.async_set_paused(True)
-
-    async def _handle_resume(call: ServiceCall) -> None:
-        for scheduler in _schedulers():
-            await scheduler.async_set_paused(False)
-
-    hass.services.async_register(
-        DOMAIN, SERVICE_RUN_NOW, _handle_run_now, schema=RUN_NOW_SCHEMA
-    )
-    hass.services.async_register(DOMAIN, SERVICE_PAUSE, _handle_pause)
-    hass.services.async_register(DOMAIN, SERVICE_RESUME, _handle_resume)
-
-
-@callback
-def _async_unregister_services(hass: HomeAssistant) -> None:
-    """Remove integration-level services."""
-    for service in (SERVICE_RUN_NOW, SERVICE_PAUSE, SERVICE_RESUME):
-        if hass.services.has_service(DOMAIN, service):
-            hass.services.async_remove(DOMAIN, service)
