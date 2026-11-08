@@ -8,7 +8,7 @@ be undone at runtime.
 """
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from homeassistant.core import HomeAssistant
 
@@ -23,11 +23,13 @@ async def test_frontend_resources_are_registered_once(
     hass: HomeAssistant,
 ) -> None:
     """A second call must return on the flag without registering again."""
-    with patch(
-        "homeassistant.components.frontend.add_extra_js_url"
-    ) as add_js, patch.object(
-        hass.http, "async_register_static_paths", AsyncMock()
-    ) as static_paths:
+    # `hass.http` is None on a bare hass: the http component is pulled in as a
+    # manifest dependency when the hub entry is set up, which this test does not
+    # do -- it drives the helper directly so the flag is the only thing at play.
+    hass.http = MagicMock(async_register_static_paths=AsyncMock())
+    static_paths = hass.http.async_register_static_paths
+
+    with patch("homeassistant.components.frontend.add_extra_js_url") as add_js:
         await _async_register_frontend_resources(hass)
         assert hass.data[_FRONTEND_REGISTERED_FLAG] is True
 
