@@ -556,7 +556,7 @@ async def test_uv_unavailable_during_sun_mode_exits_after_debounce(
 # Re-evaluation when a debounce expires (v0.9.25)
 # ---------------------------------------------------------------------------
 
-_CALL_LATER = "custom_components.shutters_management.async_call_later"
+_CALL_LATER = "custom_components.shutters_management.sun_protection.async_call_later"
 
 
 async def test_close_debounce_reevaluates_at_expiry(hass: HomeAssistant) -> None:
