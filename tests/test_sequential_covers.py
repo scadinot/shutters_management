@@ -101,7 +101,7 @@ async def test_sequential_mode_uses_random_shuffle(
 
     scheduler = await _setup(hass, base_config, sequential=True)
     with patch(
-        "custom_components.shutters_management.random.shuffle",
+        "custom_components.shutters_management.scheduler.random.shuffle",
         side_effect=_reverse,
     ) as mock_shuffle:
         await scheduler.async_run_now(ACTION_OPEN)
@@ -133,7 +133,7 @@ async def test_sequential_mode_waits_for_target_state(
 
     scheduler = await _setup(hass, base_config, sequential=True)
     with patch(
-        "custom_components.shutters_management.random.shuffle",
+        "custom_components.shutters_management.scheduler.random.shuffle",
         side_effect=lambda seq: None,  # keep insertion order
     ):
         task = hass.async_create_task(scheduler.async_run_now(ACTION_OPEN))
@@ -172,10 +172,10 @@ async def test_sequential_mode_continues_past_timeout(
 
     scheduler = await _setup(hass, base_config, sequential=True)
     with patch(
-        "custom_components.shutters_management.random.shuffle",
+        "custom_components.shutters_management.scheduler.random.shuffle",
         side_effect=lambda seq: None,
     ), patch(
-        "custom_components.shutters_management.COVER_ACTION_TIMEOUT_SECONDS",
+        "custom_components.shutters_management.scheduler.COVER_ACTION_TIMEOUT_SECONDS",
         0.05,
     ):
         await scheduler.async_run_now(ACTION_OPEN)
@@ -222,7 +222,7 @@ async def test_sequential_advances_at_50_percent_when_opening(
 
     scheduler = await _setup(hass, base_config, sequential=True)
     with patch(
-        "custom_components.shutters_management.random.shuffle",
+        "custom_components.shutters_management.scheduler.random.shuffle",
         side_effect=lambda seq: None,
     ):
         task = hass.async_create_task(scheduler.async_run_now(ACTION_OPEN))
@@ -264,7 +264,7 @@ async def test_sequential_advances_at_50_percent_when_closing(
 
     scheduler = await _setup(hass, base_config, sequential=True)
     with patch(
-        "custom_components.shutters_management.random.shuffle",
+        "custom_components.shutters_management.scheduler.random.shuffle",
         side_effect=lambda seq: None,
     ):
         task = hass.async_create_task(scheduler.async_run_now(ACTION_CLOSE))
@@ -308,7 +308,7 @@ async def test_sequential_immediate_pass_when_already_past_threshold(
 
     scheduler = await _setup(hass, base_config, sequential=True)
     with patch(
-        "custom_components.shutters_management.random.shuffle",
+        "custom_components.shutters_management.scheduler.random.shuffle",
         side_effect=lambda seq: None,
     ):
         await scheduler.async_run_now(ACTION_OPEN)
@@ -354,7 +354,7 @@ async def test_sequential_mode_continues_after_cover_error(
 
     scheduler = await _setup(hass, base_config, sequential=True)
     with patch(
-        "custom_components.shutters_management.random.shuffle",
+        "custom_components.shutters_management.scheduler.random.shuffle",
         side_effect=lambda seq: None,
     ):
         await scheduler.async_run_now(ACTION_OPEN)
@@ -378,7 +378,7 @@ async def test_sequential_notification_skips_failed_cover(
         hub_data={CONF_NOTIFY_SERVICES: ["notify.iphone"]},
     )
     with patch(
-        "custom_components.shutters_management.random.shuffle",
+        "custom_components.shutters_management.scheduler.random.shuffle",
         side_effect=lambda seq: None,
     ):
         await scheduler.async_run_now(ACTION_CLOSE)

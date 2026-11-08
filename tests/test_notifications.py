@@ -153,7 +153,7 @@ async def test_notification_lists_covers_in_processing_order(
     from unittest.mock import patch
 
     with patch(
-        "custom_components.shutters_management.random.shuffle",
+        "custom_components.shutters_management.scheduler.random.shuffle",
         side_effect=lambda seq: seq.reverse(),
     ):
         await scheduler.async_run_now(ACTION_OPEN)

@@ -73,7 +73,7 @@ async def test_sunrise_mode_uses_get_astral_event_next(
     subentry_id = get_only_subentry_id(entry)
     scheduler = hass.data[DOMAIN][subentry_id]
     with patch(
-        "custom_components.shutters_management.get_astral_event_next",
+        "custom_components.shutters_management.scheduler.get_astral_event_next",
         return_value=fake_sunrise,
     ) as mock_next:
         result = scheduler.next_open()
@@ -98,7 +98,7 @@ async def test_sunset_offset_negative(
     subentry_id = get_only_subentry_id(entry)
     scheduler = hass.data[DOMAIN][subentry_id]
     with patch(
-        "custom_components.shutters_management.get_astral_event_next",
+        "custom_components.shutters_management.scheduler.get_astral_event_next",
         return_value=fake_sunset,
     ) as mock_next:
         result = scheduler.next_close()
@@ -134,7 +134,7 @@ async def test_sun_handler_filters_inactive_days(
     sun = datetime(2026, 5, 3, 6, 0, 0, tzinfo=timezone.utc)
     mon = datetime(2026, 5, 4, 6, 0, 0, tzinfo=timezone.utc)
     with patch(
-        "custom_components.shutters_management.get_astral_event_next",
+        "custom_components.shutters_management.scheduler.get_astral_event_next",
         side_effect=[sat, sun, mon],
     ) as mock_next:
         result = scheduler.next_open()
@@ -173,11 +173,11 @@ async def test_none_open_mode_registers_no_trigger(
     entry = _build_entry(open_mode=MODE_NONE, close_mode=MODE_FIXED)
     entry.add_to_hass(hass)
     with patch(
-        "custom_components.shutters_management.async_track_time_change"
+        "custom_components.shutters_management.scheduler.async_track_time_change"
     ) as mock_time, patch(
-        "custom_components.shutters_management.async_track_sunrise"
+        "custom_components.shutters_management.scheduler.async_track_sunrise"
     ) as mock_rise, patch(
-        "custom_components.shutters_management.async_track_sunset"
+        "custom_components.shutters_management.scheduler.async_track_sunset"
     ) as mock_set:
         assert await hass.config_entries.async_setup(entry.entry_id)
         await hass.async_block_till_done()

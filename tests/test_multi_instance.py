@@ -129,7 +129,7 @@ async def test_signal_is_scoped_per_subentry(
     expected_signal = signal_state_update(subentry_id)
 
     with patch(
-        "custom_components.shutters_management.async_dispatcher_send"
+        "custom_components.shutters_management.scheduler.async_dispatcher_send"
     ) as mock_dispatch:
         await scheduler.async_set_paused(True)
 

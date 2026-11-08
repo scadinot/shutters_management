@@ -1,6 +1,7 @@
 """Tests for the ShuttersScheduler core logic."""
 from __future__ import annotations
 
+import logging
 from datetime import datetime, timedelta, timezone
 
 from freezegun import freeze_time
@@ -286,3 +287,25 @@ async def test_run_now_service_skips_sun_protection_subentries(
 
     assert len(cover_calls) == 1
     assert cover_calls[0].data["entity_id"] == ["cover.living_room"]
+
+
+async def test_scheduler_logs_carry_the_submodule_logger_name(
+    hass: HomeAssistant, setup_integration, caplog
+) -> None:
+    """Scheduler log records carry the submodule logger name after the split.
+
+    Consequence of moving ShuttersScheduler out of the package root: records
+    that used to be emitted under `custom_components.shutters_management` now
+    name the submodule. Users' `logger:` configuration still applies, child
+    loggers inheriting from the parent, but the name in the journal changes --
+    so it is pinned here rather than left to drift unnoticed.
+    """
+    scheduler: ShuttersScheduler = setup_integration
+    caplog.clear()
+    with caplog.at_level(logging.INFO):
+        await scheduler.async_set_paused(True)
+
+    names = {record.name for record in caplog.records}
+    assert any(
+        name.endswith("shutters_management.scheduler") for name in names
+    ), names
