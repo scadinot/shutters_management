@@ -118,3 +118,34 @@ async def test_service_run_now_close(
             DOMAIN, SERVICE_RUN_NOW, {ATTR_ACTION: ACTION_CLOSE}, blocking=True
         )
         mock_run_now.assert_awaited_once_with(ACTION_CLOSE)
+
+
+async def test_services_survive_two_consecutive_reloads(
+    hass: HomeAssistant, setup_integration, mock_config_entry: MockConfigEntry
+) -> None:
+    """run_now still reaches the current schedulers after two reloads.
+
+    Services are registered once per setup and removed on unload, and the
+    handlers close over `hass.data[DOMAIN]` rather than over a list captured at
+    registration time. A reload replaces every scheduler instance, so a handler
+    holding a stale list would silently drive objects nobody listens to.
+    """
+    for _ in range(2):
+        assert await hass.config_entries.async_reload(
+            mock_config_entry.entry_id
+        )
+        await hass.async_block_till_done()
+
+    assert hass.services.has_service(DOMAIN, SERVICE_RUN_NOW)
+    assert hass.services.has_service(DOMAIN, SERVICE_PAUSE)
+    assert hass.services.has_service(DOMAIN, SERVICE_RESUME)
+
+    subentry_id = get_only_subentry_id(mock_config_entry)
+    current = hass.data[DOMAIN][subentry_id]
+    assert current is not setup_integration
+
+    with patch.object(current, "async_run_now", AsyncMock()) as mock_run_now:
+        await hass.services.async_call(
+            DOMAIN, SERVICE_RUN_NOW, {ATTR_ACTION: ACTION_OPEN}, blocking=True
+        )
+        mock_run_now.assert_awaited_once_with(ACTION_OPEN)
