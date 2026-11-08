@@ -609,9 +609,8 @@ Structure du dépôt :
 shutters_management/
 ├── custom_components/
 │   └── shutters_management/
-│       ├── __init__.py        # scheduler + sun-protection manager
-│       │                      #   + dispatcher notifications/TTS
-│       │                      #   + chaîne de migration v2 → v8
+│       ├── __init__.py        # cycle de vie de l'entrée (setup, unload,
+│       │                      #   remove) et ré-exports du paquet
 │       ├── binary_sensor.py   # sun_protection_active + sun_facing
 │       ├── brand/             # assets de marque (HA ≥ 2026.3)
 │       │   ├── icon.png       # 256×256
@@ -621,21 +620,34 @@ shutters_management/
 │       ├── button.py          # boutons « tester ouverture/fermeture »
 │       ├── config_flow.py     # hub flow + 3 subentry flows
 │       ├── const.py           # constantes (modes, défauts, schéma)
+│       ├── frontend/          # JS de la carte 3D + three.js
+│       ├── frontend.py        # ressources statiques et carte 3D
 │       ├── icons.json
 │       ├── manifest.json
+│       ├── migrations.py      # montée de version des données (v2 → v8)
+│       ├── notifications.py   # push et annonces vocales
+│       ├── panel.py           # panneau Lovelace généré
+│       ├── presence.py        # présence du foyer
+│       ├── scheduler.py       # planification et exécution sur les volets
 │       ├── sensor.py          # next_open / next_close +
 │       │                      #   14 sensors diagnostic Sun Protection
+│       ├── services.py        # services run_now / pause / resume
 │       ├── state_store.py     # état persisté (pause, switch, mode soleil)
 │       ├── strings.json
+│       ├── sun_protection.py  # moteur de protection solaire
 │       ├── switch.py          # simulation_active + sun_protection
 │       └── translations/
 │           ├── en.json
 │           └── fr.json
+├── scripts/                   # outillage de developpement
+│   └── check_imports.py       # charge tous les modules du paquet
 ├── tests/                     # suite pytest
 │   ├── conftest.py
 │   ├── test_config_flow.py
+│   ├── test_frontend.py
 │   ├── test_migration.py
 │   ├── test_notifications.py
+│   ├── test_presence.py
 │   ├── test_scheduler.py
 │   ├── test_sun_protection.py
 │   ├── test_sun_protection_entities.py

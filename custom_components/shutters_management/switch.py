@@ -10,7 +10,8 @@ from homeassistant.helpers.device_registry import DeviceEntryType, DeviceInfo
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from . import ShuttersScheduler, ShuttersSunProtectionManager
+from .scheduler import ShuttersScheduler
+from .sun_protection import ShuttersSunProtectionManager
 from .const import (
     DOMAIN,
     SUBENTRY_TYPE_INSTANCE,

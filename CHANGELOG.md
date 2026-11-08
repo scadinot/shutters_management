@@ -6,6 +6,32 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le pr
 
 ## [Non publié]
 
+## [0.9.28] — 2026-11-08
+
+### Modifié — découpage interne, aucun changement de comportement
+
+`__init__.py` faisait 2 278 lignes et mélangeait sept responsabilités : le
+planificateur, le moteur de protection solaire, les notifications et le TTS, la
+chaîne de migration v2 → v8, les services, l'enregistrement du frontend et le
+cycle de vie de l'entrée. Chaque évolution touchait ce même fichier.
+
+Le code est désormais réparti en huit modules dédiés — `scheduler.py`,
+`sun_protection.py`, `notifications.py`, `presence.py`, `migrations.py`,
+`services.py`, `frontend.py` — `__init__.py` ne gardant que le cycle de vie de
+l'entrée, soit 233 lignes. Les imports ne vont que vers le bas d'un graphe sans
+cycle : aucun module métier ne remonte vers `__init__.py`.
+
+Il s'agit d'un **déplacement pur** : mêmes entités, mêmes services, mêmes
+messages, même état persisté, mêmes seuils de décision. Aucune action n'est
+requise à la mise à jour.
+
+Une seule conséquence est visible, dans les journaux : les lignes de log portent
+maintenant le nom du sous-module qui les émet
+(`custom_components.shutters_management.scheduler` plutôt que
+`custom_components.shutters_management`), ce qui indique directement quel
+sous-système a parlé. Une configuration `logger:` existante reste valable, les
+loggers enfants héritant du parent.
+
 ## [0.9.27] — 2026-09-13
 
 ### Corrigé — seuils du panneau synchronisés avec `const.py`
