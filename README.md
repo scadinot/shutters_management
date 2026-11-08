@@ -631,6 +631,8 @@ shutters_management/
 │       └── translations/
 │           ├── en.json
 │           └── fr.json
+├── scripts/                   # outillage de developpement
+│   └── check_imports.py       # charge tous les modules du paquet
 ├── tests/                     # suite pytest
 │   ├── conftest.py
 │   ├── test_config_flow.py
