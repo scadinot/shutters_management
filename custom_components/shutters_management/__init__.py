@@ -11,6 +11,7 @@ from homeassistant.core import (
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import device_registry as dr
 
+from .frontend import _async_register_frontend_resources
 from .migrations import _async_migrate_legacy_entries, async_migrate_entry
 from .panel import async_register_panel, async_unregister_panel
 from .scheduler import ShuttersScheduler
@@ -230,40 +231,3 @@ async def _async_update_listener(hass: HomeAssistant, entry: ConfigEntry) -> Non
         async_register_panel(hass, entry)
         return
     await hass.config_entries.async_reload(entry.entry_id)
-
-
-_FRONTEND_DIR = "frontend"
-_FRONTEND_URL = f"/{DOMAIN}_frontend"
-_CARD_URL = f"{_FRONTEND_URL}/shutters-sun-3d-card.js"
-_FRONTEND_REGISTERED_FLAG = f"{DOMAIN}_frontend_registered"
-
-
-async def _async_register_frontend_resources(hass: HomeAssistant) -> None:
-    """Serve the custom Lovelace card and register it as a frontend module.
-
-    Idempotent across reloads of the integration: a flag in
-    ``hass.data`` guards a second registration attempt. Removing
-    static paths or extra JS modules requires a HA restart, which is
-    acceptable for a ``single_config_entry`` integration.
-
-    Defensive against test harnesses where the ``frontend`` component
-    is not fully set up: ``DATA_EXTRA_MODULE_URL`` is initialized via
-    ``setdefault`` so ``add_extra_js_url`` does not KeyError.
-    """
-    if hass.data.get(_FRONTEND_REGISTERED_FLAG):
-        return
-    from pathlib import Path
-
-    from homeassistant.components.frontend import (
-        DATA_EXTRA_MODULE_URL,
-        add_extra_js_url,
-    )
-    from homeassistant.components.http import StaticPathConfig
-
-    frontend_path = Path(__file__).parent / _FRONTEND_DIR
-    await hass.http.async_register_static_paths(
-        [StaticPathConfig(_FRONTEND_URL, str(frontend_path), False)]
-    )
-    hass.data.setdefault(DATA_EXTRA_MODULE_URL, set())
-    add_extra_js_url(hass, _CARD_URL)
-    hass.data[_FRONTEND_REGISTERED_FLAG] = True
