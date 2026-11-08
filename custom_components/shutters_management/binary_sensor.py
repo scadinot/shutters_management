@@ -16,7 +16,7 @@ from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from . import ShuttersSunProtectionManager
+from .sun_protection import ShuttersSunProtectionManager
 from .const import DOMAIN, SUBENTRY_TYPE_SUN_PROTECTION, signal_state_update
 from .entities import _build_entity_id
 

@@ -36,7 +36,8 @@ from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.event import async_track_time_interval
 
-from . import ShuttersScheduler, ShuttersSunProtectionManager
+from .scheduler import ShuttersScheduler
+from .sun_protection import ShuttersSunProtectionManager
 from .const import (
     DEFAULT_MIN_ELEVATION,
     DEFAULT_MIN_UV,
