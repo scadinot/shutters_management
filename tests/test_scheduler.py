@@ -6,7 +6,11 @@ from datetime import datetime, timedelta, timezone
 
 from freezegun import freeze_time
 from homeassistant.config_entries import ConfigSubentryData
-from homeassistant.const import SERVICE_CLOSE_COVER, SERVICE_OPEN_COVER
+from homeassistant.const import (
+    SERVICE_CLOSE_COVER,
+    SERVICE_OPEN_COVER,
+    STATE_UNKNOWN,
+)
 from homeassistant.core import HomeAssistant
 from homeassistant.util import dt as dt_util
 from pytest_homeassistant_custom_component.common import (
@@ -166,6 +170,34 @@ async def test_only_when_away_runs_when_away(
 ) -> None:
     """only_when_away with a 'not_home' presence entity must fire the open trigger."""
     hass.states.async_set("person.someone", "not_home")
+    calls = async_mock_service(hass, "cover", SERVICE_OPEN_COVER)
+
+    fake_now = datetime(2026, 4, 27, 11, 59, 0, tzinfo=timezone.utc)
+    with freeze_time(fake_now):
+        await _setup_with_open_at_noon(
+            hass,
+            base_config,
+            only_when_away=True,
+            presence_entity="person.someone",
+        )
+        async_fire_time_changed(hass, fake_now + timedelta(seconds=61))
+        await hass.async_block_till_done()
+
+    assert len(calls) == 1
+    assert calls[0].data["entity_id"] == ["cover.living_room"]
+
+
+async def test_only_when_away_runs_when_the_presence_entity_is_unknown(
+    hass: HomeAssistant, base_config
+) -> None:
+    """An 'unknown' presence entity must not keep the shutters shut.
+
+    The production symptom: ``person.*`` reports ``unknown`` (a restart
+    before the device tracker reports, a companion app that dropped its
+    tracker), the ``person.*`` fallback hands back that same unusable
+    entity, and the scheduled opening is skipped for the whole day.
+    """
+    hass.states.async_set("person.someone", STATE_UNKNOWN)
     calls = async_mock_service(hass, "cover", SERVICE_OPEN_COVER)
 
     fake_now = datetime(2026, 4, 27, 11, 59, 0, tzinfo=timezone.utc)

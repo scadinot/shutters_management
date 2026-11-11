@@ -24,12 +24,18 @@ def _is_away_for(hass: HomeAssistant, hub_data: Mapping[str, Any]) -> bool:
 
     The hub stores ``presence_entity`` as a list of person/group entity
     ids since v0.7.1. We treat the household as away when every listed
-    entity reports an away state. Entities whose state is unavailable
-    are skipped (logged at warning); if every configured entity is
-    unavailable we fall back to scanning ``person.*``. With no
-    configured list and no ``person.*`` entities the function assumes
-    away — the safest default for callers like the presence simulation
-    where running is preferred to skipping.
+    entity reports an away state. Entities whose state is unknown or
+    unavailable are skipped (logged at warning); if every configured
+    entity is unusable we fall back to scanning ``person.*``, skipping
+    unusable entities there too. When no usable source remains at all
+    the function assumes away — the safest default for callers like the
+    presence simulation where running is preferred to skipping.
+
+    Filtering the fallback matters because the configured list is
+    usually made of ``person.*`` entities: scanning the domain hands
+    back the very entities just rejected, and an ``unknown`` state is
+    not in :data:`AWAY_STATES`, so the household read as *home* and a
+    schedule gated on ``only_when_away`` stayed put for the whole day.
     """
     raw = hub_data.get(CONF_PRESENCE_ENTITY) or []
     entity_ids = [raw] if isinstance(raw, str) else list(raw)
@@ -53,11 +59,16 @@ def _is_away_for(hass: HomeAssistant, hub_data: Mapping[str, Any]) -> bool:
             "All configured presence entities are unavailable; "
             "falling back to person.* scan"
         )
-    persons = hass.states.async_all("person")
+    persons = [
+        state
+        for state in hass.states.async_all("person")
+        if state.state not in (STATE_UNAVAILABLE, STATE_UNKNOWN)
+    ]
     if not persons:
         _LOGGER.warning(
-            "Presence-aware mode requested but no presence entity is "
-            "configured and no person.* exists; assuming away"
+            "Presence-aware mode requested but no usable presence source "
+            "is available (no configured entity reporting a known state "
+            "and no person.* either); assuming away"
         )
         return True
     return all(p.state in AWAY_STATES for p in persons)

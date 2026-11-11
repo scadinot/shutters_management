@@ -6,6 +6,25 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le pr
 
 ## [Non publié]
 
+### Corrigé — présence : plus de blocage quand aucune source n'est fiable
+
+Quand toutes les entités de présence configurées passaient à `unknown` ou
+`unavailable` — un redémarrage avant que le suivi de position ne remonte, une
+application compagnon qui décroche — le repli rescannait le domaine `person.*`
+et récupérait **les mêmes entités**, celles qui venaient d'être écartées.
+`unknown` ne faisant pas partie des états d'absence, la fonction concluait
+« quelqu'un est à la maison ».
+
+Conséquence pour une planification en « seulement quand absent » : l'ouverture
+et la fermeture programmées étaient sautées et les volets restaient fermés toute
+la journée. Les notifications partaient aussi sur le mauvais canal — une annonce
+vocale dans une maison supposée vide, et pas de notification push.
+
+Le scan `person.*` écarte désormais les états inutilisables, comme le fait déjà
+la liste configurée. Quand il ne reste aucune source exploitable, la fonction
+applique le défaut qui était déjà documenté : considérer la maison vide, donc
+exécuter la planification plutôt que la sauter.
+
 ## [0.9.28] — 2026-11-08
 
 ### Modifié — découpage interne, aucun changement de comportement
