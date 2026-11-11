@@ -15,7 +15,7 @@ utilisateurs.
 
 | Horizon | Objectif principal | Effort estimé |
 |---|---|---|
-| [Statut actuel](#statut-actuel) | Version courante v0.9.28 — voir CHANGELOG pour l'historique | livré |
+| [Statut actuel](#statut-actuel) | Version courante v0.9.29 — voir CHANGELOG pour l'historique | livré |
 | [Court terme](#court-terme--dette-technique) | Découpage interne du moteur de protection solaire, chargement de la carte 3D, ciblage des services par sous-entrée | quelques jours par lot |
 | [Moyen terme](#moyen-terme--prochaines-versions) | Profils horaires, réglages avancés du décalage aléatoire | quelques jours par lot |
 | [Long terme](#long-terme--stabilisation-v100) | Groupes de volets, templates Jinja, statistiques d'exécution, API publique stabilisée | plusieurs semaines |
@@ -25,7 +25,7 @@ utilisateurs.
 
 ## Statut actuel
 
-La version courante est **v0.9.28**. Pour la liste des fonctionnalités
+La version courante est **v0.9.29**. Pour la liste des fonctionnalités
 déjà disponibles, voir la section [Fonctionnalités](README.md#fonctionnalités)
 du README. Pour l'historique détaillé des versions livrées, voir le
 [CHANGELOG.md](CHANGELOG.md).
@@ -59,6 +59,9 @@ Faits marquants depuis v0.7.1 :
   (restauration et détection des mouvements manuels).
 - **v0.9.27** — seuils du panneau lus depuis `const.py`.
 - **v0.9.28** — découpage d'`__init__.py` en modules dédiés.
+- **v0.9.29** — la présence retombe sur « absent » quand plus aucune
+  source n'est fiable : une `person.*` bloquée sur `unknown` ne fait
+  plus sauter l'ouverture programmée.
 
 Le présent document décrit uniquement les évolutions **à venir**.
 
