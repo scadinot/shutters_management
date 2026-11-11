@@ -6,6 +6,8 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le pr
 
 ## [Non publié]
 
+## [0.9.29] — 2026-11-11
+
 ### Corrigé — présence : plus de blocage quand aucune source n'est fiable
 
 Quand toutes les entités de présence configurées passaient à `unknown` ou
@@ -2147,7 +2149,16 @@ Aucun changement de code dans l'intégration. Seules les méta-données (`manife
 - Annulation propre des déclencheurs et des callbacks différés au déchargement / rechargement.
 - Traductions français et anglais.
 
-[Non publié]: https://github.com/scadinot/shutters_management/compare/0.9.20...HEAD
+[Non publié]: https://github.com/scadinot/shutters_management/compare/0.9.29...HEAD
+[0.9.29]: https://github.com/scadinot/shutters_management/compare/0.9.28...0.9.29
+[0.9.28]: https://github.com/scadinot/shutters_management/compare/0.9.27...0.9.28
+[0.9.27]: https://github.com/scadinot/shutters_management/compare/0.9.26...0.9.27
+[0.9.26]: https://github.com/scadinot/shutters_management/compare/0.9.25...0.9.26
+[0.9.25]: https://github.com/scadinot/shutters_management/compare/0.9.24...0.9.25
+[0.9.24]: https://github.com/scadinot/shutters_management/compare/0.9.23...0.9.24
+[0.9.23]: https://github.com/scadinot/shutters_management/compare/0.9.22...0.9.23
+[0.9.22]: https://github.com/scadinot/shutters_management/compare/0.9.21...0.9.22
+[0.9.21]: https://github.com/scadinot/shutters_management/compare/0.9.20...0.9.21
 [0.9.20]: https://github.com/scadinot/shutters_management/compare/0.9.19...0.9.20
 [0.9.19]: https://github.com/scadinot/shutters_management/compare/0.9.18...0.9.19
 [0.9.18]: https://github.com/scadinot/shutters_management/compare/0.9.17...0.9.18

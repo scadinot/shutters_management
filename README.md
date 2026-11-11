@@ -243,11 +243,16 @@ l'algorithme suivant :
 2. Une entité dont l'état est `unavailable` ou `unknown` est ignorée
    (un avertissement est inscrit dans le journal).
 3. Si toutes les entités configurées sont indisponibles, ou si la
-   liste est vide, repli sur toutes les `person.*` du système : la
-   condition est satisfaite si **toutes** sont absentes.
-4. Si aucune `person.*` n'existe : la simulation s'exécute par
-   défaut (« assume away »), un avertissement est inscrit dans le
-   journal.
+   liste est vide, repli sur toutes les `person.*` du système — les
+   états `unavailable` et `unknown` y étant ignorés comme à l'étape
+   2 : la condition est satisfaite si **toutes** les restantes sont
+   absentes.
+4. S'il ne reste aucune source exploitable — aucune `person.*`, ou
+   aucune portant un état connu : la simulation s'exécute par défaut
+   (« assume away »), un avertissement est inscrit dans le journal.
+   Depuis v0.9.29 ; auparavant, une `person.*` bloquée sur `unknown`
+   faisait conclure à une présence et sautait l'action pour toute la
+   journée.
 
 ### Modes par canal
 
