@@ -6,6 +6,27 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le pr
 
 ## [Non publié]
 
+### Corrigé — volets : plus d'attente de 90 secondes sur un volet hors ligne
+
+Quand un volet rapporte `unavailable` — appareil hors du réseau,
+intégration pas encore chargée — Home Assistant écarte silencieusement
+l'entité de l'appel de service : la commande ne lève aucune erreur,
+mais rien ne bouge.
+
+Le planificateur attendait alors les 90 secondes complètes d'un signal
+de progression qui ne pouvait pas arriver, décalant d'autant la suite
+de la séquence. Et le volet était malgré tout nommé dans la
+notification push et dans l'annonce vocale, comme s'il avait été
+actionné — ce qui annonçait un mouvement qui n'avait pas eu lieu.
+
+Les deux modes vérifient désormais la disponibilité avant d'agir : un
+volet indisponible est écarté avec un avertissement explicite, la
+séquence enchaîne immédiatement sur le suivant, et seuls les volets
+réellement commandés figurent dans la notification.
+
+Un volet dont l'état est `unknown` continue d'être commandé : il est
+disponible, seule sa position est indéterminée.
+
 ## [0.9.29] — 2026-11-11
 
 ### Corrigé — présence : plus de blocage quand aucune source n'est fiable

@@ -3,7 +3,11 @@ from __future__ import annotations
 
 import logging
 
-from homeassistant.const import SERVICE_OPEN_COVER
+from homeassistant.const import (
+    SERVICE_OPEN_COVER,
+    STATE_OPEN,
+    STATE_UNAVAILABLE,
+)
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
 from pytest_homeassistant_custom_component.common import (
@@ -15,6 +19,7 @@ from custom_components.shutters_management import ShuttersScheduler
 from custom_components.shutters_management.const import (
     ACTION_CLOSE,
     ACTION_OPEN,
+    CONF_COVERS,
     CONF_NOTIFY_MODE,
     CONF_NOTIFY_SERVICES,
     CONF_PRESENCE_ENTITY,
@@ -395,3 +400,33 @@ async def test_invalid_notify_target_logs_warning(
     messages = [r.message for r in caplog.records if r.levelname == "WARNING"]
     assert any("malformed" in m for m in messages)
     assert any("automation.test" in m for m in messages)
+
+
+async def test_notification_omits_a_cover_reporting_unavailable(
+    hass: HomeAssistant, base_config
+) -> None:
+    """The body must not name a cover Core could not act on.
+
+    ``entity_service_call`` drops entities whose ``available`` is
+    False, so a batched call returns without moving them. Listing them
+    anyway told the user a shutter had moved when it had not —
+    contradicting the promise made by ``_async_call_sequential``'s
+    docstring for the sequential path, and unconditionally true of the
+    batched one, which listed every configured cover.
+    """
+    base_config[CONF_COVERS] = ["cover.offline_one", "cover.ready_one"]
+    async_mock_service(hass, "cover", SERVICE_OPEN_COVER)
+    notify_calls = async_mock_service(hass, "notify", "iphone")
+
+    _, scheduler = await _setup_hub(
+        hass, base_config, notify_services=["notify.iphone"]
+    )
+    hass.states.async_set("cover.offline_one", STATE_UNAVAILABLE)
+    hass.states.async_set("cover.ready_one", STATE_OPEN)
+
+    await scheduler.async_run_now(ACTION_OPEN)
+    await hass.async_block_till_done()
+
+    assert len(notify_calls) == 1
+    body_lines = notify_calls[0].data["message"].splitlines()
+    assert body_lines[1:] == ["cover.ready_one"]
