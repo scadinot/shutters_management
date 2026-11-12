@@ -22,6 +22,7 @@ from homeassistant.const import (
     SERVICE_OPEN_COVER,
     STATE_CLOSED,
     STATE_OPEN,
+    STATE_UNAVAILABLE,
     SUN_EVENT_SUNRISE,
     SUN_EVENT_SUNSET,
 )
@@ -338,7 +339,7 @@ class ShuttersScheduler:
         Two modes, gated by the hub-level ``sequential_covers`` toggle:
 
         * **Parallel** (default): one batched ``cover.<service>`` call on
-          the whole list; HA dispatches immediately, no waiting.
+          the available covers; HA dispatches immediately, no waiting.
         * **Sequential**: shuffle the list, then for each cover issue
           its own ``blocking=True`` call and wait for the cover to
           either report half its travel (``current_position`` past
@@ -371,14 +372,19 @@ class ShuttersScheduler:
             )
             processed = await self._async_call_sequential(service, ordered)
         else:
-            processed = list(covers)
-            await self.hass.services.async_call(
-                "cover",
-                service,
-                {ATTR_ENTITY_ID: processed},
-                blocking=False,
-            )
-            _LOGGER.info("Called cover.%s on %s", service, processed)
+            processed = [
+                entity_id
+                for entity_id in covers
+                if self._is_actionable(entity_id)
+            ]
+            if processed:
+                await self.hass.services.async_call(
+                    "cover",
+                    service,
+                    {ATTR_ENTITY_ID: processed},
+                    blocking=False,
+                )
+                _LOGGER.info("Called cover.%s on %s", service, processed)
 
         # If we got unloaded mid-call (sequential mode aborts on
         # subentry remove / HA shutdown), don't notify or signal: the
@@ -391,15 +397,47 @@ class ShuttersScheduler:
             await self._async_send_notifications(service, processed)
         async_dispatcher_send(self.hass, signal_state_update(self.subentry_id))
 
+    def _is_actionable(self, entity_id: str) -> bool:
+        """Tell whether Home Assistant can act on ``entity_id`` right now.
+
+        Core's ``entity_service_call`` silently drops entities whose
+        ``available`` is False: the call returns without raising *and*
+        without moving anything. Checking first keeps two promises --
+        the sequential queue never waits
+        ``COVER_ACTION_TIMEOUT_SECONDS`` for a progress signal that
+        cannot come, and the notification never names a cover that did
+        not move.
+
+        Only an explicit ``unavailable`` is rejected. Two states are
+        deliberately left alone:
+
+        * ``unknown`` -- such a cover is available and does accept the
+          command; only its position is undetermined.
+        * no state object at all -- the entity is absent from the state
+          machine (deleted, renamed, or its integration not loaded
+          yet). Core cannot serve it either, so the call is futile, but
+          that is a stale-configuration problem of its own rather than
+          an offline device, and reporting it belongs to a separate
+          change.
+        """
+        state = self.hass.states.get(entity_id)
+        if state is not None and state.state == STATE_UNAVAILABLE:
+            _LOGGER.warning(
+                "Cover %s is unavailable; not actioning it", entity_id
+            )
+            return False
+        return True
+
     async def _async_call_sequential(
         self, service: str, ordered: list[str]
     ) -> list[str]:
         """Run ``cover.<service>`` on each cover in the given order, in turn.
 
         ``ordered`` is the already-shuffled list; the caller owns the
-        shuffling. Returns the covers whose service call succeeded, in
-        processing order, so the notification body only lists covers
-        that were actually actioned.
+        shuffling. Returns the covers that were actionable and whose
+        service call succeeded, in processing order, so the
+        notification body only lists covers that were actually
+        actioned.
 
         A failing call (``HomeAssistantError`` such as a device
         communication error, or any exception raised by the cover
@@ -419,6 +457,8 @@ class ShuttersScheduler:
                     "Aborting sequential cover sequence: scheduler unloaded"
                 )
                 return actioned
+            if not self._is_actionable(entity_id):
+                continue
             try:
                 await self.hass.services.async_call(
                     "cover",

@@ -9,6 +9,8 @@ from homeassistant.config_entries import ConfigSubentryData
 from homeassistant.const import (
     SERVICE_CLOSE_COVER,
     SERVICE_OPEN_COVER,
+    STATE_OPEN,
+    STATE_UNAVAILABLE,
     STATE_UNKNOWN,
 )
 from homeassistant.core import HomeAssistant
@@ -33,6 +35,7 @@ from custom_components.shutters_management.const import (
     CONF_OPEN_TIME,
     CONF_ORIENTATION,
     CONF_PRESENCE_ENTITY,
+    CONF_SEQUENTIAL_COVERS,
     CONF_TARGET_POSITION,
     CONF_TYPE,
     DEFAULT_ARC,
@@ -341,3 +344,36 @@ async def test_scheduler_logs_carry_the_submodule_logger_name(
     assert any(
         name.endswith("shutters_management.scheduler") for name in names
     ), names
+
+
+async def test_sequential_skips_a_cover_reporting_unavailable(
+    hass: HomeAssistant, base_config
+) -> None:
+    """An unavailable cover must be skipped, not called and awaited.
+
+    Core's ``entity_service_call`` silently drops entities whose
+    ``available`` is False, so the service call returns without acting
+    and the cover never publishes a progress signal. Calling it anyway
+    cost a full ``COVER_ACTION_TIMEOUT_SECONDS`` of dead wait before
+    the queue moved on. Reproduces the production symptom seen on
+    ``cover.volet_bureau`` while its Shelly was off the network.
+    """
+    base_config[CONF_COVERS] = ["cover.offline_one", "cover.ready_one"]
+    entry = build_hub_with_instance(
+        instance_data=base_config,
+        hub_data={CONF_SEQUENTIAL_COVERS: True},
+    )
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    hass.states.async_set("cover.offline_one", STATE_UNAVAILABLE)
+    hass.states.async_set("cover.ready_one", STATE_OPEN)
+    calls = async_mock_service(hass, "cover", SERVICE_OPEN_COVER)
+
+    subentry_id = get_only_subentry_id(entry)
+    scheduler: ShuttersScheduler = hass.data[DOMAIN][subentry_id]
+    await scheduler.async_run_now(ACTION_OPEN)
+    await hass.async_block_till_done()
+
+    assert [call.data["entity_id"] for call in calls] == ["cover.ready_one"]
